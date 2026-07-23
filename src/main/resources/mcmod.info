@@ -1,0 +1,13 @@
+[
+  {
+    "modid": "qazrlegacy",
+    "name": "Qazr Legacy",
+    "description": "A Forge 1.12.2 client-side port of Qazr Addons.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "https://github.com/bykedie/ay",
+    "authorList": ["bykedie"],
+    "credits": "Ported and rebuilt for Forge 1.12.2",
+    "clientSideOnly": true
+  }
+]
