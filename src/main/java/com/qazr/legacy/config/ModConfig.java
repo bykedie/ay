@@ -21,6 +21,13 @@ public final class ModConfig {
     public static int mineRadius;
     public static int mineDelayTicks;
     public static String[] mineBlocks;
+    public static double meleeRange;
+    public static int meleeDelayTicks;
+    public static boolean meleePlayers;
+    public static boolean meleeHostiles;
+    public static boolean meleeAnimals;
+    public static boolean meleeAutoWeapon;
+    public static String meleePriority;
 
     private ModConfig() {
     }
@@ -49,6 +56,13 @@ public final class ModConfig {
             "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:gold_ore",
             "minecraft:redstone_ore", "minecraft:lapis_ore", "minecraft:diamond_ore", "minecraft:emerald_ore"
         }, "Registry names of blocks to mine.");
+        meleeRange = configuration.getFloat("range", "meleeAura", 4.2F, 1.0F, 6.0F, "Maximum attack distance.");
+        meleeDelayTicks = configuration.getInt("delayTicks", "meleeAura", 1, 0, 20, "Extra ticks between attacks after cooldown is ready.");
+        meleePlayers = configuration.getBoolean("players", "meleeAura", true, "Target players.");
+        meleeHostiles = configuration.getBoolean("hostiles", "meleeAura", true, "Target hostile mobs.");
+        meleeAnimals = configuration.getBoolean("animals", "meleeAura", false, "Target animals.");
+        meleeAutoWeapon = configuration.getBoolean("autoWeapon", "meleeAura", true, "Select the strongest sword or axe in the hotbar.");
+        meleePriority = configuration.getString("priority", "meleeAura", "distance", "Target priority: distance or health.");
         if (configuration.hasChanged()) configuration.save();
     }
 
