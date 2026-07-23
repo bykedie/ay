@@ -11,6 +11,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.item.ItemPickaxe;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -41,11 +42,11 @@ public final class AutoMiner {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.AUTO_MINE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
         if (delay-- > 0) return;
-        BlockPos target = findNearestReachable();
+        MineTarget target = findNearestReachable();
         if (target == null) return;
-        selectBestPickaxe(mc.world.getBlockState(target));
-        face(target);
-        mc.playerController.onPlayerDamageBlock(target, facing(target));
+        selectBestPickaxe(mc.world.getBlockState(target.pos));
+        face(target.pos);
+        mc.playerController.onPlayerDamageBlock(target.pos, target.side);
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         delay = ModConfig.mineDelayTicks;
     }
@@ -76,21 +77,30 @@ public final class AutoMiner {
         return stack.getDestroySpeed(state);
     }
 
-    private BlockPos findNearestReachable() {
+    private MineTarget findNearestReachable() {
         BlockPos origin = mc.player.getPosition();
-        BlockPos best = null;
+        MineTarget best = null;
         double bestDistance = 25.0;
         int radius = ModConfig.mineRadius;
         for (BlockPos pos : BlockPos.getAllInBoxMutable(origin.add(-radius, -radius, -radius), origin.add(radius, radius, radius))) {
             IBlockState state = mc.world.getBlockState(pos);
             if (!targets.contains(state.getBlock())) continue;
             double distance = mc.player.getDistanceSqToCenter(pos);
-            if (distance < bestDistance) {
+            MineTarget visible = visibleTarget(pos);
+            if (visible != null && distance < bestDistance) {
                 bestDistance = distance;
-                best = pos.toImmutable();
+                best = visible;
             }
         }
         return best;
+    }
+
+    private MineTarget visibleTarget(BlockPos pos) {
+        Vec3d eyes = mc.player.getPositionEyes(1.0F);
+        Vec3d center = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+        RayTraceResult hit = mc.world.rayTraceBlocks(eyes, center, false, true, false);
+        if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK || !pos.equals(hit.getBlockPos())) return null;
+        return new MineTarget(pos.toImmutable(), hit.sideHit);
     }
 
     private void face(BlockPos pos) {
@@ -104,10 +114,13 @@ public final class AutoMiner {
         mc.player.rotationPitch = (float) -Math.toDegrees(Math.atan2(y, horizontal));
     }
 
-    private EnumFacing facing(BlockPos pos) {
-        double dx = mc.player.posX - (pos.getX() + 0.5);
-        double dy = mc.player.posY + mc.player.getEyeHeight() - (pos.getY() + 0.5);
-        double dz = mc.player.posZ - (pos.getZ() + 0.5);
-        return EnumFacing.getFacingFromVector((float) dx, (float) dy, (float) dz);
+    private static final class MineTarget {
+        private final BlockPos pos;
+        private final EnumFacing side;
+
+        private MineTarget(BlockPos pos, EnumFacing side) {
+            this.pos = pos;
+            this.side = side;
+        }
     }
 }

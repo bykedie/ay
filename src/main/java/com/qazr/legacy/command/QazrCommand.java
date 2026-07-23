@@ -69,7 +69,7 @@ public final class QazrCommand extends CommandBase {
                 sender.sendMessage(new TextComponentString("[Qazr] creativeTools is disabled."));
                 return;
             }
-            int level = parseInt(args[2], 1, 256);
+            int level = parseInt(args[2], 1, 128);
             int seconds = parseInt(args[3], 1, 3600);
             boolean splash = args.length >= 5 && Boolean.parseBoolean(args[4]);
             sender.sendMessage(new TextComponentString("[Qazr] " + CreativeItems.givePotion(args[1], level, seconds, splash)));

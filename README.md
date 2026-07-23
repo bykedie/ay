@@ -1,0 +1,57 @@
+# Qazr Legacy
+
+Forge 1.12.2 client-side rebuild of Qazr Addons. The original mace mechanics do not exist in Minecraft 1.12.2, so they are represented by configurable sword/axe melee and critical-hit modules.
+
+## Requirements
+
+- Minecraft 1.12.2
+- Forge 14.23.5.2860
+- Java 8
+
+The included wrapper pins Gradle 7.6.1 and ForgeGradle 5.1.77.
+
+## Modules
+
+- `autoGg`: detects local-player kills from chat death messages and sends a delayed configurable response.
+- `autoReply`: responds to a selected player's common chat format with rate limiting.
+- `autoMine`: mines configured, visible ore blocks within normal reach and selects the fastest hotbar pickaxe.
+- `creativeTools`: enables commands that create normal items and NBT custom potions in Creative mode.
+- `meleeAura`: targets visible players, hostile mobs or animals with normal 1.9+ attack cooldown handling and sword/axe selection.
+- `criticals`: sends a short grounded critical movement sequence before sword/axe attacks.
+
+All modules and their detailed settings are stored in `config/qazrlegacy.cfg`.
+
+## Controls And Commands
+
+- `R`: toggle melee aura.
+- `C`: toggle criticals.
+- `M`: toggle auto mine.
+- `/qazr status`
+- `/qazr toggle <module>`
+- `/qazr reload`
+- `/qazr give <item-id> [count] [metadata]`
+- `/qazr potion <effect-id> <level> <seconds> [splash]`
+
+Key bindings can be changed in Minecraft's Controls screen. Item and potion commands require Creative mode and the `creativeTools` module.
+
+## Build And Verification
+
+On Windows:
+
+```powershell
+.\gradlew.bat clean verifyRelease
+```
+
+On Linux or macOS:
+
+```bash
+./gradlew clean verifyRelease
+```
+
+The release artifact is `build/libs/qazr-legacy-1.0.0.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+
+For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
+
+## Scope
+
+This is a client utility mod, not a Meteor addon; Meteor does not support Minecraft 1.12.2. Cross-version packet and item-component code was rewritten against Forge 1.12.2 APIs. Use automation only where server rules allow it.

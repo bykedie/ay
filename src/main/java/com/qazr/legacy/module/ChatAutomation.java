@@ -65,7 +65,8 @@ public final class ChatAutomation {
                 pendingTicks = randomRange(ModConfig.ggMinDelayTicks, ModConfig.ggMaxDelayTicks);
             }
         }
-        if (modules.isEnabled(ModuleId.AUTO_REPLY) && replyCooldown == 0 && ModConfig.replyMessages.length > 0) {
+        if (modules.isEnabled(ModuleId.AUTO_REPLY) && pendingMessage == null
+                && replyCooldown == 0 && ModConfig.replyMessages.length > 0) {
             ChatParser.ChatLine line = ChatParser.parseChatLine(text);
             if (line != null && !line.author.equalsIgnoreCase(mc.player.getName())
                     && (ModConfig.replyTarget.isEmpty() || line.author.equalsIgnoreCase(ModConfig.replyTarget))) {

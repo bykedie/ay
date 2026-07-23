@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:3.0.197'
+        classpath 'net.minecraftforge.gradle:ForgeGradle:5.1.77'
     }
 }
 
@@ -16,6 +16,20 @@ archivesBaseName = 'qazr-legacy'
 
 sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
 
+configurations {
+    forgeUniversal {
+        transitive = false
+    }
+}
+
+configurations.all {
+    // mergetool is needed while ForgeGradle prepares Minecraft, but its ASM 6
+    // dependencies are not valid Forge 1.12 runtime mod candidates.
+    if (name != 'forgeUniversal') {
+        exclude group: 'net.minecraftforge', module: 'mergetool'
+    }
+}
+
 minecraft {
     mappings channel: 'stable', version: '39-1.12'
 
@@ -23,26 +37,30 @@ minecraft {
         client {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'info'
+            mods {
+                qazrlegacy {
+                    source sourceSets.main
+                }
+            }
         }
     }
 }
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2860'
-    testCompile 'junit:junit:4.13.2'
+    forgeUniversal 'net.minecraftforge:forge:1.12.2-14.23.5.2860:universal'
+    testImplementation 'junit:junit:4.13.2'
 }
+
+// Forge 1.12 discovers resources beside class files when loading a source set.
+sourceSets.all { it.output.resourcesDir = it.output.classesDirs.getFiles().iterator().next() }
 
 processResources {
     inputs.property 'version', project.version
     inputs.property 'mcversion', '1.12.2'
 
-    from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod.info'
+    filesMatching('mcmod.info') {
         expand version: project.version, mcversion: '1.12.2'
-    }
-
-    from(sourceSets.main.resources.srcDirs) {
-        exclude 'mcmod.info'
     }
 }
 
@@ -51,3 +69,91 @@ tasks.withType(JavaCompile) {
 }
 
 jar.finalizedBy('reobfJar')
+
+task patchLegacyDevSide(dependsOn: 'prepareRunClient') {
+    doLast {
+        def sidePath = 'net/minecraftforge/fml/relauncher/Side.class'
+        def mapped = configurations.runtimeClasspath.files.find {
+            it.name == 'forge-1.12.2-14.23.5.2860_mapped_stable_39-1.12.jar'
+        }
+        if (mapped == null) throw new GradleException('Cannot locate the mapped Forge development JAR')
+
+        def mappedZip = new java.util.zip.ZipFile(mapped)
+        byte[] mappedSide
+        try {
+            mappedSide = mappedZip.getInputStream(mappedZip.getEntry(sidePath)).bytes
+        } finally {
+            mappedZip.close()
+        }
+        if (!new String(mappedSide, 'ISO-8859-1').contains('BUKKIT')) return
+
+        def universal = configurations.forgeUniversal.singleFile
+        def universalZip = new java.util.zip.ZipFile(universal)
+        byte[] officialSide
+        try {
+            officialSide = universalZip.getInputStream(universalZip.getEntry(sidePath)).bytes
+        } finally {
+            universalZip.close()
+        }
+
+        def replacement = file("${mapped}.qazr-tmp")
+        def input = new java.util.zip.ZipFile(mapped)
+        def output = new java.util.zip.ZipOutputStream(new FileOutputStream(replacement))
+        try {
+            input.entries().each { entry ->
+                def copy = new java.util.zip.ZipEntry(entry.name)
+                copy.time = entry.time
+                output.putNextEntry(copy)
+                output.write(entry.name == sidePath ? officialSide : input.getInputStream(entry).bytes)
+                output.closeEntry()
+            }
+        } finally {
+            output.close()
+            input.close()
+        }
+        java.nio.file.Files.move(replacement.toPath(), mapped.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        println 'Patched Forge legacydev Side enum for the development client'
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'runClient') {
+        dependsOn patchLegacyDevSide
+    }
+}
+
+task verifyRelease(dependsOn: ['test', 'reobfJar']) {
+    doLast {
+        def output = file("${buildDir}/libs/${archivesBaseName}-${version}.jar")
+        if (!output.isFile()) throw new GradleException("Missing release JAR: ${output}")
+
+        def required = [
+            'mcmod.info',
+            'com/qazr/legacy/QazrLegacy.class',
+            'com/qazr/legacy/module/AutoMiner.class',
+            'com/qazr/legacy/module/ChatAutomation.class',
+            'com/qazr/legacy/module/MeleeCombat.class',
+            'com/qazr/legacy/util/CreativeItems.class'
+        ]
+        def zip = new java.util.zip.ZipFile(output)
+        try {
+            required.each { name ->
+                if (zip.getEntry(name) == null) throw new GradleException("Release JAR is missing ${name}")
+            }
+            def metadata = zip.getInputStream(zip.getEntry('mcmod.info')).getText('UTF-8')
+            if (!metadata.contains('\"version\": \"1.0.0\"') || !metadata.contains('\"mcversion\": \"1.12.2\"')) {
+                throw new GradleException('Expanded release metadata is invalid')
+            }
+            def stream = zip.getInputStream(zip.getEntry('com/qazr/legacy/QazrLegacy.class'))
+            byte[] header = new byte[8]
+            if (stream.read(header) != 8) throw new GradleException('Cannot read class header')
+            stream.close()
+            int major = ((header[6] & 0xff) << 8) | (header[7] & 0xff)
+            if (major != 52) throw new GradleException("Expected Java 8 bytecode (52), found ${major}")
+        } finally {
+            zip.close()
+        }
+        println "Verified ${output.name}: Forge 1.12.2 metadata, required classes, Java 8 bytecode"
+    }
+}
