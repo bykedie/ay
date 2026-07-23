@@ -3,6 +3,8 @@ package com.qazr.legacy;
 import com.qazr.legacy.command.QazrCommand;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.module.ModuleManager;
+import com.qazr.legacy.module.AutoMiner;
+import com.qazr.legacy.module.ChatAutomation;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
@@ -31,6 +33,8 @@ public final class QazrLegacy {
         ModConfig.load(event.getSuggestedConfigurationFile());
         modules = new ModuleManager();
         MinecraftForge.EVENT_BUS.register(modules);
+        MinecraftForge.EVENT_BUS.register(new ChatAutomation(modules));
+        MinecraftForge.EVENT_BUS.register(new AutoMiner(modules));
     }
 
     @Mod.EventHandler
