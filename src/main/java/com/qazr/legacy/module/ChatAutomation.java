@@ -12,6 +12,7 @@ import net.minecraft.util.text.ChatType;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.event.world.WorldEvent;
 
 public final class ChatAutomation {
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -31,7 +32,7 @@ public final class ChatAutomation {
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || mc.player == null || mc.world == null) return;
         if (replyCooldown > 0) replyCooldown--;
-        if (++scanTicks >= 20) {
+        if (recentPlayers.isEmpty() || ++scanTicks >= 20) {
             scanTicks = 0;
             recentPlayers.clear();
             for (EntityPlayer player : mc.world.playerEntities) recentPlayers.add(player.getName());
@@ -40,6 +41,16 @@ public final class ChatAutomation {
             mc.player.sendChatMessage(pendingMessage);
             pendingMessage = null;
         }
+    }
+
+    @SubscribeEvent
+    public void onWorldUnload(WorldEvent.Unload event) {
+        if (!event.getWorld().isRemote) return;
+        recentPlayers.clear();
+        pendingMessage = null;
+        pendingTicks = 0;
+        replyCooldown = 0;
+        scanTicks = 0;
     }
 
     @SubscribeEvent

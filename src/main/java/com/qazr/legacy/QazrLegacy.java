@@ -6,6 +6,7 @@ import com.qazr.legacy.module.ModuleManager;
 import com.qazr.legacy.module.AutoMiner;
 import com.qazr.legacy.module.ChatAutomation;
 import com.qazr.legacy.module.MeleeCombat;
+import com.qazr.legacy.control.ClientControls;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
@@ -35,13 +36,18 @@ public final class QazrLegacy {
         modules = new ModuleManager();
         MinecraftForge.EVENT_BUS.register(modules);
         MinecraftForge.EVENT_BUS.register(new ChatAutomation(modules));
-        MinecraftForge.EVENT_BUS.register(new AutoMiner(modules));
+        AutoMiner autoMiner = new AutoMiner(modules);
+        modules.addReloadListener(autoMiner::reloadTargets);
+        MinecraftForge.EVENT_BUS.register(autoMiner);
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         ClientCommandHandler.instance.registerCommand(new QazrCommand(modules));
+        ClientControls controls = new ClientControls(modules);
+        controls.register();
+        MinecraftForge.EVENT_BUS.register(controls);
     }
 
     public ModuleManager getModules() {

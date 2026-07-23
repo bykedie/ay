@@ -11,8 +11,11 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.item.ItemPickaxe;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.event.world.WorldEvent;
 
 public final class AutoMiner {
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -22,6 +25,11 @@ public final class AutoMiner {
 
     public AutoMiner(ModuleManager modules) {
         this.modules = modules;
+        reloadTargets();
+    }
+
+    public void reloadTargets() {
+        targets.clear();
         for (String name : ModConfig.mineBlocks) {
             Block block = Block.REGISTRY.getObject(new ResourceLocation(name));
             if (block != null) targets.add(block);
@@ -35,10 +43,37 @@ public final class AutoMiner {
         if (delay-- > 0) return;
         BlockPos target = findNearestReachable();
         if (target == null) return;
+        selectBestPickaxe(mc.world.getBlockState(target));
         face(target);
         mc.playerController.onPlayerDamageBlock(target, facing(target));
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         delay = ModConfig.mineDelayTicks;
+    }
+
+    @SubscribeEvent
+    public void onWorldUnload(WorldEvent.Unload event) {
+        if (event.getWorld().isRemote) delay = 0;
+    }
+
+    private void selectBestPickaxe(IBlockState state) {
+        int bestSlot = mc.player.inventory.currentItem;
+        float bestSpeed = toolSpeed(mc.player.inventory.getStackInSlot(bestSlot), state);
+        for (int slot = 0; slot < 9; slot++) {
+            float speed = toolSpeed(mc.player.inventory.getStackInSlot(slot), state);
+            if (speed > bestSpeed) {
+                bestSpeed = speed;
+                bestSlot = slot;
+            }
+        }
+        if (bestSlot != mc.player.inventory.currentItem) {
+            mc.player.inventory.currentItem = bestSlot;
+            mc.playerController.updateController();
+        }
+    }
+
+    private float toolSpeed(ItemStack stack, IBlockState state) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof ItemPickaxe)) return -1.0F;
+        return stack.getDestroySpeed(state);
     }
 
     private BlockPos findNearestReachable() {

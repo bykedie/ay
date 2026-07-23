@@ -21,6 +21,7 @@ import net.minecraft.util.EnumHand;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraftforge.event.world.WorldEvent;
 
 public final class MeleeCombat {
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -55,7 +56,15 @@ public final class MeleeCombat {
     @SubscribeEvent
     public void onAttack(AttackEntityEvent event) {
         if (auraAttack || !modules.isEnabled(ModuleId.CRITICALS) || event.getEntityPlayer() != mc.player) return;
+        if (mc.player == null || weaponDamage(mc.player.getHeldItemMainhand()) < 0.0) return;
         sendCriticalSequence();
+    }
+
+    @SubscribeEvent
+    public void onWorldUnload(WorldEvent.Unload event) {
+        if (!event.getWorld().isRemote) return;
+        delay = 0;
+        auraAttack = false;
     }
 
     private EntityLivingBase findTarget() {

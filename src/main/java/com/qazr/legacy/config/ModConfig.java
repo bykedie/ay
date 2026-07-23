@@ -66,6 +66,11 @@ public final class ModConfig {
         if (configuration.hasChanged()) configuration.save();
     }
 
+    public static void reload() {
+        configuration.load();
+        sync();
+    }
+
     public static void saveModule(ModuleId id, boolean enabled) {
         configuration.get("modules", id.key(), enabled).set(enabled);
         configuration.save();

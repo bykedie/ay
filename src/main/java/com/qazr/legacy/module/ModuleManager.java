@@ -4,17 +4,34 @@ import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class ModuleManager {
     private final Map<ModuleId, Boolean> states = new EnumMap<>(ModuleId.class);
+    private final List<Runnable> reloadListeners = new ArrayList<>();
 
     public ModuleManager() {
+        reloadStates();
+    }
+
+    private void reloadStates() {
         states.put(ModuleId.AUTO_GG, ModConfig.autoGg);
         states.put(ModuleId.AUTO_REPLY, ModConfig.autoReply);
         states.put(ModuleId.AUTO_MINE, ModConfig.autoMine);
         states.put(ModuleId.CREATIVE_TOOLS, ModConfig.creativeTools);
         states.put(ModuleId.MELEE_AURA, ModConfig.meleeAura);
         states.put(ModuleId.CRITICALS, ModConfig.criticals);
+    }
+
+    public void reloadConfig() {
+        ModConfig.reload();
+        reloadStates();
+        for (Runnable listener : reloadListeners) listener.run();
+    }
+
+    public void addReloadListener(Runnable listener) {
+        reloadListeners.add(listener);
     }
 
     public boolean isEnabled(ModuleId id) {

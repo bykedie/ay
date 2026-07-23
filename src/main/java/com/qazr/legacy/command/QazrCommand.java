@@ -39,6 +39,11 @@ public final class QazrCommand extends CommandBase {
             sender.sendMessage(new TextComponentString("[Qazr] " + modules.statusLine()));
             return;
         }
+        if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
+            modules.reloadConfig();
+            sender.sendMessage(new TextComponentString("[Qazr] Configuration reloaded."));
+            return;
+        }
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             try {
                 ModuleId id = ModuleId.parse(args[1]);
@@ -50,12 +55,20 @@ public final class QazrCommand extends CommandBase {
             return;
         }
         if (args.length >= 2 && "give".equalsIgnoreCase(args[0])) {
+            if (!modules.isEnabled(ModuleId.CREATIVE_TOOLS)) {
+                sender.sendMessage(new TextComponentString("[Qazr] creativeTools is disabled."));
+                return;
+            }
             int count = args.length >= 3 ? parseInt(args[2], 1, 64) : 1;
             int meta = args.length >= 4 ? parseInt(args[3], 0, Short.MAX_VALUE) : 0;
             sender.sendMessage(new TextComponentString("[Qazr] " + CreativeItems.give(args[1], count, meta)));
             return;
         }
         if (args.length >= 4 && "potion".equalsIgnoreCase(args[0])) {
+            if (!modules.isEnabled(ModuleId.CREATIVE_TOOLS)) {
+                sender.sendMessage(new TextComponentString("[Qazr] creativeTools is disabled."));
+                return;
+            }
             int level = parseInt(args[2], 1, 256);
             int seconds = parseInt(args[3], 1, 3600);
             boolean splash = args.length >= 5 && Boolean.parseBoolean(args[4]);
@@ -67,7 +80,7 @@ public final class QazrCommand extends CommandBase {
 
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, net.minecraft.util.math.BlockPos targetPos) {
-        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "status", "toggle", "give", "potion");
+        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "status", "reload", "toggle", "give", "potion");
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, java.util.Arrays.stream(ModuleId.values()).map(ModuleId::key).toArray(String[]::new));
         }
