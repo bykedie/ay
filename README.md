@@ -2,6 +2,8 @@
 
 Voris Hub is a Forge 1.12.2 client-side utility mod with configurable combat, automation, visualization, and Creative-mode tools.
 
+Maintainer handoff notes are in [`HANDOFF.md`](HANDOFF.md).
+
 ## Requirements
 
 - Minecraft 1.12.2
