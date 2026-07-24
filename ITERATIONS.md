@@ -17,3 +17,4 @@
 - Added a localized in-game module control screen, opened with Right Shift by default.
 - Removed the default R, B, C, and M module bindings while keeping each action available for manual binding.
 - Added Chinese module names and release verification for the packaged language resource and GUI class.
+- Reworked the module screen into an in-world, multi-column ClickGUI with Chinese categories and live states.

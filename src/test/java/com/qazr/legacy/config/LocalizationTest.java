@@ -25,5 +25,8 @@ public class LocalizationTest {
         assertEquals("已开启", translations.getProperty("gui.qazr.enabled"));
         assertEquals("已关闭", translations.getProperty("gui.qazr.disabled"));
         assertEquals("范围", translations.getProperty("command.qazr.range"));
+        assertEquals("战斗", translations.getProperty("gui.qazr.category.combat"));
+        assertEquals("自动化", translations.getProperty("gui.qazr.category.automation"));
+        assertEquals("工具", translations.getProperty("gui.qazr.category.tools"));
     }
 }

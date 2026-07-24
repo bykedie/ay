@@ -13,12 +13,13 @@ import net.minecraftforge.fml.common.gameevent.InputEvent;
 import org.lwjgl.input.Keyboard;
 
 public final class ClientControls {
+    private static final String CATEGORY = "Qazr Legacy 功能设置";
     private final ModuleManager modules;
-    private final KeyBinding menu = new KeyBinding("key.qazr.menu", Keyboard.KEY_RSHIFT, "key.categories.qazr");
-    private final KeyBinding melee = new KeyBinding("key.qazr.module.melee", Keyboard.KEY_NONE, "key.categories.qazr");
-    private final KeyBinding blink = new KeyBinding("key.qazr.module.blink", Keyboard.KEY_NONE, "key.categories.qazr");
-    private final KeyBinding criticals = new KeyBinding("key.qazr.module.criticals", Keyboard.KEY_NONE, "key.categories.qazr");
-    private final KeyBinding mine = new KeyBinding("key.qazr.module.mine", Keyboard.KEY_NONE, "key.categories.qazr");
+    private final KeyBinding menu = new KeyBinding("打开控制面板", Keyboard.KEY_RSHIFT, CATEGORY);
+    private final KeyBinding melee = new KeyBinding("切换自动近战", Keyboard.KEY_NONE, CATEGORY);
+    private final KeyBinding blink = new KeyBinding("切换闪现攻击", Keyboard.KEY_NONE, CATEGORY);
+    private final KeyBinding criticals = new KeyBinding("切换自动暴击", Keyboard.KEY_NONE, CATEGORY);
+    private final KeyBinding mine = new KeyBinding("切换自动挖矿", Keyboard.KEY_NONE, CATEGORY);
 
     public ClientControls(ModuleManager modules) {
         this.modules = modules;
@@ -34,7 +35,9 @@ public final class ClientControls {
 
     @SubscribeEvent
     public void onKey(InputEvent.KeyInputEvent event) {
-        if (menu.isPressed()) Minecraft.getMinecraft().displayGuiScreen(new ModuleControlScreen(modules));
+        if (menu.isPressed()) {
+            Minecraft.getMinecraft().displayGuiScreen(new ModuleControlScreen(modules, menu.getKeyCode()));
+        }
         if (melee.isPressed()) toggle(ModuleId.MELEE_AURA);
         if (blink.isPressed()) toggle(ModuleId.BLINK_STRIKE);
         if (criticals.isPressed()) toggle(ModuleId.CRITICALS);
