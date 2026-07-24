@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.1.0'
+version = '1.2.0'
 group = 'com.qazr.legacy'
 archivesBaseName = 'qazr-legacy'
 
@@ -130,11 +130,13 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
 
         def required = [
             'mcmod.info',
+            'assets/qazrlegacy/lang/zh_cn.lang',
             'com/qazr/legacy/QazrLegacy.class',
             'com/qazr/legacy/module/AutoMiner.class',
             'com/qazr/legacy/module/ChatAutomation.class',
             'com/qazr/legacy/module/MeleeCombat.class',
             'com/qazr/legacy/module/BlinkStrike.class',
+            'com/qazr/legacy/gui/ModuleControlScreen.class',
             'com/qazr/legacy/util/BlinkPath.class',
             'com/qazr/legacy/util/CreativeItems.class'
         ]

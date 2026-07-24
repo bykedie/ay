@@ -11,4 +11,11 @@ public class ModuleIdTest {
         assertEquals(ModuleId.BLINK_STRIKE, ModuleId.parse("blink-strike"));
         assertEquals(ModuleId.CRITICALS, ModuleId.parse("criticals"));
     }
+
+    @Test
+    public void exposesStableTranslationKeysWithoutChangingConfigKeys() {
+        assertEquals("meleeAura", ModuleId.MELEE_AURA.key());
+        assertEquals("module.qazr.meleeAura", ModuleId.MELEE_AURA.translationKey());
+        assertEquals("module.qazr.blinkStrike", ModuleId.BLINK_STRIKE.translationKey());
+    }
 }

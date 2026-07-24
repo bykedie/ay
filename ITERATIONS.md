@@ -11,3 +11,9 @@
 - Refined `meleeAura` range to use the nearest point of each target hitbox and restored a conservative three-block default.
 - Added mutually exclusive `blinkStrike`, a collision-checked packet excursion that attacks near a visible target and retraces its path.
 - Added in-game range commands plus path, diagonal-step, hitbox-distance, and release-contents verification.
+
+## Version 1.2 Control Update
+
+- Added a localized in-game module control screen, opened with Right Shift by default.
+- Removed the default R, B, C, and M module bindings while keeping each action available for manual binding.
+- Added Chinese module names and release verification for the packaged language resource and GUI class.

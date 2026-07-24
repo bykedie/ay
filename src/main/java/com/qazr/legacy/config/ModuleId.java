@@ -19,6 +19,10 @@ public enum ModuleId {
         return key;
     }
 
+    public String translationKey() {
+        return "module.qazr." + key;
+    }
+
     public static ModuleId parse(String raw) {
         String normalized = raw.trim().replace('-', '_').toUpperCase();
         for (ModuleId id : values()) {

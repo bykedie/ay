@@ -6,6 +6,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.resources.I18n;
 
 public final class ModuleManager {
     private final Map<ModuleId, Boolean> states = new EnumMap<>(ModuleId.class);
@@ -65,7 +66,8 @@ public final class ModuleManager {
         StringBuilder text = new StringBuilder();
         for (ModuleId id : ModuleId.values()) {
             if (text.length() > 0) text.append(" | ");
-            text.append(id.key()).append('=').append(isEnabled(id) ? "on" : "off");
+            text.append(I18n.format(id.translationKey())).append('=')
+                .append(I18n.format(isEnabled(id) ? "gui.qazr.enabled" : "gui.qazr.disabled"));
         }
         return text.toString();
     }
