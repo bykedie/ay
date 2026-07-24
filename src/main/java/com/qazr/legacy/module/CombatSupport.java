@@ -1,9 +1,14 @@
 package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.ModConfig;
+import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.util.CombatMath;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.EntityList;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.monster.IMob;
@@ -17,50 +22,69 @@ import net.minecraft.item.ItemSword;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.ResourceLocation;
 
 final class CombatSupport {
     private CombatSupport() {
     }
 
-    static EntityLivingBase findTarget(Minecraft mc, double range, boolean requireVisible) {
-        return findTarget(mc, range, requireVisible, true);
+    static List<EntityLivingBase> findTargets(Minecraft mc, ModuleId module, int limit) {
+        boolean melee = module == ModuleId.MELEE_AURA;
+        if (!melee && module != ModuleId.BLINK_STRIKE) throw new IllegalArgumentException("Unsupported combat module: " + module);
+        double range = melee ? ModConfig.meleeRange : ModConfig.blinkRange;
+        return findTargets(mc, module, range, true, melee, limit);
     }
 
-    static EntityLivingBase findPositionTarget(Minecraft mc, double range, boolean requireVisible) {
-        return findTarget(mc, range, requireVisible, false);
-    }
-
-    private static EntityLivingBase findTarget(Minecraft mc, double range, boolean requireVisible, boolean hitboxRange) {
-        EntityLivingBase best = null;
-        double bestScore = Double.MAX_VALUE;
+    static List<EntityLivingBase> findTargets(Minecraft mc, ModuleId module, double range,
+            boolean requireVisible, boolean hitboxRange, int limit) {
+        List<ScoredTarget> candidates = new ArrayList<>();
         double maxDistanceSq = range * range;
         for (net.minecraft.entity.Entity entity : mc.world.loadedEntityList) {
             if (!(entity instanceof EntityLivingBase)) continue;
             EntityLivingBase living = (EntityLivingBase) entity;
-            if (!canAttack(mc, living, requireVisible)) continue;
+            if (!canAttack(mc, living, module, requireVisible)) continue;
             double distanceSq = hitboxRange
                 ? distanceSqToHitbox(mc.player.getPositionEyes(1.0F), living.getEntityBoundingBox())
                 : mc.player.getDistanceSq(living);
             if (distanceSq > maxDistanceSq) continue;
-            double score = CombatMath.score(distanceSq, living.getHealth(), ModConfig.meleePriority);
-            if (score < bestScore) {
-                bestScore = score;
-                best = living;
-            }
+            String priority = module == ModuleId.MELEE_AURA ? ModConfig.meleePriority : ModConfig.blinkPriority;
+            candidates.add(new ScoredTarget(living, CombatMath.score(distanceSq, living.getHealth(), priority), distanceSq));
         }
-        return best;
+        candidates.sort(Comparator.comparingDouble((ScoredTarget target) -> target.score)
+            .thenComparingDouble(target -> target.distanceSq)
+            .thenComparingInt(target -> target.entity.getEntityId()));
+        int count = Math.min(Math.max(0, limit), candidates.size());
+        List<EntityLivingBase> result = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) result.add(candidates.get(i).entity);
+        return result;
     }
 
-    static boolean canAttack(Minecraft mc, EntityLivingBase target, boolean requireVisible) {
+    static boolean canAttack(Minecraft mc, EntityLivingBase target, ModuleId module, boolean requireVisible) {
         if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) return false;
         if (requireVisible && !mc.player.canEntityBeSeen(target)) return false;
+        boolean melee = module == ModuleId.MELEE_AURA;
         if (target instanceof EntityPlayer) {
             EntityPlayer player = (EntityPlayer) target;
-            return ModConfig.meleePlayers && !player.isSpectator() && !player.capabilities.isCreativeMode
+            boolean players = melee ? ModConfig.meleePlayers : ModConfig.blinkPlayers;
+            return players && !player.isSpectator() && !player.capabilities.isCreativeMode
                 && !mc.player.isOnSameTeam(player);
         }
-        if (target instanceof IMob) return ModConfig.meleeHostiles;
-        return target instanceof EntityAnimal && ModConfig.meleeAnimals;
+        if (isModdedEntity(target)) {
+            ResourceLocation key = EntityList.getKey(target);
+            boolean enabled = melee ? ModConfig.meleeModded : ModConfig.blinkModded;
+            return enabled && key != null && ModConfig.isModEntityEnabled(module, key.toString());
+        }
+        if (target instanceof IMob) return melee ? ModConfig.meleeHostiles : ModConfig.blinkHostiles;
+        return target instanceof EntityAnimal && (melee ? ModConfig.meleeAnimals : ModConfig.blinkAnimals);
+    }
+
+    static boolean isModdedEntity(net.minecraft.entity.Entity entity) {
+        ResourceLocation key = EntityList.getKey(entity);
+        return isModdedRegistry(key);
+    }
+
+    static boolean isModdedRegistry(ResourceLocation key) {
+        return key != null && !"minecraft".equals(key.getNamespace());
     }
 
     static double distanceSqToHitbox(Vec3d point, AxisAlignedBB box) {
@@ -103,5 +127,17 @@ final class CombatSupport {
         double dy = target.posY + target.getEyeHeight() - fromEyes.y;
         double dz = target.posZ - fromEyes.z;
         return new float[] {CombatMath.yaw(dx, dz), CombatMath.pitch(dx, dy, dz)};
+    }
+
+    private static final class ScoredTarget {
+        private final EntityLivingBase entity;
+        private final double score;
+        private final double distanceSq;
+
+        private ScoredTarget(EntityLivingBase entity, double score, double distanceSq) {
+            this.entity = entity;
+            this.score = score;
+            this.distanceSq = distanceSq;
+        }
     }
 }

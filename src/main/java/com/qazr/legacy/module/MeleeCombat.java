@@ -4,6 +4,7 @@ import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
+import java.util.List;
 import net.minecraft.init.MobEffects;
 import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.util.EnumHand;
@@ -28,15 +29,18 @@ public final class MeleeCombat {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.MELEE_AURA)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
         if (delay-- > 0 || mc.player.getCooledAttackStrength(0.0F) < 0.95F) return;
-        EntityLivingBase target = CombatSupport.findTarget(mc, ModConfig.meleeRange, true);
-        if (target == null) return;
+        int targetLimit = ModConfig.meleeMultiTarget ? ModConfig.meleeMaxTargets : 1;
+        List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.MELEE_AURA, targetLimit);
+        if (targets.isEmpty()) return;
         if (ModConfig.meleeAutoWeapon) CombatSupport.selectBestWeapon(mc);
-        face(target);
+        if (ModConfig.meleeRotate) face(targets.get(0));
         if (modules.isEnabled(ModuleId.CRITICALS)) sendCriticalSequence();
         auraAttack = true;
         try {
-            mc.playerController.attackEntity(mc.player, target);
-            mc.player.swingArm(EnumHand.MAIN_HAND);
+            for (EntityLivingBase target : targets) {
+                mc.playerController.attackEntity(mc.player, target);
+                mc.player.swingArm(EnumHand.MAIN_HAND);
+            }
         } finally {
             auraAttack = false;
         }

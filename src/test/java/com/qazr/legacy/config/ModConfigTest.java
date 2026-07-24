@@ -33,6 +33,16 @@ public class ModConfigTest {
         assertEquals(12.0, ModConfig.blinkRange, 0.0);
         assertEquals(4.0, ModConfig.blinkStep, 0.0);
         assertEquals(2.5, ModConfig.blinkAttackDistance, 0.0);
+        assertTrue(ModConfig.meleePlayers);
+        assertTrue(ModConfig.blinkPlayers);
+        assertFalse(ModConfig.meleeRotate);
+        assertFalse(ModConfig.blinkRotate);
+        assertFalse(ModConfig.meleeMultiTarget);
+        assertFalse(ModConfig.blinkMultiTarget);
+        assertFalse(ModConfig.meleeVisualize);
+        assertFalse(ModConfig.blinkVisualize);
+        assertFalse(ModConfig.meleeModded);
+        assertFalse(ModConfig.blinkModded);
     }
 
     @Test
@@ -87,6 +97,52 @@ public class ModConfigTest {
         assertEquals(40, ModConfig.ggMaxDelayTicks);
         assertTrue(ModConfig.meleeAnimals);
         assertEquals("health", ModConfig.meleePriority);
+    }
+
+    @Test
+    public void persistsIndependentModEntitySelections() throws Exception {
+        ModConfig.load(configFile());
+        assertTrue(ModConfig.isModEntityEnabled(ModuleId.MELEE_AURA, "example:boss"));
+        assertFalse(ModConfig.toggleModEntity(ModuleId.MELEE_AURA, "example:boss"));
+        assertTrue(ModConfig.isModEntityEnabled(ModuleId.BLINK_STRIKE, "example:boss"));
+        ModConfig.reload();
+
+        assertFalse(ModConfig.isModEntityEnabled(ModuleId.MELEE_AURA, "example:boss"));
+        assertTrue(ModConfig.isModEntityEnabled(ModuleId.BLINK_STRIKE, "example:boss"));
+        assertTrue(ModConfig.toggleModEntity(ModuleId.MELEE_AURA, "example:boss"));
+    }
+
+    @Test
+    public void persistsIndependentCombatTargetAndPresentationSettings() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.toggle(ModuleSetting.MELEE_ANIMALS);
+        ModConfig.toggle(ModuleSetting.MELEE_ROTATE);
+        ModConfig.toggle(ModuleSetting.MELEE_MULTI);
+        ModConfig.toggle(ModuleSetting.MELEE_VISUALIZE);
+        ModConfig.saveNumber(ModuleSetting.MELEE_MAX_TARGETS, 5.0);
+        ModConfig.toggle(ModuleSetting.BLINK_PLAYERS);
+        ModConfig.toggle(ModuleSetting.BLINK_MODDED);
+        ModConfig.toggle(ModuleSetting.BLINK_ROTATE);
+        ModConfig.toggle(ModuleSetting.BLINK_MULTI);
+        ModConfig.toggle(ModuleSetting.BLINK_VISUALIZE);
+        ModConfig.saveNumber(ModuleSetting.BLINK_MAX_TARGETS, 4.0);
+        ModConfig.cycleChoice(ModuleSetting.BLINK_PRIORITY);
+        ModConfig.reload();
+
+        assertTrue(ModConfig.meleeAnimals);
+        assertTrue(ModConfig.meleeRotate);
+        assertTrue(ModConfig.meleeMultiTarget);
+        assertTrue(ModConfig.meleeVisualize);
+        assertEquals(5, ModConfig.meleeMaxTargets);
+        assertFalse(ModConfig.blinkPlayers);
+        assertTrue(ModConfig.blinkModded);
+        assertTrue(ModConfig.blinkRotate);
+        assertTrue(ModConfig.blinkMultiTarget);
+        assertTrue(ModConfig.blinkVisualize);
+        assertEquals(4, ModConfig.blinkMaxTargets);
+        assertEquals("health", ModConfig.blinkPriority);
+        assertFalse(ModConfig.blinkAnimals);
+        assertFalse(ModConfig.meleeModded);
     }
 
     private File configFile() throws Exception {

@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.3.0'
+version = '1.4.0'
 group = 'com.qazr.legacy'
 archivesBaseName = 'qazr-legacy'
 
@@ -136,6 +136,7 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
             'com/qazr/legacy/module/ChatAutomation.class',
             'com/qazr/legacy/module/MeleeCombat.class',
             'com/qazr/legacy/module/BlinkStrike.class',
+            'com/qazr/legacy/module/CombatTargetRenderer.class',
             'com/qazr/legacy/gui/ModuleControlScreen.class',
             'com/qazr/legacy/config/ModuleSetting.class',
             'com/qazr/legacy/util/BlinkPath.class',

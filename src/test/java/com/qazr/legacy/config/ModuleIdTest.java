@@ -29,8 +29,8 @@ public class ModuleIdTest {
 
     @Test
     public void mapsSettingsToTheirOwningModules() {
-        assertEquals(7, ModuleSetting.forModule(ModuleId.MELEE_AURA).length);
-        assertEquals(5, ModuleSetting.forModule(ModuleId.BLINK_STRIKE).length);
+        assertEquals(12, ModuleSetting.forModule(ModuleId.MELEE_AURA).length);
+        assertEquals(15, ModuleSetting.forModule(ModuleId.BLINK_STRIKE).length);
         assertEquals(0, ModuleSetting.forModule(ModuleId.CRITICALS).length);
         assertTrue(ModuleSetting.MELEE_RANGE.type() == ModuleSetting.Type.NUMBER);
     }

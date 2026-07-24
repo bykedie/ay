@@ -3,6 +3,8 @@ package com.qazr.legacy.control;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.gui.ModuleControlScreen;
 import com.qazr.legacy.module.ModuleManager;
+import java.util.EnumMap;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.text.TextComponentString;
@@ -15,32 +17,40 @@ public final class ClientControls {
     private static final String CATEGORY = "Qazr Legacy 功能设置";
     private final ModuleManager modules;
     private final KeyBinding menu = new KeyBinding("打开控制面板", Keyboard.KEY_RSHIFT, CATEGORY);
-    private final KeyBinding melee = new KeyBinding("切换自动近战", Keyboard.KEY_NONE, CATEGORY);
-    private final KeyBinding blink = new KeyBinding("切换闪现攻击", Keyboard.KEY_NONE, CATEGORY);
-    private final KeyBinding criticals = new KeyBinding("切换自动暴击", Keyboard.KEY_NONE, CATEGORY);
-    private final KeyBinding mine = new KeyBinding("切换自动挖矿", Keyboard.KEY_NONE, CATEGORY);
+    private final Map<ModuleId, KeyBinding> moduleKeys = new EnumMap<>(ModuleId.class);
 
     public ClientControls(ModuleManager modules) {
         this.modules = modules;
+        for (ModuleId id : ModuleId.values()) {
+            moduleKeys.put(id, new KeyBinding("切换" + id.displayName(), Keyboard.KEY_NONE, CATEGORY));
+        }
     }
 
     public void register() {
         ClientRegistry.registerKeyBinding(menu);
-        ClientRegistry.registerKeyBinding(melee);
-        ClientRegistry.registerKeyBinding(blink);
-        ClientRegistry.registerKeyBinding(criticals);
-        ClientRegistry.registerKeyBinding(mine);
+        for (KeyBinding binding : moduleKeys.values()) ClientRegistry.registerKeyBinding(binding);
     }
 
     @SubscribeEvent
     public void onKey(InputEvent.KeyInputEvent event) {
         if (menu.isPressed()) {
-            Minecraft.getMinecraft().displayGuiScreen(new ModuleControlScreen(modules, menu.getKeyCode()));
+            Minecraft.getMinecraft().displayGuiScreen(new ModuleControlScreen(modules, this, menu.getKeyCode()));
         }
-        if (melee.isPressed()) toggle(ModuleId.MELEE_AURA);
-        if (blink.isPressed()) toggle(ModuleId.BLINK_STRIKE);
-        if (criticals.isPressed()) toggle(ModuleId.CRITICALS);
-        if (mine.isPressed()) toggle(ModuleId.AUTO_MINE);
+        for (Map.Entry<ModuleId, KeyBinding> entry : moduleKeys.entrySet()) {
+            if (entry.getValue().isPressed()) toggle(entry.getKey());
+        }
+    }
+
+    public KeyBinding getModuleBinding(ModuleId id) {
+        return moduleKeys.get(id);
+    }
+
+    public void setModuleKey(ModuleId id, int keyCode) {
+        KeyBinding binding = moduleKeys.get(id);
+        if (binding == null) return;
+        binding.setKeyCode(keyCode);
+        KeyBinding.resetKeyBindingArrayAndHash();
+        Minecraft.getMinecraft().gameSettings.saveOptions();
     }
 
     private void toggle(ModuleId id) {

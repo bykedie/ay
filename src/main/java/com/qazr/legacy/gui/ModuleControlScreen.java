@@ -3,13 +3,22 @@ package com.qazr.legacy.gui;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleSetting;
+import com.qazr.legacy.control.ClientControls;
 import com.qazr.legacy.module.ModuleManager;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.EntityList;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.util.ResourceLocation;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 public final class ModuleControlScreen extends GuiScreen {
     private static final int MARGIN = 10;
@@ -39,14 +48,27 @@ public final class ModuleControlScreen extends GuiScreen {
     };
 
     private final ModuleManager modules;
+    private final ClientControls controls;
     private final int menuKeyCode;
     private final EnumSet<ModuleId> expanded = EnumSet.noneOf(ModuleId.class);
     private final Map<ModuleSetting, Double> sliderPreview = new EnumMap<>(ModuleSetting.class);
+    private final Map<ModuleId, Integer> settingScroll = new EnumMap<>(ModuleId.class);
     private ModuleSetting dragging;
+    private ModuleId awaitingKey;
+    private ModuleId entitySelector;
+    private int entityScroll;
+    private final List<ResourceLocation> modEntityTypes = new ArrayList<>();
 
-    public ModuleControlScreen(ModuleManager modules, int menuKeyCode) {
+    public ModuleControlScreen(ModuleManager modules, ClientControls controls, int menuKeyCode) {
         this.modules = modules;
+        this.controls = controls;
         this.menuKeyCode = menuKeyCode;
+        for (ResourceLocation key : EntityList.getEntityNameList()) {
+            Class<? extends net.minecraft.entity.Entity> type = EntityList.getClass(key);
+            if (!"minecraft".equals(key.getNamespace()) && type != null
+                    && EntityLivingBase.class.isAssignableFrom(type)) modEntityTypes.add(key);
+        }
+        modEntityTypes.sort(Comparator.comparing(ResourceLocation::toString));
     }
 
     @Override
@@ -57,31 +79,48 @@ public final class ModuleControlScreen extends GuiScreen {
         fontRenderer.drawStringWithShadow("Qazr Legacy 控制面板", MARGIN, 10, 0xFFFFFF);
 
         for (int i = 0; i < CATEGORIES.length; i++) drawCategory(CATEGORIES[i], i, mouseX, mouseY);
+        if (entitySelector != null) drawEntitySelector(mouseX, mouseY);
         super.drawScreen(mouseX, mouseY, partialTicks);
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
+        if (entitySelector != null) {
+            clickEntitySelector(mouseX, mouseY, mouseButton);
+            return;
+        }
         for (int i = 0; i < CATEGORIES.length; i++) {
             ModuleId selected = moduleAt(CATEGORIES[i], i, mouseX, mouseY);
             if (selected != null) {
                 if (mouseButton == 0) {
                     modules.toggle(selected);
                 } else if (mouseButton == 1) {
-                    if (!expanded.remove(selected)) expanded.add(selected);
+                    if (!expanded.remove(selected)) {
+                        expanded.clear();
+                        expanded.add(selected);
+                        settingScroll.put(selected, 0);
+                    }
                 }
                 return;
             }
             ModuleSetting setting = settingAt(CATEGORIES[i], i, mouseX, mouseY);
-            if (setting != null && mouseButton == 0) {
-                if (setting.type() == ModuleSetting.Type.NUMBER) {
+            if (setting != null) {
+                if (mouseButton == 1 && isModEntitySetting(setting)) {
+                    entitySelector = setting.module();
+                    entityScroll = 0;
+                } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.NUMBER) {
                     dragging = setting;
                     updateSlider(setting, CATEGORIES[i], i, mouseX);
-                } else if (setting.type() == ModuleSetting.Type.TOGGLE) {
+                } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.TOGGLE) {
                     ModConfig.toggle(setting);
-                } else {
+                } else if (mouseButton == 0) {
                     ModConfig.cycleChoice(setting);
                 }
+                return;
+            }
+            ModuleId keyModule = keyBindingAt(CATEGORIES[i], i, mouseX, mouseY);
+            if (keyModule != null && mouseButton == 0) {
+                awaitingKey = keyModule;
                 return;
             }
         }
@@ -114,11 +153,41 @@ public final class ModuleControlScreen extends GuiScreen {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (entitySelector != null) {
+            if (keyCode == Keyboard.KEY_ESCAPE || keyCode == menuKeyCode) entitySelector = null;
+            return;
+        }
+        if (awaitingKey != null) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                awaitingKey = null;
+            } else {
+                controls.setModuleKey(awaitingKey,
+                    keyCode == Keyboard.KEY_DELETE || keyCode == Keyboard.KEY_BACK ? Keyboard.KEY_NONE : keyCode);
+                awaitingKey = null;
+            }
+            return;
+        }
         if (keyCode == Keyboard.KEY_ESCAPE || keyCode == menuKeyCode) {
             mc.displayGuiScreen(null);
             return;
         }
         super.keyTyped(typedChar, keyCode);
+    }
+
+    @Override
+    public void handleMouseInput() throws IOException {
+        super.handleMouseInput();
+        int wheel = Mouse.getEventDWheel();
+        if (wheel == 0) return;
+        if (entitySelector == null) {
+            int mouseX = Mouse.getEventX() * width / mc.displayWidth;
+            int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
+            scrollSettingsAt(mouseX, mouseY, wheel < 0 ? 1 : -1);
+            return;
+        }
+        int visible = entitySelectorBounds().visibleRows;
+        int max = Math.max(0, modEntityTypes.size() - visible);
+        entityScroll = Math.max(0, Math.min(max, entityScroll + (wheel < 0 ? 1 : -1)));
     }
 
     @Override
@@ -156,19 +225,23 @@ public final class ModuleControlScreen extends GuiScreen {
 
     private int drawSettings(ModuleId id, Bounds bounds, int startY, int mouseX, int mouseY) {
         ModuleSetting[] settings = ModuleSetting.forModule(id);
+        int y = drawKeyBinding(id, bounds, startY, mouseX, mouseY);
         if (settings.length == 0) {
-            drawRect(bounds.x + 1, startY, bounds.x + bounds.width, startY + SETTING_HEIGHT, COLOR_SETTING);
-            fontRenderer.drawStringWithShadow("暂无可调参数", bounds.x + 14, startY + 8, COLOR_DISABLED);
-            return startY + SETTING_HEIGHT;
+            drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + SETTING_HEIGHT, COLOR_SETTING);
+            fontRenderer.drawStringWithShadow("暂无其他参数", bounds.x + 14, y + 8, COLOR_DISABLED);
+            return y + SETTING_HEIGHT;
         }
-        int y = startY;
-        for (ModuleSetting setting : settings) {
+        int visible = visibleSettingRows(id);
+        int scroll = settingScroll(id, settings.length, visible);
+        for (int index = scroll; index < settings.length && index < scroll + visible; index++) {
+            ModuleSetting setting = settings[index];
             boolean hovered = inside(mouseX, mouseY, bounds.x, y, bounds.width, SETTING_HEIGHT);
             drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + SETTING_HEIGHT,
                 hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
             int textY = y + 4;
             fontRenderer.drawStringWithShadow(setting.label(), bounds.x + 14, textY, 0xFFE2E2E2);
             String value = settingValue(setting);
+            if (isModEntitySetting(setting)) value += " 右键选择";
             fontRenderer.drawStringWithShadow(value, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value),
                 textY, setting.type() == ModuleSetting.Type.TOGGLE && ModConfig.getToggle(setting)
                     ? COLOR_ENABLED : 0xFFFFFFFF);
@@ -176,6 +249,19 @@ public final class ModuleControlScreen extends GuiScreen {
             y += SETTING_HEIGHT;
         }
         return y;
+    }
+
+    private int drawKeyBinding(ModuleId id, Bounds bounds, int y, int mouseX, int mouseY) {
+        boolean hovered = inside(mouseX, mouseY, bounds.x, y, bounds.width, SETTING_HEIGHT);
+        drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + SETTING_HEIGHT,
+            hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
+        fontRenderer.drawStringWithShadow("绑定按键", bounds.x + 14, y + 8, 0xFFE2E2E2);
+        KeyBinding binding = controls.getModuleBinding(id);
+        String value = awaitingKey == id ? "请按键..."
+            : binding.getKeyCode() == Keyboard.KEY_NONE ? "未绑定" : Keyboard.getKeyName(binding.getKeyCode());
+        fontRenderer.drawStringWithShadow(value, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value),
+            y + 8, awaitingKey == id ? COLOR_ENABLED : 0xFFFFFFFF);
+        return y + SETTING_HEIGHT;
     }
 
     private void drawSlider(ModuleSetting setting, Bounds bounds, int y) {
@@ -187,6 +273,68 @@ public final class ModuleControlScreen extends GuiScreen {
         drawRect(left, sliderY, right, sliderY + 2, COLOR_SLIDER);
         drawRect(left, sliderY, filled, sliderY + 2, COLOR_SLIDER_FILL);
         drawRect(filled - 1, sliderY - 2, filled + 2, sliderY + 4, 0xFFFFFFFF);
+    }
+
+    private void drawEntitySelector(int mouseX, int mouseY) {
+        SelectorBounds bounds = entitySelectorBounds();
+        drawRect(0, 0, width, height, 0x78000000);
+        drawRect(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, 0xF0181A1F);
+        drawRect(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + HEADER_HEIGHT, COLOR_HEADER);
+        String title = entitySelector.displayName() + "：模组实体类型";
+        fontRenderer.drawStringWithShadow(title, bounds.x + 8, bounds.y + 7, 0xFFFFFFFF);
+        fontRenderer.drawStringWithShadow("关闭", bounds.x + bounds.width - 8 - fontRenderer.getStringWidth("关闭"),
+            bounds.y + 7, COLOR_DISABLED);
+        if (modEntityTypes.isEmpty()) {
+            fontRenderer.drawStringWithShadow("当前客户端没有注册第三方活体实体", bounds.x + 10,
+                bounds.y + HEADER_HEIGHT + 12, COLOR_DISABLED);
+            return;
+        }
+        for (int row = 0; row < bounds.visibleRows && entityScroll + row < modEntityTypes.size(); row++) {
+            ResourceLocation key = modEntityTypes.get(entityScroll + row);
+            int y = bounds.y + HEADER_HEIGHT + row * ROW_HEIGHT;
+            boolean hovered = inside(mouseX, mouseY, bounds.x, y, bounds.width, ROW_HEIGHT);
+            boolean enabled = ModConfig.isModEntityEnabled(entitySelector, key.toString());
+            drawRect(bounds.x + 1, y, bounds.x + bounds.width - 1, y + ROW_HEIGHT,
+                hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
+            String name = trimToWidth(key.toString(), bounds.width - 55);
+            fontRenderer.drawStringWithShadow(name, bounds.x + 8, y + 6, 0xFFFFFFFF);
+            String state = enabled ? "选中" : "忽略";
+            fontRenderer.drawStringWithShadow(state, bounds.x + bounds.width - 8 - fontRenderer.getStringWidth(state),
+                y + 6, enabled ? COLOR_ENABLED : COLOR_DISABLED);
+        }
+        String page = Math.min(modEntityTypes.size(), entityScroll + 1) + "-"
+            + Math.min(modEntityTypes.size(), entityScroll + bounds.visibleRows) + " / " + modEntityTypes.size();
+        fontRenderer.drawStringWithShadow(page, bounds.x + 8, bounds.y + bounds.height - 14, COLOR_DISABLED);
+    }
+
+    private void clickEntitySelector(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton != 0) return;
+        SelectorBounds bounds = entitySelectorBounds();
+        if (!inside(mouseX, mouseY, bounds.x, bounds.y, bounds.width, bounds.height)) {
+            entitySelector = null;
+            return;
+        }
+        if (inside(mouseX, mouseY, bounds.x, bounds.y, bounds.width, HEADER_HEIGHT)) {
+            if (mouseX >= bounds.x + bounds.width - 55) entitySelector = null;
+            return;
+        }
+        int row = (mouseY - bounds.y - HEADER_HEIGHT) / ROW_HEIGHT;
+        if (row >= 0 && row < bounds.visibleRows && entityScroll + row < modEntityTypes.size()) {
+            ModConfig.toggleModEntity(entitySelector, modEntityTypes.get(entityScroll + row).toString());
+        }
+    }
+
+    private SelectorBounds entitySelectorBounds() {
+        int panelWidth = Math.min(430, width - 40);
+        int visibleRows = Math.max(1, Math.min(12, (height - 62) / ROW_HEIGHT));
+        int panelHeight = HEADER_HEIGHT + visibleRows * ROW_HEIGHT + 20;
+        return new SelectorBounds((width - panelWidth) / 2, Math.max(20, (height - panelHeight) / 2),
+            panelWidth, panelHeight, visibleRows);
+    }
+
+    private String trimToWidth(String value, int maxWidth) {
+        if (fontRenderer.getStringWidth(value) <= maxWidth) return value;
+        return fontRenderer.trimStringToWidth(value, Math.max(0, maxWidth - fontRenderer.getStringWidth("..."))) + "...";
     }
 
     private ModuleId moduleAt(Category category, int index, int mouseX, int mouseY) {
@@ -205,11 +353,29 @@ public final class ModuleControlScreen extends GuiScreen {
         for (ModuleId id : category.modules) {
             y += ROW_HEIGHT;
             if (expanded.contains(id)) {
-                for (ModuleSetting setting : ModuleSetting.forModule(id)) {
+                y += SETTING_HEIGHT;
+                ModuleSetting[] settings = ModuleSetting.forModule(id);
+                int visible = visibleSettingRows(id);
+                int scroll = settingScroll(id, settings.length, visible);
+                for (int settingIndex = scroll; settingIndex < settings.length && settingIndex < scroll + visible; settingIndex++) {
+                    ModuleSetting setting = settings[settingIndex];
                     if (inside(mouseX, mouseY, bounds.x, y, bounds.width, SETTING_HEIGHT)) return setting;
                     y += SETTING_HEIGHT;
                 }
                 if (ModuleSetting.forModule(id).length == 0) y += SETTING_HEIGHT;
+            }
+        }
+        return null;
+    }
+
+    private ModuleId keyBindingAt(Category category, int index, int mouseX, int mouseY) {
+        Bounds bounds = boundsFor(category, index);
+        int y = bounds.y + HEADER_HEIGHT;
+        for (ModuleId id : category.modules) {
+            y += ROW_HEIGHT;
+            if (expanded.contains(id)) {
+                if (inside(mouseX, mouseY, bounds.x, y, bounds.width, SETTING_HEIGHT)) return id;
+                y += SETTING_HEIGHT + Math.max(1, visibleSettingRows(id)) * SETTING_HEIGHT;
             }
         }
         return null;
@@ -237,7 +403,55 @@ public final class ModuleControlScreen extends GuiScreen {
 
     private int expandedHeight(ModuleId id) {
         if (!expanded.contains(id)) return 0;
-        return Math.max(1, ModuleSetting.forModule(id).length) * SETTING_HEIGHT;
+        return (1 + Math.max(1, visibleSettingRows(id))) * SETTING_HEIGHT;
+    }
+
+    private int visibleSettingRows(ModuleId id) {
+        int total = ModuleSetting.forModule(id).length;
+        if (total == 0) return 1;
+        Category category = categoryFor(id);
+        int baseHeight = HEADER_HEIGHT + category.modules.length * ROW_HEIGHT + SETTING_HEIGHT;
+        int available = Math.max(SETTING_HEIGHT, height - MARGIN - categoryTop(category) - baseHeight);
+        return Math.max(1, Math.min(total, available / SETTING_HEIGHT));
+    }
+
+    private int categoryTop(Category target) {
+        if (width - MARGIN * 2 >= 390) return TITLE_HEIGHT + GAP;
+        int y = TITLE_HEIGHT + GAP;
+        for (Category category : CATEGORIES) {
+            if (category == target) return y;
+            y += HEADER_HEIGHT + category.modules.length * ROW_HEIGHT + GAP;
+        }
+        return y;
+    }
+
+    private int settingScroll(ModuleId id, int total, int visible) {
+        int max = Math.max(0, total - visible);
+        int value = Math.max(0, Math.min(max, settingScroll.getOrDefault(id, 0)));
+        settingScroll.put(id, value);
+        return value;
+    }
+
+    private void scrollSettingsAt(int mouseX, int mouseY, int direction) {
+        for (int i = 0; i < CATEGORIES.length; i++) {
+            Bounds bounds = boundsFor(CATEGORIES[i], i);
+            if (!inside(mouseX, mouseY, bounds.x, bounds.y, bounds.width, bounds.height)) continue;
+            for (ModuleId id : CATEGORIES[i].modules) {
+                if (!expanded.contains(id)) continue;
+                int total = ModuleSetting.forModule(id).length;
+                int visible = visibleSettingRows(id);
+                int current = settingScroll(id, total, visible);
+                settingScroll.put(id, Math.max(0, Math.min(Math.max(0, total - visible), current + direction)));
+                return;
+            }
+        }
+    }
+
+    private static Category categoryFor(ModuleId id) {
+        for (Category category : CATEGORIES) {
+            if (contains(category.modules, id)) return category;
+        }
+        throw new IllegalArgumentException("Unknown module category: " + id);
     }
 
     private void updateSlider(ModuleSetting setting, Category category, int index, int mouseX) {
@@ -257,6 +471,10 @@ public final class ModuleControlScreen extends GuiScreen {
         String number = setting.step() >= 1.0 ? Integer.toString((int) Math.round(value))
             : String.format(java.util.Locale.ROOT, "%.1f", value);
         return number + setting.suffix();
+    }
+
+    private static boolean isModEntitySetting(ModuleSetting setting) {
+        return setting == ModuleSetting.MELEE_MODDED || setting == ModuleSetting.BLINK_MODDED;
     }
 
     private double displayNumber(ModuleSetting setting) {
@@ -301,6 +519,22 @@ public final class ModuleControlScreen extends GuiScreen {
             this.y = y;
             this.width = width;
             this.height = height;
+        }
+    }
+
+    private static final class SelectorBounds {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final int visibleRows;
+
+        private SelectorBounds(int x, int y, int width, int height, int visibleRows) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.visibleRows = visibleRows;
         }
     }
 }

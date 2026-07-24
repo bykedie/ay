@@ -17,12 +17,27 @@ public enum ModuleSetting {
     MELEE_HOSTILES(ModuleId.MELEE_AURA, "攻击敌对生物", Type.TOGGLE),
     MELEE_ANIMALS(ModuleId.MELEE_AURA, "攻击动物", Type.TOGGLE),
     MELEE_AUTO_WEAPON(ModuleId.MELEE_AURA, "自动选择武器", Type.TOGGLE),
+    MELEE_MODDED(ModuleId.MELEE_AURA, "攻击模组实体", Type.TOGGLE),
+    MELEE_ROTATE(ModuleId.MELEE_AURA, "追踪目标视角", Type.TOGGLE),
+    MELEE_MULTI(ModuleId.MELEE_AURA, "多目标攻击", Type.TOGGLE),
+    MELEE_MAX_TARGETS(ModuleId.MELEE_AURA, "最大目标数", Type.NUMBER, 1.0, 5.0, 1.0, " 个"),
+    MELEE_VISUALIZE(ModuleId.MELEE_AURA, "目标可视化", Type.TOGGLE),
     MELEE_PRIORITY(ModuleId.MELEE_AURA, "目标优先级", Type.CHOICE),
     BLINK_RANGE(ModuleId.BLINK_STRIKE, "搜索距离", Type.NUMBER, 3.0, 200.0, 1.0, " 格"),
     BLINK_STEP(ModuleId.BLINK_STRIKE, "分段步长", Type.NUMBER, 1.0, 9.5, 0.1, " 格"),
     BLINK_ATTACK_DISTANCE(ModuleId.BLINK_STRIKE, "攻击位置距离", Type.NUMBER, 1.0, 4.0, 0.1, " 格"),
     BLINK_PREDICT(ModuleId.BLINK_STRIKE, "目标预测", Type.NUMBER, 0.0, 5.0, 1.0, " tick"),
-    BLINK_DELAY(ModuleId.BLINK_STRIKE, "攻击间隔", Type.NUMBER, 1.0, 40.0, 1.0, " tick");
+    BLINK_DELAY(ModuleId.BLINK_STRIKE, "攻击间隔", Type.NUMBER, 1.0, 40.0, 1.0, " tick"),
+    BLINK_PLAYERS(ModuleId.BLINK_STRIKE, "攻击玩家", Type.TOGGLE),
+    BLINK_HOSTILES(ModuleId.BLINK_STRIKE, "攻击敌对生物", Type.TOGGLE),
+    BLINK_ANIMALS(ModuleId.BLINK_STRIKE, "攻击动物", Type.TOGGLE),
+    BLINK_MODDED(ModuleId.BLINK_STRIKE, "攻击模组实体", Type.TOGGLE),
+    BLINK_AUTO_WEAPON(ModuleId.BLINK_STRIKE, "自动选择武器", Type.TOGGLE),
+    BLINK_ROTATE(ModuleId.BLINK_STRIKE, "追踪目标视角", Type.TOGGLE),
+    BLINK_MULTI(ModuleId.BLINK_STRIKE, "多目标攻击", Type.TOGGLE),
+    BLINK_MAX_TARGETS(ModuleId.BLINK_STRIKE, "最大目标数", Type.NUMBER, 1.0, 5.0, 1.0, " 个"),
+    BLINK_VISUALIZE(ModuleId.BLINK_STRIKE, "目标可视化", Type.TOGGLE),
+    BLINK_PRIORITY(ModuleId.BLINK_STRIKE, "目标优先级", Type.CHOICE);
 
     public enum Type {
         NUMBER, TOGGLE, CHOICE

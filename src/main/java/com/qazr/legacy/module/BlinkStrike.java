@@ -37,17 +37,29 @@ public final class BlinkStrike {
         }
         if (mc.player.getCooledAttackStrength(0.0F) < 0.95F) return;
 
-        EntityLivingBase target = CombatSupport.findPositionTarget(mc, ModConfig.blinkRange, true);
-        if (target == null) return;
-        if (ModConfig.meleeAutoWeapon) CombatSupport.selectBestWeapon(mc);
+        int targetLimit = ModConfig.blinkMultiTarget ? ModConfig.blinkMaxTargets : 1;
+        List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE, targetLimit);
+        if (targets.isEmpty()) return;
+        if (ModConfig.blinkAutoWeapon) CombatSupport.selectBestWeapon(mc);
+        if (ModConfig.blinkRotate) face(targets.get(0));
 
         BlinkPath.Point origin = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
+        boolean attacked = false;
+        for (EntityLivingBase target : targets) {
+            if (strike(target, origin)) attacked = true;
+        }
+        if (attacked) {
+            mc.player.resetCooldown();
+            delay = ModConfig.blinkDelayTicks;
+        } else {
+            delay = Math.max(2, ModConfig.blinkDelayTicks / 2);
+        }
+    }
+
+    private boolean strike(EntityLivingBase target, BlinkPath.Point origin) {
         BlinkPath.Point destination = destinationFor(target, origin);
         List<BlinkPath.Point> path = BlinkPath.interpolate(origin, destination, ModConfig.blinkStep);
-        if (!isPathClear(origin, destination)) {
-            delay = Math.max(2, ModConfig.blinkDelayTicks / 2);
-            return;
-        }
+        if (!isPathClear(origin, destination)) return false;
 
         int sent = 0;
         try {
@@ -61,14 +73,13 @@ public final class BlinkStrike {
             sendRemoteCritical(destination);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
-            mc.player.resetCooldown();
         } finally {
             List<BlinkPath.Point> returnPath = BlinkPath.returnPath(origin, path, sent);
             for (int i = 0; i < returnPath.size(); i++) {
                 sendPosition(returnPath.get(i), i == returnPath.size() - 1 && mc.player.onGround);
             }
         }
-        delay = ModConfig.blinkDelayTicks;
+        return true;
     }
 
     @SubscribeEvent
@@ -83,6 +94,12 @@ public final class BlinkStrike {
         BlinkPath.Point predicted = new BlinkPath.Point(predictedX, predictedY, predictedZ);
         BlinkPath.Point limited = BlinkPath.limitDistance(origin, predicted, ModConfig.blinkRange);
         return BlinkPath.approach(origin, limited, ModConfig.blinkAttackDistance);
+    }
+
+    private void face(EntityLivingBase target) {
+        float[] rotations = CombatSupport.rotations(mc.player.getPositionEyes(1.0F), target);
+        mc.player.rotationYaw = rotations[0];
+        mc.player.rotationPitch = rotations[1];
     }
 
     private boolean isPathClear(BlinkPath.Point origin, BlinkPath.Point destination) {
