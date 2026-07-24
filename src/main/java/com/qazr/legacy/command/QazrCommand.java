@@ -1,6 +1,7 @@
 package com.qazr.legacy.command;
 
 import com.qazr.legacy.config.ModuleId;
+import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.module.ModuleManager;
 import com.qazr.legacy.util.CreativeItems;
 import java.util.Collections;
@@ -25,7 +26,7 @@ public final class QazrCommand extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/qazr [status|toggle <module>|give <id> [count] [meta]|potion <effect> <level> <seconds> [splash]]";
+        return "/qazr [status|toggle <module>|range <meleeAura|blinkStrike> [blocks]|give <id> [count] [meta]|potion <effect> <level> <seconds> [splash]]";
     }
 
     @Override
@@ -49,6 +50,22 @@ public final class QazrCommand extends CommandBase {
                 ModuleId id = ModuleId.parse(args[1]);
                 boolean enabled = modules.toggle(id);
                 sender.sendMessage(new TextComponentString("[Qazr] " + id.key() + " = " + (enabled ? "on" : "off")));
+            } catch (IllegalArgumentException ex) {
+                sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
+            }
+            return;
+        }
+        if (args.length >= 2 && args.length <= 3 && "range".equalsIgnoreCase(args[0])) {
+            try {
+                ModuleId id = ModuleId.parse(args[1]);
+                double min = id == ModuleId.MELEE_AURA ? 1.0 : 3.0;
+                double max = id == ModuleId.MELEE_AURA ? 6.0 : 200.0;
+                if (id != ModuleId.MELEE_AURA && id != ModuleId.BLINK_STRIKE) {
+                    throw new IllegalArgumentException("Module has no attack range: " + id.key());
+                }
+                double value = args.length == 2 ? ModConfig.getRange(id) : parseDouble(args[2], min, max);
+                if (args.length == 3) ModConfig.saveRange(id, value);
+                sender.sendMessage(new TextComponentString("[Qazr] " + id.key() + " range = " + value));
             } catch (IllegalArgumentException ex) {
                 sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
             }
@@ -80,9 +97,12 @@ public final class QazrCommand extends CommandBase {
 
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, net.minecraft.util.math.BlockPos targetPos) {
-        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "status", "reload", "toggle", "give", "potion");
+        if (args.length == 1) return getListOfStringsMatchingLastWord(args, "status", "reload", "toggle", "range", "give", "potion");
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, java.util.Arrays.stream(ModuleId.values()).map(ModuleId::key).toArray(String[]::new));
+        }
+        if (args.length == 2 && "range".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, ModuleId.MELEE_AURA.key(), ModuleId.BLINK_STRIKE.key());
         }
         return Collections.emptyList();
     }

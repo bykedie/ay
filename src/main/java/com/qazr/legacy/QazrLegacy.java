@@ -6,6 +6,7 @@ import com.qazr.legacy.module.ModuleManager;
 import com.qazr.legacy.module.AutoMiner;
 import com.qazr.legacy.module.ChatAutomation;
 import com.qazr.legacy.module.MeleeCombat;
+import com.qazr.legacy.module.BlinkStrike;
 import com.qazr.legacy.control.ClientControls;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -23,7 +24,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 public final class QazrLegacy {
     public static final String MOD_ID = "qazrlegacy";
     public static final String NAME = "Qazr Legacy";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.1.0";
 
     @Mod.Instance(MOD_ID)
     public static QazrLegacy instance;
@@ -40,6 +41,7 @@ public final class QazrLegacy {
         modules.addReloadListener(autoMiner::reloadTargets);
         MinecraftForge.EVENT_BUS.register(autoMiner);
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
+        MinecraftForge.EVENT_BUS.register(new BlinkStrike(modules));
     }
 
     @Mod.EventHandler

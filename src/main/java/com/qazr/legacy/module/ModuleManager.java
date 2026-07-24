@@ -21,7 +21,12 @@ public final class ModuleManager {
         states.put(ModuleId.AUTO_MINE, ModConfig.autoMine);
         states.put(ModuleId.CREATIVE_TOOLS, ModConfig.creativeTools);
         states.put(ModuleId.MELEE_AURA, ModConfig.meleeAura);
+        states.put(ModuleId.BLINK_STRIKE, ModConfig.blinkStrike);
         states.put(ModuleId.CRITICALS, ModConfig.criticals);
+        if (isEnabled(ModuleId.MELEE_AURA) && isEnabled(ModuleId.BLINK_STRIKE)) {
+            states.put(ModuleId.BLINK_STRIKE, false);
+            ModConfig.saveModule(ModuleId.BLINK_STRIKE, false);
+        }
     }
 
     public void reloadConfig() {
@@ -43,9 +48,17 @@ public final class ModuleManager {
     }
 
     public boolean setEnabled(ModuleId id, boolean enabled) {
+        if (enabled && id == ModuleId.MELEE_AURA) disableCombatPeer(ModuleId.BLINK_STRIKE);
+        if (enabled && id == ModuleId.BLINK_STRIKE) disableCombatPeer(ModuleId.MELEE_AURA);
         states.put(id, enabled);
         ModConfig.saveModule(id, enabled);
         return enabled;
+    }
+
+    private void disableCombatPeer(ModuleId id) {
+        if (!isEnabled(id)) return;
+        states.put(id, false);
+        ModConfig.saveModule(id, false);
     }
 
     public String statusLine() {

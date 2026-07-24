@@ -2,22 +2,12 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
-import com.qazr.legacy.util.CombatMath;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.attributes.AttributeModifier;
-import net.minecraft.inventory.EntityEquipmentSlot;
-import net.minecraft.entity.monster.IMob;
-import net.minecraft.entity.passive.EntityAnimal;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.MobEffects;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemAxe;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemSword;
 import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -38,9 +28,9 @@ public final class MeleeCombat {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.MELEE_AURA)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
         if (delay-- > 0 || mc.player.getCooledAttackStrength(0.0F) < 0.95F) return;
-        EntityLivingBase target = findTarget();
+        EntityLivingBase target = CombatSupport.findTarget(mc, ModConfig.meleeRange, true);
         if (target == null) return;
-        if (ModConfig.meleeAutoWeapon) selectBestWeapon();
+        if (ModConfig.meleeAutoWeapon) CombatSupport.selectBestWeapon(mc);
         face(target);
         if (modules.isEnabled(ModuleId.CRITICALS)) sendCriticalSequence();
         auraAttack = true;
@@ -56,7 +46,7 @@ public final class MeleeCombat {
     @SubscribeEvent
     public void onAttack(AttackEntityEvent event) {
         if (auraAttack || !modules.isEnabled(ModuleId.CRITICALS) || event.getEntityPlayer() != mc.player) return;
-        if (mc.player == null || weaponDamage(mc.player.getHeldItemMainhand()) < 0.0) return;
+        if (mc.player == null || CombatSupport.weaponDamage(mc.player.getHeldItemMainhand()) < 0.0) return;
         sendCriticalSequence();
     }
 
@@ -67,71 +57,11 @@ public final class MeleeCombat {
         auraAttack = false;
     }
 
-    private EntityLivingBase findTarget() {
-        EntityLivingBase best = null;
-        double bestScore = Double.MAX_VALUE;
-        double maxDistance = ModConfig.meleeRange * ModConfig.meleeRange;
-        for (net.minecraft.entity.Entity entity : mc.world.loadedEntityList) {
-            if (!(entity instanceof EntityLivingBase)) continue;
-            EntityLivingBase living = (EntityLivingBase) entity;
-            if (!canAttack(living)) continue;
-            double distance = mc.player.getDistanceSq(living);
-            if (distance > maxDistance) continue;
-            double score = CombatMath.score(distance, living.getHealth(), ModConfig.meleePriority);
-            if (score < bestScore) {
-                bestScore = score;
-                best = living;
-            }
-        }
-        return best;
-    }
-
-    private boolean canAttack(EntityLivingBase target) {
-        if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) return false;
-        if (!mc.player.canEntityBeSeen(target)) return false;
-        if (target instanceof EntityPlayer) {
-            EntityPlayer player = (EntityPlayer) target;
-            return ModConfig.meleePlayers && !player.isSpectator() && !player.capabilities.isCreativeMode
-                && !mc.player.isOnSameTeam(player);
-        }
-        if (target instanceof IMob) return ModConfig.meleeHostiles;
-        return target instanceof EntityAnimal && ModConfig.meleeAnimals;
-    }
-
-    private void selectBestWeapon() {
-        int bestSlot = mc.player.inventory.currentItem;
-        double bestDamage = weaponDamage(mc.player.inventory.getStackInSlot(bestSlot));
-        for (int slot = 0; slot < 9; slot++) {
-            double damage = weaponDamage(mc.player.inventory.getStackInSlot(slot));
-            if (damage > bestDamage) {
-                bestDamage = damage;
-                bestSlot = slot;
-            }
-        }
-        if (bestSlot != mc.player.inventory.currentItem) {
-            mc.player.inventory.currentItem = bestSlot;
-            mc.playerController.updateController();
-        }
-    }
-
-    private double weaponDamage(ItemStack stack) {
-        if (stack.isEmpty()) return -1.0;
-        Item item = stack.getItem();
-        if (!(item instanceof ItemSword) && !(item instanceof ItemAxe)) return -1.0;
-        double damage = 0.0;
-        for (AttributeModifier modifier : stack.getAttributeModifiers(EntityEquipmentSlot.MAINHAND)
-                .get(SharedMonsterAttributes.ATTACK_DAMAGE.getName())) {
-            damage += modifier.getAmount();
-        }
-        return damage;
-    }
-
     private void face(EntityLivingBase target) {
-        double dx = target.posX - mc.player.posX;
-        double dy = target.posY + target.getEyeHeight() - (mc.player.posY + mc.player.getEyeHeight());
-        double dz = target.posZ - mc.player.posZ;
-        mc.player.rotationYaw = CombatMath.yaw(dx, dz);
-        mc.player.rotationPitch = CombatMath.pitch(dx, dy, dz);
+        Vec3d eyes = mc.player.getPositionEyes(1.0F);
+        float[] rotations = CombatSupport.rotations(eyes, target);
+        mc.player.rotationYaw = rotations[0];
+        mc.player.rotationPitch = rotations[1];
     }
 
     private void sendCriticalSequence() {

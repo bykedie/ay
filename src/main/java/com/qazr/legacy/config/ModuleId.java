@@ -6,6 +6,7 @@ public enum ModuleId {
     AUTO_MINE("autoMine"),
     CREATIVE_TOOLS("creativeTools"),
     MELEE_AURA("meleeAura"),
+    BLINK_STRIKE("blinkStrike"),
     CRITICALS("criticals");
 
     private final String key;

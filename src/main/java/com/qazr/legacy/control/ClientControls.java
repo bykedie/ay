@@ -13,6 +13,7 @@ import org.lwjgl.input.Keyboard;
 public final class ClientControls {
     private final ModuleManager modules;
     private final KeyBinding melee = new KeyBinding("key.qazr.melee", Keyboard.KEY_R, "key.categories.qazr");
+    private final KeyBinding blink = new KeyBinding("key.qazr.blink", Keyboard.KEY_B, "key.categories.qazr");
     private final KeyBinding criticals = new KeyBinding("key.qazr.criticals", Keyboard.KEY_C, "key.categories.qazr");
     private final KeyBinding mine = new KeyBinding("key.qazr.mine", Keyboard.KEY_M, "key.categories.qazr");
 
@@ -22,6 +23,7 @@ public final class ClientControls {
 
     public void register() {
         ClientRegistry.registerKeyBinding(melee);
+        ClientRegistry.registerKeyBinding(blink);
         ClientRegistry.registerKeyBinding(criticals);
         ClientRegistry.registerKeyBinding(mine);
     }
@@ -29,6 +31,7 @@ public final class ClientControls {
     @SubscribeEvent
     public void onKey(InputEvent.KeyInputEvent event) {
         if (melee.isPressed()) toggle(ModuleId.MELEE_AURA);
+        if (blink.isPressed()) toggle(ModuleId.BLINK_STRIKE);
         if (criticals.isPressed()) toggle(ModuleId.CRITICALS);
         if (mine.isPressed()) toggle(ModuleId.AUTO_MINE);
     }

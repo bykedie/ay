@@ -8,6 +8,7 @@ public class ModuleIdTest {
     public void parsesDisplayAndConfigNames() {
         assertEquals(ModuleId.AUTO_GG, ModuleId.parse("auto-gg"));
         assertEquals(ModuleId.MELEE_AURA, ModuleId.parse("meleeAura"));
+        assertEquals(ModuleId.BLINK_STRIKE, ModuleId.parse("blink-strike"));
         assertEquals(ModuleId.CRITICALS, ModuleId.parse("criticals"));
     }
 }
