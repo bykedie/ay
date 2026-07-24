@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
@@ -59,6 +60,25 @@ final class CombatSupport {
         return result;
     }
 
+    static List<EntityLivingBase> findVisualizationTargets(Minecraft mc, double range, int limit) {
+        List<EntityLivingBase> result = new ArrayList<>();
+        double maxDistanceSq = range * range;
+        for (net.minecraft.entity.Entity entity : mc.world.loadedEntityList) {
+            if (!(entity instanceof EntityLivingBase)) continue;
+            EntityLivingBase target = (EntityLivingBase) entity;
+            if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) continue;
+            if (target instanceof EntityPlayer) {
+                EntityPlayer player = (EntityPlayer) target;
+                if (player.isSpectator() || player.capabilities.isCreativeMode || mc.player.isOnSameTeam(player)) continue;
+            }
+            if (mc.player.getDistanceSq(target) <= maxDistanceSq) result.add(target);
+        }
+        result.sort(Comparator.comparingDouble((EntityLivingBase target) -> mc.player.getDistanceSq(target))
+            .thenComparingInt(EntityLivingBase::getEntityId));
+        if (result.size() > limit) return new ArrayList<>(result.subList(0, limit));
+        return result;
+    }
+
     static boolean canAttack(Minecraft mc, EntityLivingBase target, ModuleId module, boolean requireVisible) {
         if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) return false;
         if (requireVisible && !mc.player.canEntityBeSeen(target)) return false;
@@ -75,7 +95,8 @@ final class CombatSupport {
             return enabled && key != null && ModConfig.isModEntityEnabled(module, key.toString());
         }
         if (target instanceof IMob) return melee ? ModConfig.meleeHostiles : ModConfig.blinkHostiles;
-        return target instanceof EntityAnimal && (melee ? ModConfig.meleeAnimals : ModConfig.blinkAnimals);
+        if (target instanceof EntityAnimal) return melee ? ModConfig.meleeAnimals : ModConfig.blinkAnimals;
+        return target instanceof EntityLiving && (melee ? ModConfig.meleePeaceful : ModConfig.blinkPeaceful);
     }
 
     static boolean isModdedEntity(net.minecraft.entity.Entity entity) {

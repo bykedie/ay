@@ -21,3 +21,9 @@
 - Embedded visible Chinese labels in code so legacy clients cannot expose untranslated resource keys.
 - Added right-click module drawers with persistent sliders, toggles, and target-priority controls.
 - Split melee and blink targeting, added optional camera rotation, multi-target attacks, target boxes, per-module key binding, and selectable mod entity types.
+
+## Version 1.5 Messaging And Visualization Update
+
+- Added five editable random message slots to automatic GG and reply automation.
+- Added peaceful-target filters and raised both combat multi-target limits to 50.
+- Added an independent target visualizer with skeleton, box and ray switches plus visible/obstructed colors.

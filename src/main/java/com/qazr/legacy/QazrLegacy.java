@@ -25,7 +25,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 public final class QazrLegacy {
     public static final String MOD_ID = "qazrlegacy";
     public static final String NAME = "Qazr Legacy";
-    public static final String VERSION = "1.4.0";
+    public static final String VERSION = "1.5.0";
 
     @Mod.Instance(MOD_ID)
     public static QazrLegacy instance;

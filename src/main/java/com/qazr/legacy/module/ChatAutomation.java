@@ -59,21 +59,22 @@ public final class ChatAutomation {
         String text = event.getMessage().getUnformattedText();
         if (modules.isEnabled(ModuleId.AUTO_GG) && pendingMessage == null) {
             String victim = ChatParser.findKilledPlayer(text, mc.player.getName(), recentPlayers);
-            if (!victim.isEmpty() && ModConfig.ggMessages.length > 0) {
-                String template = ModConfig.ggMessages[random.nextInt(ModConfig.ggMessages.length)];
+            String template = randomTemplate(ModConfig.ggMessages);
+            if (!victim.isEmpty() && template != null) {
                 pendingMessage = template.replace("{player}", victim);
                 pendingTicks = randomRange(ModConfig.ggMinDelayTicks, ModConfig.ggMaxDelayTicks);
             }
         }
-        if (modules.isEnabled(ModuleId.AUTO_REPLY) && pendingMessage == null
-                && replyCooldown == 0 && ModConfig.replyMessages.length > 0) {
+        if (modules.isEnabled(ModuleId.AUTO_REPLY) && pendingMessage == null && replyCooldown == 0) {
             ChatParser.ChatLine line = ChatParser.parseChatLine(text);
             if (line != null && !line.author.equalsIgnoreCase(mc.player.getName())
                     && (ModConfig.replyTarget.isEmpty() || line.author.equalsIgnoreCase(ModConfig.replyTarget))) {
-                String template = ModConfig.replyMessages[random.nextInt(ModConfig.replyMessages.length)];
-                pendingMessage = template.replace("{player}", line.author);
-                pendingTicks = 10;
-                replyCooldown = ModConfig.replyCooldownTicks;
+                String template = randomTemplate(ModConfig.replyMessages);
+                if (template != null) {
+                    pendingMessage = template.replace("{player}", line.author);
+                    pendingTicks = 10;
+                    replyCooldown = ModConfig.replyCooldownTicks;
+                }
             }
         }
     }
@@ -81,5 +82,13 @@ public final class ChatAutomation {
     private int randomRange(int min, int max) {
         if (max <= min) return min;
         return min + random.nextInt(max - min + 1);
+    }
+
+    private String randomTemplate(String[] messages) {
+        List<String> available = new ArrayList<>();
+        for (String message : messages) {
+            if (message != null && !message.trim().isEmpty()) available.add(message.trim());
+        }
+        return available.isEmpty() ? null : available.get(random.nextInt(available.size()));
     }
 }

@@ -43,6 +43,15 @@ public class ModConfigTest {
         assertFalse(ModConfig.blinkVisualize);
         assertFalse(ModConfig.meleeModded);
         assertFalse(ModConfig.blinkModded);
+        assertFalse(ModConfig.meleePeaceful);
+        assertFalse(ModConfig.blinkPeaceful);
+        assertFalse(ModConfig.targetVisualizer);
+        assertTrue(ModConfig.targetSkeleton);
+        assertTrue(ModConfig.targetBox);
+        assertFalse(ModConfig.targetRays);
+        assertEquals(64.0, ModConfig.targetVisualizerRange, 0.0);
+        assertEquals(5, ModConfig.ggMessages.length);
+        assertEquals(5, ModConfig.replyMessages.length);
     }
 
     @Test
@@ -119,13 +128,15 @@ public class ModConfigTest {
         ModConfig.toggle(ModuleSetting.MELEE_ROTATE);
         ModConfig.toggle(ModuleSetting.MELEE_MULTI);
         ModConfig.toggle(ModuleSetting.MELEE_VISUALIZE);
-        ModConfig.saveNumber(ModuleSetting.MELEE_MAX_TARGETS, 5.0);
+        ModConfig.toggle(ModuleSetting.MELEE_PEACEFUL);
+        ModConfig.saveNumber(ModuleSetting.MELEE_MAX_TARGETS, 50.0);
         ModConfig.toggle(ModuleSetting.BLINK_PLAYERS);
         ModConfig.toggle(ModuleSetting.BLINK_MODDED);
         ModConfig.toggle(ModuleSetting.BLINK_ROTATE);
         ModConfig.toggle(ModuleSetting.BLINK_MULTI);
         ModConfig.toggle(ModuleSetting.BLINK_VISUALIZE);
-        ModConfig.saveNumber(ModuleSetting.BLINK_MAX_TARGETS, 4.0);
+        ModConfig.toggle(ModuleSetting.BLINK_PEACEFUL);
+        ModConfig.saveNumber(ModuleSetting.BLINK_MAX_TARGETS, 49.0);
         ModConfig.cycleChoice(ModuleSetting.BLINK_PRIORITY);
         ModConfig.reload();
 
@@ -133,16 +144,41 @@ public class ModConfigTest {
         assertTrue(ModConfig.meleeRotate);
         assertTrue(ModConfig.meleeMultiTarget);
         assertTrue(ModConfig.meleeVisualize);
-        assertEquals(5, ModConfig.meleeMaxTargets);
+        assertTrue(ModConfig.meleePeaceful);
+        assertEquals(50, ModConfig.meleeMaxTargets);
         assertFalse(ModConfig.blinkPlayers);
         assertTrue(ModConfig.blinkModded);
         assertTrue(ModConfig.blinkRotate);
         assertTrue(ModConfig.blinkMultiTarget);
         assertTrue(ModConfig.blinkVisualize);
-        assertEquals(4, ModConfig.blinkMaxTargets);
+        assertTrue(ModConfig.blinkPeaceful);
+        assertEquals(49, ModConfig.blinkMaxTargets);
         assertEquals("health", ModConfig.blinkPriority);
         assertFalse(ModConfig.blinkAnimals);
         assertFalse(ModConfig.meleeModded);
+    }
+
+    @Test
+    public void persistsFiveEditableMessagesAndVisualizerSettings() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.saveGgMessages(new String[] {"a", "b", "c", "d", "e"});
+        ModConfig.saveReplySettings("Alex", new String[] {"1", "2", "3", "4", "5"});
+        ModConfig.saveModule(ModuleId.TARGET_VISUALIZER, true);
+        ModConfig.toggle(ModuleSetting.TARGET_SKELETON);
+        ModConfig.toggle(ModuleSetting.TARGET_BOX);
+        ModConfig.toggle(ModuleSetting.TARGET_RAYS);
+        ModConfig.saveNumber(ModuleSetting.TARGET_RANGE, 96.0);
+        ModConfig.reload();
+
+        assertEquals(5, ModConfig.ggMessages.length);
+        assertEquals("e", ModConfig.ggMessages[4]);
+        assertEquals("Alex", ModConfig.replyTarget);
+        assertEquals("5", ModConfig.replyMessages[4]);
+        assertTrue(ModConfig.targetVisualizer);
+        assertFalse(ModConfig.targetSkeleton);
+        assertFalse(ModConfig.targetBox);
+        assertTrue(ModConfig.targetRays);
+        assertEquals(96.0, ModConfig.targetVisualizerRange, 0.0);
     }
 
     private File configFile() throws Exception {

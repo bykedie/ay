@@ -7,7 +7,8 @@ public enum ModuleId {
     CREATIVE_TOOLS("creativeTools", "创造工具"),
     MELEE_AURA("meleeAura", "自动近战"),
     BLINK_STRIKE("blinkStrike", "闪现攻击"),
-    CRITICALS("criticals", "自动暴击");
+    CRITICALS("criticals", "自动暴击"),
+    TARGET_VISUALIZER("targetVisualizer", "目标可视化");
 
     private final String key;
     private final String displayName;

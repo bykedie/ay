@@ -41,7 +41,7 @@ public final class ModuleControlScreen extends GuiScreen {
 
     private static final Category[] CATEGORIES = {
         new Category("战斗",
-            ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.CRITICALS),
+            ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.CRITICALS, ModuleId.TARGET_VISUALIZER),
         new Category("自动化",
             ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE),
         new Category("工具", ModuleId.CREATIVE_TOOLS)
@@ -113,6 +113,8 @@ public final class ModuleControlScreen extends GuiScreen {
                     updateSlider(setting, CATEGORIES[i], i, mouseX);
                 } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.TOGGLE) {
                     ModConfig.toggle(setting);
+                } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.TEXT) {
+                    mc.displayGuiScreen(new MessageEditorScreen(this, setting.module()));
                 } else if (mouseButton == 0) {
                     ModConfig.cycleChoice(setting);
                 }
@@ -467,6 +469,7 @@ public final class ModuleControlScreen extends GuiScreen {
     private String settingValue(ModuleSetting setting) {
         if (setting.type() == ModuleSetting.Type.TOGGLE) return ModConfig.getToggle(setting) ? "开" : "关";
         if (setting.type() == ModuleSetting.Type.CHOICE) return ModConfig.getChoice(setting);
+        if (setting.type() == ModuleSetting.Type.TEXT) return "点击编辑";
         double value = displayNumber(setting);
         String number = setting.step() >= 1.0 ? Integer.toString((int) Math.round(value))
             : String.format(java.util.Locale.ROOT, "%.1f", value);

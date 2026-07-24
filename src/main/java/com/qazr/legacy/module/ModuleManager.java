@@ -23,6 +23,7 @@ public final class ModuleManager {
         states.put(ModuleId.MELEE_AURA, ModConfig.meleeAura);
         states.put(ModuleId.BLINK_STRIKE, ModConfig.blinkStrike);
         states.put(ModuleId.CRITICALS, ModConfig.criticals);
+        states.put(ModuleId.TARGET_VISUALIZER, ModConfig.targetVisualizer);
         if (isEnabled(ModuleId.MELEE_AURA) && isEnabled(ModuleId.BLINK_STRIKE)) {
             states.put(ModuleId.BLINK_STRIKE, false);
             ModConfig.saveModule(ModuleId.BLINK_STRIKE, false);

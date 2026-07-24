@@ -8,7 +8,9 @@ import java.util.Map;
 public enum ModuleSetting {
     GG_MIN_DELAY(ModuleId.AUTO_GG, "最小延迟", Type.NUMBER, 0.0, 200.0, 1.0, " tick"),
     GG_MAX_DELAY(ModuleId.AUTO_GG, "最大延迟", Type.NUMBER, 0.0, 200.0, 1.0, " tick"),
+    GG_MESSAGES(ModuleId.AUTO_GG, "消息列表", Type.TEXT),
     REPLY_COOLDOWN(ModuleId.AUTO_REPLY, "回复冷却", Type.NUMBER, 20.0, 1200.0, 20.0, " tick"),
+    REPLY_MESSAGES(ModuleId.AUTO_REPLY, "回复消息列表", Type.TEXT),
     MINE_RADIUS(ModuleId.AUTO_MINE, "搜索半径", Type.NUMBER, 1.0, 6.0, 1.0, " 格"),
     MINE_DELAY(ModuleId.AUTO_MINE, "挖掘延迟", Type.NUMBER, 0.0, 40.0, 1.0, " tick"),
     MELEE_RANGE(ModuleId.MELEE_AURA, "攻击距离", Type.NUMBER, 1.0, 6.0, 0.1, " 格"),
@@ -16,11 +18,12 @@ public enum ModuleSetting {
     MELEE_PLAYERS(ModuleId.MELEE_AURA, "攻击玩家", Type.TOGGLE),
     MELEE_HOSTILES(ModuleId.MELEE_AURA, "攻击敌对生物", Type.TOGGLE),
     MELEE_ANIMALS(ModuleId.MELEE_AURA, "攻击动物", Type.TOGGLE),
+    MELEE_PEACEFUL(ModuleId.MELEE_AURA, "攻击和平生物", Type.TOGGLE),
     MELEE_AUTO_WEAPON(ModuleId.MELEE_AURA, "自动选择武器", Type.TOGGLE),
     MELEE_MODDED(ModuleId.MELEE_AURA, "攻击模组实体", Type.TOGGLE),
     MELEE_ROTATE(ModuleId.MELEE_AURA, "追踪目标视角", Type.TOGGLE),
     MELEE_MULTI(ModuleId.MELEE_AURA, "多目标攻击", Type.TOGGLE),
-    MELEE_MAX_TARGETS(ModuleId.MELEE_AURA, "最大目标数", Type.NUMBER, 1.0, 5.0, 1.0, " 个"),
+    MELEE_MAX_TARGETS(ModuleId.MELEE_AURA, "最大目标数", Type.NUMBER, 1.0, 50.0, 1.0, " 个"),
     MELEE_VISUALIZE(ModuleId.MELEE_AURA, "目标可视化", Type.TOGGLE),
     MELEE_PRIORITY(ModuleId.MELEE_AURA, "目标优先级", Type.CHOICE),
     BLINK_RANGE(ModuleId.BLINK_STRIKE, "搜索距离", Type.NUMBER, 3.0, 200.0, 1.0, " 格"),
@@ -31,16 +34,21 @@ public enum ModuleSetting {
     BLINK_PLAYERS(ModuleId.BLINK_STRIKE, "攻击玩家", Type.TOGGLE),
     BLINK_HOSTILES(ModuleId.BLINK_STRIKE, "攻击敌对生物", Type.TOGGLE),
     BLINK_ANIMALS(ModuleId.BLINK_STRIKE, "攻击动物", Type.TOGGLE),
+    BLINK_PEACEFUL(ModuleId.BLINK_STRIKE, "攻击和平生物", Type.TOGGLE),
     BLINK_MODDED(ModuleId.BLINK_STRIKE, "攻击模组实体", Type.TOGGLE),
     BLINK_AUTO_WEAPON(ModuleId.BLINK_STRIKE, "自动选择武器", Type.TOGGLE),
     BLINK_ROTATE(ModuleId.BLINK_STRIKE, "追踪目标视角", Type.TOGGLE),
     BLINK_MULTI(ModuleId.BLINK_STRIKE, "多目标攻击", Type.TOGGLE),
-    BLINK_MAX_TARGETS(ModuleId.BLINK_STRIKE, "最大目标数", Type.NUMBER, 1.0, 5.0, 1.0, " 个"),
+    BLINK_MAX_TARGETS(ModuleId.BLINK_STRIKE, "最大目标数", Type.NUMBER, 1.0, 50.0, 1.0, " 个"),
     BLINK_VISUALIZE(ModuleId.BLINK_STRIKE, "目标可视化", Type.TOGGLE),
-    BLINK_PRIORITY(ModuleId.BLINK_STRIKE, "目标优先级", Type.CHOICE);
+    BLINK_PRIORITY(ModuleId.BLINK_STRIKE, "目标优先级", Type.CHOICE),
+    TARGET_RANGE(ModuleId.TARGET_VISUALIZER, "显示距离", Type.NUMBER, 3.0, 200.0, 1.0, " 格"),
+    TARGET_SKELETON(ModuleId.TARGET_VISUALIZER, "绘制骨骼", Type.TOGGLE),
+    TARGET_BOX(ModuleId.TARGET_VISUALIZER, "绘制方框", Type.TOGGLE),
+    TARGET_RAYS(ModuleId.TARGET_VISUALIZER, "连接射线", Type.TOGGLE);
 
     public enum Type {
-        NUMBER, TOGGLE, CHOICE
+        NUMBER, TOGGLE, CHOICE, TEXT
     }
 
     private final ModuleId module;

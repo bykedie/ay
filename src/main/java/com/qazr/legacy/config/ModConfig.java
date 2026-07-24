@@ -16,6 +16,7 @@ public final class ModConfig {
     public static boolean meleeAura;
     public static boolean blinkStrike;
     public static boolean criticals;
+    public static boolean targetVisualizer;
     public static String[] ggMessages;
     public static int ggMinDelayTicks;
     public static int ggMaxDelayTicks;
@@ -30,6 +31,7 @@ public final class ModConfig {
     public static boolean meleePlayers;
     public static boolean meleeHostiles;
     public static boolean meleeAnimals;
+    public static boolean meleePeaceful;
     public static boolean meleeAutoWeapon;
     public static boolean meleeModded;
     public static boolean meleeRotate;
@@ -46,6 +48,7 @@ public final class ModConfig {
     public static boolean blinkPlayers;
     public static boolean blinkHostiles;
     public static boolean blinkAnimals;
+    public static boolean blinkPeaceful;
     public static boolean blinkModded;
     public static boolean blinkAutoWeapon;
     public static boolean blinkRotate;
@@ -54,6 +57,19 @@ public final class ModConfig {
     public static boolean blinkVisualize;
     public static String blinkPriority;
     private static final Set<String> blinkExcludedModEntities = new LinkedHashSet<>();
+    public static boolean targetSkeleton;
+    public static boolean targetBox;
+    public static boolean targetRays;
+    public static double targetVisualizerRange;
+
+    private static final String[] DEFAULT_GG_MESSAGES = {
+        "gg {player}", "good fight {player}", "well played {player}",
+        "nice fight {player}", "gg wp {player}"
+    };
+    private static final String[] DEFAULT_REPLY_MESSAGES = {
+        "Hi {player}", "I saw that, {player}.", "Hello {player}",
+        "Got it, {player}.", "Thanks, {player}."
+    };
 
     private ModConfig() {
     }
@@ -71,11 +87,12 @@ public final class ModConfig {
         meleeAura = configuration.getBoolean("meleeAura", "modules", false, "Automatically attack nearby entities with swords or axes.");
         blinkStrike = configuration.getBoolean("blinkStrike", "modules", false, "Attack through a temporary packet-position excursion and return.");
         criticals = configuration.getBoolean("criticals", "modules", false, "Send a critical movement sequence before melee attacks.");
-        ggMessages = configuration.getStringList("messages", "autoGg", new String[] {"gg {player}", "good fight {player}"}, "Messages sent after a detected kill.");
+        targetVisualizer = configuration.getBoolean("targetVisualizer", "modules", false, "Draw configurable target overlays.");
+        ggMessages = fiveMessages(configuration.getStringList("messages", "autoGg", DEFAULT_GG_MESSAGES, "Messages sent after a detected kill."), DEFAULT_GG_MESSAGES);
         ggMinDelayTicks = configuration.getInt("minDelayTicks", "autoGg", 4, 0, 200, "Minimum delay before sending.");
         ggMaxDelayTicks = configuration.getInt("maxDelayTicks", "autoGg", 24, 0, 200, "Maximum delay before sending.");
         replyTarget = configuration.getString("target", "autoReply", "", "Only messages from this player trigger a reply. Empty accepts anyone.");
-        replyMessages = configuration.getStringList("messages", "autoReply", new String[] {"Hi {player}", "I saw that, {player}."}, "Random automatic replies.");
+        replyMessages = fiveMessages(configuration.getStringList("messages", "autoReply", DEFAULT_REPLY_MESSAGES, "Random automatic replies."), DEFAULT_REPLY_MESSAGES);
         replyCooldownTicks = configuration.getInt("cooldownTicks", "autoReply", 100, 20, 1200, "Minimum delay between replies.");
         mineRadius = configuration.getInt("radius", "autoMine", 4, 1, 6, "Block scan radius. Only reachable blocks are mined.");
         mineDelayTicks = configuration.getInt("delayTicks", "autoMine", 2, 0, 40, "Delay between mining actions.");
@@ -88,11 +105,12 @@ public final class ModConfig {
         meleePlayers = configuration.getBoolean("players", "meleeAura", true, "Target players.");
         meleeHostiles = configuration.getBoolean("hostiles", "meleeAura", true, "Target hostile mobs.");
         meleeAnimals = configuration.getBoolean("animals", "meleeAura", false, "Target animals.");
+        meleePeaceful = configuration.getBoolean("peaceful", "meleeAura", false, "Target other peaceful living entities such as villagers and golems.");
         meleeAutoWeapon = configuration.getBoolean("autoWeapon", "meleeAura", true, "Select the strongest sword or axe in the hotbar.");
         meleeModded = configuration.getBoolean("moddedEntities", "meleeAura", false, "Target living entities registered by other mods.");
         meleeRotate = configuration.getBoolean("rotateView", "meleeAura", false, "Turn the local camera toward the current target.");
         meleeMultiTarget = configuration.getBoolean("multiTarget", "meleeAura", false, "Attack multiple sorted targets per cycle.");
-        meleeMaxTargets = configuration.getInt("maxTargets", "meleeAura", 3, 1, 5, "Maximum targets attacked per cycle when multi-target is enabled.");
+        meleeMaxTargets = configuration.getInt("maxTargets", "meleeAura", 3, 1, 50, "Maximum targets attacked per cycle when multi-target is enabled.");
         meleeVisualize = configuration.getBoolean("visualizeTargets", "meleeAura", false, "Draw boxes around selected targets.");
         meleePriority = configuration.getString("priority", "meleeAura", "distance", "Target priority: distance or health.");
         meleeExcludedModEntities.clear();
@@ -106,16 +124,23 @@ public final class ModConfig {
         blinkPlayers = configuration.getBoolean("players", "blinkStrike", true, "Target players independently from melee aura.");
         blinkHostiles = configuration.getBoolean("hostiles", "blinkStrike", true, "Target hostile mobs independently from melee aura.");
         blinkAnimals = configuration.getBoolean("animals", "blinkStrike", false, "Target animals independently from melee aura.");
+        blinkPeaceful = configuration.getBoolean("peaceful", "blinkStrike", false, "Target other peaceful living entities independently from melee aura.");
         blinkModded = configuration.getBoolean("moddedEntities", "blinkStrike", false, "Target living entities registered by other mods.");
         blinkAutoWeapon = configuration.getBoolean("autoWeapon", "blinkStrike", true, "Select the strongest sword or axe in the hotbar.");
         blinkRotate = configuration.getBoolean("rotateView", "blinkStrike", false, "Turn the local camera toward the current target.");
         blinkMultiTarget = configuration.getBoolean("multiTarget", "blinkStrike", false, "Attack multiple sorted targets per cycle.");
-        blinkMaxTargets = configuration.getInt("maxTargets", "blinkStrike", 3, 1, 5, "Maximum targets attacked per cycle when multi-target is enabled.");
+        blinkMaxTargets = configuration.getInt("maxTargets", "blinkStrike", 3, 1, 50, "Maximum targets attacked per cycle when multi-target is enabled.");
         blinkVisualize = configuration.getBoolean("visualizeTargets", "blinkStrike", false, "Draw boxes around selected targets.");
         blinkPriority = configuration.getString("priority", "blinkStrike", "distance", "Target priority: distance or health.");
         blinkExcludedModEntities.clear();
         blinkExcludedModEntities.addAll(Arrays.asList(configuration.getStringList("excludedModEntities", "blinkStrike",
             new String[0], "Mod entity registry names excluded from blink strike.")));
+        targetSkeleton = configuration.getBoolean("skeleton", "targetVisualizer", true, "Draw stick-figure skeletons.");
+        targetBox = configuration.getBoolean("box", "targetVisualizer", true, "Draw target bounding boxes.");
+        targetRays = configuration.getBoolean("rays", "targetVisualizer", false, "Draw lines from the camera to targets.");
+        targetVisualizerRange = configuration.getFloat("range", "targetVisualizer", 64.0F, 3.0F, 200.0F, "Maximum visualization distance.");
+        configuration.get("autoGg", "messages", DEFAULT_GG_MESSAGES).set(ggMessages);
+        configuration.get("autoReply", "messages", DEFAULT_REPLY_MESSAGES).set(replyMessages);
         if (configuration.hasChanged()) configuration.save();
     }
 
@@ -126,6 +151,20 @@ public final class ModConfig {
 
     public static void saveModule(ModuleId id, boolean enabled) {
         configuration.get("modules", id.key(), enabled).set(enabled);
+        configuration.save();
+    }
+
+    public static void saveGgMessages(String[] messages) {
+        ggMessages = fiveMessages(messages, DEFAULT_GG_MESSAGES);
+        configuration.get("autoGg", "messages", DEFAULT_GG_MESSAGES).set(ggMessages);
+        configuration.save();
+    }
+
+    public static void saveReplySettings(String target, String[] messages) {
+        replyTarget = target == null ? "" : target.trim();
+        replyMessages = fiveMessages(messages, DEFAULT_REPLY_MESSAGES);
+        configuration.get("autoReply", "target", "").set(replyTarget);
+        configuration.get("autoReply", "messages", DEFAULT_REPLY_MESSAGES).set(replyMessages);
         configuration.save();
     }
 
@@ -167,6 +206,7 @@ public final class ModConfig {
             case BLINK_PREDICT: return blinkPredictTicks;
             case BLINK_DELAY: return blinkDelayTicks;
             case BLINK_MAX_TARGETS: return blinkMaxTargets;
+            case TARGET_RANGE: return targetVisualizerRange;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
     }
@@ -203,6 +243,7 @@ public final class ModConfig {
             case BLINK_PREDICT: blinkPredictTicks = (int) rounded; saveInt("blinkStrike", "predictTicks", blinkPredictTicks); break;
             case BLINK_DELAY: blinkDelayTicks = (int) rounded; saveInt("blinkStrike", "delayTicks", blinkDelayTicks); break;
             case BLINK_MAX_TARGETS: blinkMaxTargets = (int) rounded; saveInt("blinkStrike", "maxTargets", blinkMaxTargets); break;
+            case TARGET_RANGE: targetVisualizerRange = rounded; saveDouble("targetVisualizer", "range", rounded); break;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
         configuration.save();
@@ -214,6 +255,7 @@ public final class ModConfig {
             case MELEE_PLAYERS: return meleePlayers;
             case MELEE_HOSTILES: return meleeHostiles;
             case MELEE_ANIMALS: return meleeAnimals;
+            case MELEE_PEACEFUL: return meleePeaceful;
             case MELEE_AUTO_WEAPON: return meleeAutoWeapon;
             case MELEE_MODDED: return meleeModded;
             case MELEE_ROTATE: return meleeRotate;
@@ -222,11 +264,15 @@ public final class ModConfig {
             case BLINK_PLAYERS: return blinkPlayers;
             case BLINK_HOSTILES: return blinkHostiles;
             case BLINK_ANIMALS: return blinkAnimals;
+            case BLINK_PEACEFUL: return blinkPeaceful;
             case BLINK_MODDED: return blinkModded;
             case BLINK_AUTO_WEAPON: return blinkAutoWeapon;
             case BLINK_ROTATE: return blinkRotate;
             case BLINK_MULTI: return blinkMultiTarget;
             case BLINK_VISUALIZE: return blinkVisualize;
+            case TARGET_SKELETON: return targetSkeleton;
+            case TARGET_BOX: return targetBox;
+            case TARGET_RAYS: return targetRays;
             default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
         }
     }
@@ -237,6 +283,7 @@ public final class ModConfig {
             case MELEE_PLAYERS: meleePlayers = value; saveBoolean("meleeAura", "players", value); break;
             case MELEE_HOSTILES: meleeHostiles = value; saveBoolean("meleeAura", "hostiles", value); break;
             case MELEE_ANIMALS: meleeAnimals = value; saveBoolean("meleeAura", "animals", value); break;
+            case MELEE_PEACEFUL: meleePeaceful = value; saveBoolean("meleeAura", "peaceful", value); break;
             case MELEE_AUTO_WEAPON: meleeAutoWeapon = value; saveBoolean("meleeAura", "autoWeapon", value); break;
             case MELEE_MODDED: meleeModded = value; saveBoolean("meleeAura", "moddedEntities", value); break;
             case MELEE_ROTATE: meleeRotate = value; saveBoolean("meleeAura", "rotateView", value); break;
@@ -245,11 +292,15 @@ public final class ModConfig {
             case BLINK_PLAYERS: blinkPlayers = value; saveBoolean("blinkStrike", "players", value); break;
             case BLINK_HOSTILES: blinkHostiles = value; saveBoolean("blinkStrike", "hostiles", value); break;
             case BLINK_ANIMALS: blinkAnimals = value; saveBoolean("blinkStrike", "animals", value); break;
+            case BLINK_PEACEFUL: blinkPeaceful = value; saveBoolean("blinkStrike", "peaceful", value); break;
             case BLINK_MODDED: blinkModded = value; saveBoolean("blinkStrike", "moddedEntities", value); break;
             case BLINK_AUTO_WEAPON: blinkAutoWeapon = value; saveBoolean("blinkStrike", "autoWeapon", value); break;
             case BLINK_ROTATE: blinkRotate = value; saveBoolean("blinkStrike", "rotateView", value); break;
             case BLINK_MULTI: blinkMultiTarget = value; saveBoolean("blinkStrike", "multiTarget", value); break;
             case BLINK_VISUALIZE: blinkVisualize = value; saveBoolean("blinkStrike", "visualizeTargets", value); break;
+            case TARGET_SKELETON: targetSkeleton = value; saveBoolean("targetVisualizer", "skeleton", value); break;
+            case TARGET_BOX: targetBox = value; saveBoolean("targetVisualizer", "box", value); break;
+            case TARGET_RAYS: targetRays = value; saveBoolean("targetVisualizer", "rays", value); break;
             default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
         }
         configuration.save();
@@ -312,6 +363,15 @@ public final class ModConfig {
 
     private static void saveBoolean(String category, String key, boolean value) {
         configuration.get(category, key, value).set(value);
+    }
+
+    private static String[] fiveMessages(String[] messages, String[] defaults) {
+        String[] result = new String[5];
+        for (int i = 0; i < result.length; i++) {
+            String value = messages != null && i < messages.length ? messages[i] : defaults[i];
+            result[i] = value == null ? "" : value.trim();
+        }
+        return result;
     }
 
     private static void requireRange(ModuleId id, double value, double min, double max) {
