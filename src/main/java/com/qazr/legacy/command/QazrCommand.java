@@ -6,7 +6,6 @@ import com.qazr.legacy.module.ModuleManager;
 import com.qazr.legacy.util.CreativeItems;
 import java.util.Collections;
 import java.util.List;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -50,8 +49,8 @@ public final class QazrCommand extends CommandBase {
             try {
                 ModuleId id = ModuleId.parse(args[1]);
                 boolean enabled = modules.toggle(id);
-                sender.sendMessage(new TextComponentString("[Qazr] " + I18n.format(id.translationKey()) + " = "
-                    + I18n.format(enabled ? "gui.qazr.enabled" : "gui.qazr.disabled")));
+                sender.sendMessage(new TextComponentString("[Qazr] " + id.displayName() + " = "
+                    + (enabled ? "已开启" : "已关闭")));
             } catch (IllegalArgumentException ex) {
                 sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
             }
@@ -67,8 +66,7 @@ public final class QazrCommand extends CommandBase {
                 }
                 double value = args.length == 2 ? ModConfig.getRange(id) : parseDouble(args[2], min, max);
                 if (args.length == 3) ModConfig.saveRange(id, value);
-                sender.sendMessage(new TextComponentString("[Qazr] " + I18n.format(id.translationKey())
-                    + " " + I18n.format("command.qazr.range") + " = " + value));
+                sender.sendMessage(new TextComponentString("[Qazr] " + id.displayName() + " 范围 = " + value));
             } catch (IllegalArgumentException ex) {
                 sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
             }

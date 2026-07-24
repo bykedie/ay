@@ -18,4 +18,11 @@ public class ModuleIdTest {
         assertEquals("module.qazr.meleeAura", ModuleId.MELEE_AURA.translationKey());
         assertEquals("module.qazr.blinkStrike", ModuleId.BLINK_STRIKE.translationKey());
     }
+
+    @Test
+    public void providesBuiltInChineseDisplayNames() {
+        assertEquals("自动近战", ModuleId.MELEE_AURA.displayName());
+        assertEquals("闪现攻击", ModuleId.BLINK_STRIKE.displayName());
+        assertEquals("自动暴击", ModuleId.CRITICALS.displayName());
+    }
 }

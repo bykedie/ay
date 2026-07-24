@@ -4,7 +4,6 @@ import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.module.ModuleManager;
 import java.io.IOException;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.resources.I18n;
 import org.lwjgl.input.Keyboard;
 
 public final class ModuleControlScreen extends GuiScreen {
@@ -23,11 +22,11 @@ public final class ModuleControlScreen extends GuiScreen {
     private static final int COLOR_DISABLED = 0xFFB7B7B7;
 
     private static final Category[] CATEGORIES = {
-        new Category("gui.qazr.category.combat",
+        new Category("战斗",
             ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.CRITICALS),
-        new Category("gui.qazr.category.automation",
+        new Category("自动化",
             ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE),
-        new Category("gui.qazr.category.tools", ModuleId.CREATIVE_TOOLS)
+        new Category("工具", ModuleId.CREATIVE_TOOLS)
     };
 
     private final ModuleManager modules;
@@ -43,7 +42,7 @@ public final class ModuleControlScreen extends GuiScreen {
         drawRect(0, 0, width, height, COLOR_OVERLAY);
         drawRect(0, 0, width, TITLE_HEIGHT, 0xD916181C);
         drawRect(0, TITLE_HEIGHT - 1, width, TITLE_HEIGHT, COLOR_BORDER);
-        fontRenderer.drawStringWithShadow(I18n.format("gui.qazr.title"), MARGIN, 10, 0xFFFFFF);
+        fontRenderer.drawStringWithShadow("Qazr Legacy 控制面板", MARGIN, 10, 0xFFFFFF);
 
         for (int i = 0; i < CATEGORIES.length; i++) drawCategory(CATEGORIES[i], i, mouseX, mouseY);
         super.drawScreen(mouseX, mouseY, partialTicks);
@@ -83,7 +82,7 @@ public final class ModuleControlScreen extends GuiScreen {
         drawRect(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + HEADER_HEIGHT, COLOR_HEADER);
         drawHorizontalLine(bounds.x, bounds.x + bounds.width - 1, bounds.y, COLOR_BORDER);
         drawVerticalLine(bounds.x, bounds.y, bounds.y + bounds.height - 1, COLOR_BORDER);
-        fontRenderer.drawStringWithShadow(I18n.format(category.nameKey), bounds.x + 6, bounds.y + 7, 0xFFFFFF);
+        fontRenderer.drawStringWithShadow(category.name, bounds.x + 6, bounds.y + 7, 0xFFFFFF);
 
         for (int row = 0; row < category.modules.length; row++) {
             ModuleId id = category.modules[row];
@@ -94,8 +93,8 @@ public final class ModuleControlScreen extends GuiScreen {
             else if (hovered) drawRect(bounds.x + 1, rowY, bounds.x + bounds.width, rowY + ROW_HEIGHT, COLOR_ROW_HOVER);
 
             int textY = rowY + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
-            fontRenderer.drawStringWithShadow(I18n.format(id.translationKey()), bounds.x + 6, textY, 0xFFFFFF);
-            String state = I18n.format(enabled ? "gui.qazr.on" : "gui.qazr.off");
+            fontRenderer.drawStringWithShadow(id.displayName(), bounds.x + 6, textY, 0xFFFFFF);
+            String state = enabled ? "开" : "关";
             int stateColor = enabled ? COLOR_ENABLED : COLOR_DISABLED;
             fontRenderer.drawStringWithShadow(state, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(state),
                 textY, stateColor);
@@ -133,11 +132,11 @@ public final class ModuleControlScreen extends GuiScreen {
     }
 
     private static final class Category {
-        private final String nameKey;
+        private final String name;
         private final ModuleId[] modules;
 
-        private Category(String nameKey, ModuleId... modules) {
-            this.nameKey = nameKey;
+        private Category(String name, ModuleId... modules) {
+            this.name = name;
             this.modules = modules;
         }
     }

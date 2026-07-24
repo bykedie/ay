@@ -1,18 +1,20 @@
 package com.qazr.legacy.config;
 
 public enum ModuleId {
-    AUTO_GG("autoGg"),
-    AUTO_REPLY("autoReply"),
-    AUTO_MINE("autoMine"),
-    CREATIVE_TOOLS("creativeTools"),
-    MELEE_AURA("meleeAura"),
-    BLINK_STRIKE("blinkStrike"),
-    CRITICALS("criticals");
+    AUTO_GG("autoGg", "自动发送 GG"),
+    AUTO_REPLY("autoReply", "自动回复"),
+    AUTO_MINE("autoMine", "自动挖矿"),
+    CREATIVE_TOOLS("creativeTools", "创造工具"),
+    MELEE_AURA("meleeAura", "自动近战"),
+    BLINK_STRIKE("blinkStrike", "闪现攻击"),
+    CRITICALS("criticals", "自动暴击");
 
     private final String key;
+    private final String displayName;
 
-    ModuleId(String key) {
+    ModuleId(String key, String displayName) {
         this.key = key;
+        this.displayName = displayName;
     }
 
     public String key() {
@@ -21,6 +23,10 @@ public enum ModuleId {
 
     public String translationKey() {
         return "module.qazr." + key;
+    }
+
+    public String displayName() {
+        return displayName;
     }
 
     public static ModuleId parse(String raw) {

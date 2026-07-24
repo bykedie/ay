@@ -4,7 +4,6 @@ import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.gui.ModuleControlScreen;
 import com.qazr.legacy.module.ModuleManager;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.I18n;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
@@ -48,8 +47,7 @@ public final class ClientControls {
         boolean enabled = modules.toggle(id);
         if (Minecraft.getMinecraft().player != null) {
             Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-                "[Qazr] " + I18n.format(id.translationKey()) + " = "
-                    + I18n.format(enabled ? "gui.qazr.enabled" : "gui.qazr.disabled")));
+                "[Qazr] " + id.displayName() + " = " + (enabled ? "已开启" : "已关闭")));
         }
     }
 }
