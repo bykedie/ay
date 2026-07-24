@@ -14,7 +14,7 @@ import net.minecraftforge.fml.common.gameevent.InputEvent;
 import org.lwjgl.input.Keyboard;
 
 public final class ClientControls {
-    private static final String CATEGORY = "Qazr Legacy 功能设置";
+    private static final String CATEGORY = "Voris Hub 功能设置";
     private final ModuleManager modules;
     private final KeyBinding menu = new KeyBinding("打开控制面板", Keyboard.KEY_RSHIFT, CATEGORY);
     private final Map<ModuleId, KeyBinding> moduleKeys = new EnumMap<>(ModuleId.class);
@@ -57,7 +57,7 @@ public final class ClientControls {
         boolean enabled = modules.toggle(id);
         if (Minecraft.getMinecraft().player != null) {
             Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-                "[Qazr] " + id.displayName() + " = " + (enabled ? "已开启" : "已关闭")));
+                "[Voris] " + id.displayName() + " = " + (enabled ? "已开启" : "已关闭")));
         }
     }
 }

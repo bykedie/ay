@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.EntityList;
@@ -43,7 +44,7 @@ public final class ModuleControlScreen extends GuiScreen {
         new Category("战斗",
             ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.CRITICALS, ModuleId.TARGET_VISUALIZER),
         new Category("自动化",
-            ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE),
+            ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE, ModuleId.ORE_VISUALIZER),
         new Category("工具", ModuleId.CREATIVE_TOOLS)
     };
 
@@ -58,6 +59,8 @@ public final class ModuleControlScreen extends GuiScreen {
     private ModuleId entitySelector;
     private int entityScroll;
     private final List<ResourceLocation> modEntityTypes = new ArrayList<>();
+    private final List<HelpArea> helpAreas = new ArrayList<>();
+    private String hoveredHelp;
 
     public ModuleControlScreen(ModuleManager modules, ClientControls controls, int menuKeyCode) {
         this.modules = modules;
@@ -73,14 +76,19 @@ public final class ModuleControlScreen extends GuiScreen {
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        hoveredHelp = null;
+        helpAreas.clear();
         drawRect(0, 0, width, height, COLOR_OVERLAY);
         drawRect(0, 0, width, TITLE_HEIGHT, 0xD916181C);
         drawRect(0, TITLE_HEIGHT - 1, width, TITLE_HEIGHT, COLOR_BORDER);
-        fontRenderer.drawStringWithShadow("Qazr Legacy 控制面板", MARGIN, 10, 0xFFFFFF);
+        fontRenderer.drawStringWithShadow("Voris Hub 控制面板", MARGIN, 10, 0xFFFFFF);
 
         for (int i = 0; i < CATEGORIES.length; i++) drawCategory(CATEGORIES[i], i, mouseX, mouseY);
         if (entitySelector != null) drawEntitySelector(mouseX, mouseY);
         super.drawScreen(mouseX, mouseY, partialTicks);
+        if (entitySelector == null && hoveredHelp != null) {
+            drawHoveringText(fontRenderer.listFormattedStringToWidth(hoveredHelp, Math.min(280, width - 24)), mouseX, mouseY);
+        }
     }
 
     @Override
@@ -88,6 +96,9 @@ public final class ModuleControlScreen extends GuiScreen {
         if (entitySelector != null) {
             clickEntitySelector(mouseX, mouseY, mouseButton);
             return;
+        }
+        for (HelpArea area : helpAreas) {
+            if (inside(mouseX, mouseY, area.x, area.y, area.width, area.height)) return;
         }
         for (int i = 0; i < CATEGORIES.length; i++) {
             ModuleId selected = moduleAt(CATEGORIES[i], i, mouseX, mouseY);
@@ -115,6 +126,8 @@ public final class ModuleControlScreen extends GuiScreen {
                     ModConfig.toggle(setting);
                 } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.TEXT) {
                     mc.displayGuiScreen(new MessageEditorScreen(this, setting.module()));
+                } else if (mouseButton == 0 && setting.type() == ModuleSetting.Type.COLOR) {
+                    mc.displayGuiScreen(new ColorEditorScreen(this, setting));
                 } else if (mouseButton == 0) {
                     ModConfig.cycleChoice(setting);
                 }
@@ -241,9 +254,16 @@ public final class ModuleControlScreen extends GuiScreen {
             drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + SETTING_HEIGHT,
                 hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
             int textY = y + 4;
-            fontRenderer.drawStringWithShadow(setting.label(), bounds.x + 14, textY, 0xFFE2E2E2);
             String value = settingValue(setting);
             if (isModEntitySetting(setting)) value += " 右键选择";
+            int valueX = bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value);
+            if (setting.type() == ModuleSetting.Type.COLOR) {
+                int color = ModConfig.getOreColor(setting.oreType());
+                drawRect(valueX - 14, textY - 1, valueX - 2, textY + 10, 0xFFFFFFFF);
+                drawRect(valueX - 13, textY, valueX - 3, textY + 9, 0xFF000000 | color);
+                valueX -= 16;
+            }
+            drawSettingLabel(setting, bounds.x + 14, textY, valueX - 8, mouseX, mouseY);
             fontRenderer.drawStringWithShadow(value, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value),
                 textY, setting.type() == ModuleSetting.Type.TOGGLE && ModConfig.getToggle(setting)
                     ? COLOR_ENABLED : 0xFFFFFFFF);
@@ -257,11 +277,13 @@ public final class ModuleControlScreen extends GuiScreen {
         boolean hovered = inside(mouseX, mouseY, bounds.x, y, bounds.width, SETTING_HEIGHT);
         drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + SETTING_HEIGHT,
             hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
-        fontRenderer.drawStringWithShadow("绑定按键", bounds.x + 14, y + 8, 0xFFE2E2E2);
         KeyBinding binding = controls.getModuleBinding(id);
         String value = awaitingKey == id ? "请按键..."
             : binding.getKeyCode() == Keyboard.KEY_NONE ? "未绑定" : Keyboard.getKeyName(binding.getKeyCode());
-        fontRenderer.drawStringWithShadow(value, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value),
+        int valueX = bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(value);
+        drawLabelWithHelp("绑定按键", "点击后按下需要绑定的按键；Delete 或 Backspace 清除，Esc 取消。",
+            bounds.x + 14, y + 8, valueX - 8, mouseX, mouseY);
+        fontRenderer.drawStringWithShadow(value, valueX,
             y + 8, awaitingKey == id ? COLOR_ENABLED : 0xFFFFFFFF);
         return y + SETTING_HEIGHT;
     }
@@ -470,10 +492,36 @@ public final class ModuleControlScreen extends GuiScreen {
         if (setting.type() == ModuleSetting.Type.TOGGLE) return ModConfig.getToggle(setting) ? "开" : "关";
         if (setting.type() == ModuleSetting.Type.CHOICE) return ModConfig.getChoice(setting);
         if (setting.type() == ModuleSetting.Type.TEXT) return "点击编辑";
+        if (setting.type() == ModuleSetting.Type.COLOR) {
+            return String.format(Locale.ROOT, "#%06X", ModConfig.getOreColor(setting.oreType()));
+        }
         double value = displayNumber(setting);
         String number = setting.step() >= 1.0 ? Integer.toString((int) Math.round(value))
             : String.format(java.util.Locale.ROOT, "%.1f", value);
         return number + setting.suffix();
+    }
+
+    private void drawSettingLabel(ModuleSetting setting, int x, int y, int right, int mouseX, int mouseY) {
+        drawLabelWithHelp(setting.label(), setting.description(), x, y, right, mouseX, mouseY);
+    }
+
+    private void drawLabelWithHelp(String label, String help, int x, int y, int right, int mouseX, int mouseY) {
+        int maxWidth = Math.max(8, right - x - 14);
+        String shown = label;
+        if (fontRenderer.getStringWidth(shown) > maxWidth) {
+            shown = fontRenderer.trimStringToWidth(shown, Math.max(1, maxWidth - fontRenderer.getStringWidth("..."))) + "...";
+        }
+        fontRenderer.drawStringWithShadow(shown, x, y, 0xFFE2E2E2);
+        int helpX = x + fontRenderer.getStringWidth(shown) + 3;
+        int helpY = y - 1;
+        drawRect(helpX + 2, helpY, helpX + 8, helpY + 1, COLOR_DISABLED);
+        drawRect(helpX, helpY + 2, helpX + 1, helpY + 8, COLOR_DISABLED);
+        drawRect(helpX + 9, helpY + 2, helpX + 10, helpY + 8, COLOR_DISABLED);
+        drawRect(helpX + 2, helpY + 9, helpX + 8, helpY + 10, COLOR_DISABLED);
+        fontRenderer.drawStringWithShadow("?", helpX + 2, helpY + 1, 0xFFFFFFFF);
+        HelpArea area = new HelpArea(helpX, helpY, 10, 10, help);
+        helpAreas.add(area);
+        if (inside(mouseX, mouseY, area.x, area.y, area.width, area.height)) hoveredHelp = help;
     }
 
     private static boolean isModEntitySetting(ModuleSetting setting) {
@@ -538,6 +586,22 @@ public final class ModuleControlScreen extends GuiScreen {
             this.width = width;
             this.height = height;
             this.visibleRows = visibleRows;
+        }
+    }
+
+    private static final class HelpArea {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final String help;
+
+        private HelpArea(int x, int y, int width, int height, String help) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.help = help;
         }
     }
 }

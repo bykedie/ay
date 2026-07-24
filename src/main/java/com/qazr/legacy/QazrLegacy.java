@@ -8,6 +8,7 @@ import com.qazr.legacy.module.ChatAutomation;
 import com.qazr.legacy.module.MeleeCombat;
 import com.qazr.legacy.module.BlinkStrike;
 import com.qazr.legacy.module.CombatTargetRenderer;
+import com.qazr.legacy.module.OreVisualizer;
 import com.qazr.legacy.control.ClientControls;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -24,8 +25,8 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 )
 public final class QazrLegacy {
     public static final String MOD_ID = "qazrlegacy";
-    public static final String NAME = "Qazr Legacy";
-    public static final String VERSION = "1.5.0";
+    public static final String NAME = "Voris Hub";
+    public static final String VERSION = "1.6.0";
 
     @Mod.Instance(MOD_ID)
     public static QazrLegacy instance;
@@ -44,6 +45,7 @@ public final class QazrLegacy {
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
         MinecraftForge.EVENT_BUS.register(new BlinkStrike(modules));
         MinecraftForge.EVENT_BUS.register(new CombatTargetRenderer(modules));
+        MinecraftForge.EVENT_BUS.register(new OreVisualizer(modules));
     }
 
     @Mod.EventHandler

@@ -2,6 +2,7 @@ package com.qazr.legacy.config;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import net.minecraftforge.common.config.Configuration;
@@ -12,6 +13,7 @@ public final class ModConfig {
     public static boolean autoGg;
     public static boolean autoReply;
     public static boolean autoMine;
+    public static boolean oreVisualizer;
     public static boolean creativeTools;
     public static boolean meleeAura;
     public static boolean blinkStrike;
@@ -26,6 +28,9 @@ public final class ModConfig {
     public static int mineRadius;
     public static int mineDelayTicks;
     public static String[] mineBlocks;
+    public static double oreVisualizerRange;
+    private static final EnumMap<OreType, Boolean> oreEnabled = new EnumMap<>(OreType.class);
+    private static final EnumMap<OreType, Integer> oreColors = new EnumMap<>(OreType.class);
     public static double meleeRange;
     public static int meleeDelayTicks;
     public static boolean meleePlayers;
@@ -83,6 +88,7 @@ public final class ModConfig {
         autoGg = configuration.getBoolean("autoGg", "modules", true, "Send a configurable message after a detected kill.");
         autoReply = configuration.getBoolean("autoReply", "modules", false, "Reply to messages from the selected player.");
         autoMine = configuration.getBoolean("autoMine", "modules", false, "Mine configured nearby ore blocks.");
+        oreVisualizer = configuration.getBoolean("oreVisualizer", "modules", false, "Draw cached ore block outlines.");
         creativeTools = configuration.getBoolean("creativeTools", "modules", true, "Enable creative item and potion commands.");
         meleeAura = configuration.getBoolean("meleeAura", "modules", false, "Automatically attack nearby entities with swords or axes.");
         blinkStrike = configuration.getBoolean("blinkStrike", "modules", false, "Attack through a temporary packet-position excursion and return.");
@@ -100,6 +106,16 @@ public final class ModConfig {
             "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:gold_ore",
             "minecraft:redstone_ore", "minecraft:lapis_ore", "minecraft:diamond_ore", "minecraft:emerald_ore"
         }, "Registry names of blocks to mine.");
+        oreVisualizerRange = configuration.getFloat("range", "oreVisualizer", 150.0F, 16.0F, 500.0F,
+            "Maximum ore visualization distance. Only client-loaded chunks can be scanned.");
+        oreEnabled.clear();
+        oreColors.clear();
+        for (OreType type : OreType.values()) {
+            oreEnabled.put(type, configuration.getBoolean(type.key() + "Enabled", "oreVisualizer", true,
+                "Draw " + type.displayName() + " blocks."));
+            oreColors.put(type, configuration.getInt(type.key() + "Color", "oreVisualizer", type.defaultColor(),
+                0, 0xFFFFFF, "RGB outline color for " + type.displayName() + "."));
+        }
         meleeRange = configuration.getFloat("range", "meleeAura", 3.0F, 1.0F, 6.0F, "Distance from the player eyes to the nearest point of the target hitbox.");
         meleeDelayTicks = configuration.getInt("delayTicks", "meleeAura", 1, 0, 20, "Extra ticks between attacks after cooldown is ready.");
         meleePlayers = configuration.getBoolean("players", "meleeAura", true, "Target players.");
@@ -138,7 +154,7 @@ public final class ModConfig {
         targetSkeleton = configuration.getBoolean("skeleton", "targetVisualizer", true, "Draw stick-figure skeletons.");
         targetBox = configuration.getBoolean("box", "targetVisualizer", true, "Draw target bounding boxes.");
         targetRays = configuration.getBoolean("rays", "targetVisualizer", false, "Draw lines from the camera to targets.");
-        targetVisualizerRange = configuration.getFloat("range", "targetVisualizer", 64.0F, 3.0F, 200.0F, "Maximum visualization distance.");
+        targetVisualizerRange = configuration.getFloat("range", "targetVisualizer", 150.0F, 3.0F, 500.0F, "Maximum visualization distance.");
         configuration.get("autoGg", "messages", DEFAULT_GG_MESSAGES).set(ggMessages);
         configuration.get("autoReply", "messages", DEFAULT_REPLY_MESSAGES).set(replyMessages);
         if (configuration.hasChanged()) configuration.save();
@@ -197,6 +213,7 @@ public final class ModConfig {
             case REPLY_COOLDOWN: return replyCooldownTicks;
             case MINE_RADIUS: return mineRadius;
             case MINE_DELAY: return mineDelayTicks;
+            case ORE_RANGE: return oreVisualizerRange;
             case MELEE_RANGE: return meleeRange;
             case MELEE_DELAY: return meleeDelayTicks;
             case MELEE_MAX_TARGETS: return meleeMaxTargets;
@@ -234,6 +251,7 @@ public final class ModConfig {
             case REPLY_COOLDOWN: replyCooldownTicks = (int) rounded; saveInt("autoReply", "cooldownTicks", replyCooldownTicks); break;
             case MINE_RADIUS: mineRadius = (int) rounded; saveInt("autoMine", "radius", mineRadius); break;
             case MINE_DELAY: mineDelayTicks = (int) rounded; saveInt("autoMine", "delayTicks", mineDelayTicks); break;
+            case ORE_RANGE: oreVisualizerRange = rounded; saveDouble("oreVisualizer", "range", rounded); break;
             case MELEE_RANGE: meleeRange = rounded; saveDouble("meleeAura", "range", rounded); break;
             case MELEE_DELAY: meleeDelayTicks = (int) rounded; saveInt("meleeAura", "delayTicks", meleeDelayTicks); break;
             case MELEE_MAX_TARGETS: meleeMaxTargets = (int) rounded; saveInt("meleeAura", "maxTargets", meleeMaxTargets); break;
@@ -251,6 +269,8 @@ public final class ModConfig {
     }
 
     public static boolean getToggle(ModuleSetting setting) {
+        OreType ore = setting.oreType();
+        if (ore != null && setting.type() == ModuleSetting.Type.TOGGLE) return isOreEnabled(ore);
         switch (setting) {
             case MELEE_PLAYERS: return meleePlayers;
             case MELEE_HOSTILES: return meleeHostiles;
@@ -279,6 +299,13 @@ public final class ModConfig {
 
     public static boolean toggle(ModuleSetting setting) {
         boolean value = !getToggle(setting);
+        OreType ore = setting.oreType();
+        if (ore != null && setting.type() == ModuleSetting.Type.TOGGLE) {
+            oreEnabled.put(ore, value);
+            saveBoolean("oreVisualizer", ore.key() + "Enabled", value);
+            configuration.save();
+            return value;
+        }
         switch (setting) {
             case MELEE_PLAYERS: meleePlayers = value; saveBoolean("meleeAura", "players", value); break;
             case MELEE_HOSTILES: meleeHostiles = value; saveBoolean("meleeAura", "hostiles", value); break;
@@ -305,6 +332,26 @@ public final class ModConfig {
         }
         configuration.save();
         return value;
+    }
+
+    public static boolean isOreEnabled(OreType type) {
+        Boolean enabled = oreEnabled.get(type);
+        return enabled == null || enabled;
+    }
+
+    public static int getOreColor(OreType type) {
+        Integer color = oreColors.get(type);
+        return color == null ? type.defaultColor() : color;
+    }
+
+    public static int saveOreColor(OreType type, int color) {
+        if (type == null || color < 0 || color > 0xFFFFFF) {
+            throw new IllegalArgumentException("Color must be a 6-digit RGB value");
+        }
+        oreColors.put(type, color);
+        configuration.get("oreVisualizer", type.key() + "Color", type.defaultColor()).set(color);
+        configuration.save();
+        return color;
     }
 
     public static String getChoice(ModuleSetting setting) {

@@ -46,10 +46,16 @@ public class ModConfigTest {
         assertFalse(ModConfig.meleePeaceful);
         assertFalse(ModConfig.blinkPeaceful);
         assertFalse(ModConfig.targetVisualizer);
+        assertFalse(ModConfig.oreVisualizer);
         assertTrue(ModConfig.targetSkeleton);
         assertTrue(ModConfig.targetBox);
         assertFalse(ModConfig.targetRays);
-        assertEquals(64.0, ModConfig.targetVisualizerRange, 0.0);
+        assertEquals(150.0, ModConfig.targetVisualizerRange, 0.0);
+        assertEquals(150.0, ModConfig.oreVisualizerRange, 0.0);
+        for (OreType type : OreType.values()) {
+            assertTrue(ModConfig.isOreEnabled(type));
+            assertEquals(type.defaultColor(), ModConfig.getOreColor(type));
+        }
         assertEquals(5, ModConfig.ggMessages.length);
         assertEquals(5, ModConfig.replyMessages.length);
     }
@@ -167,7 +173,7 @@ public class ModConfigTest {
         ModConfig.toggle(ModuleSetting.TARGET_SKELETON);
         ModConfig.toggle(ModuleSetting.TARGET_BOX);
         ModConfig.toggle(ModuleSetting.TARGET_RAYS);
-        ModConfig.saveNumber(ModuleSetting.TARGET_RANGE, 96.0);
+        ModConfig.saveNumber(ModuleSetting.TARGET_RANGE, 500.0);
         ModConfig.reload();
 
         assertEquals(5, ModConfig.ggMessages.length);
@@ -178,7 +184,23 @@ public class ModConfigTest {
         assertFalse(ModConfig.targetSkeleton);
         assertFalse(ModConfig.targetBox);
         assertTrue(ModConfig.targetRays);
-        assertEquals(96.0, ModConfig.targetVisualizerRange, 0.0);
+        assertEquals(500.0, ModConfig.targetVisualizerRange, 0.0);
+    }
+
+    @Test
+    public void persistsOreVisualizerDistanceTypesAndColors() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.saveModule(ModuleId.ORE_VISUALIZER, true);
+        ModConfig.saveNumber(ModuleSetting.ORE_RANGE, 500.0);
+        ModConfig.toggle(ModuleSetting.ORE_DIAMOND);
+        ModConfig.saveOreColor(OreType.DIAMOND, 0x123ABC);
+        ModConfig.reload();
+
+        assertTrue(ModConfig.oreVisualizer);
+        assertEquals(500.0, ModConfig.oreVisualizerRange, 0.0);
+        assertFalse(ModConfig.isOreEnabled(OreType.DIAMOND));
+        assertTrue(ModConfig.isOreEnabled(OreType.IRON));
+        assertEquals(0x123ABC, ModConfig.getOreColor(OreType.DIAMOND));
     }
 
     private File configFile() throws Exception {

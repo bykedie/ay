@@ -6,12 +6,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelBiped;
+import net.minecraft.client.model.ModelChicken;
+import net.minecraft.client.model.ModelHorse;
+import net.minecraft.client.model.ModelQuadruped;
+import net.minecraft.client.model.ModelSpider;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.entity.Render;
+import net.minecraft.client.renderer.entity.RenderLivingBase;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -43,7 +51,7 @@ public final class CombatTargetRenderer {
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
-        GlStateManager.glLineWidth(2.0F);
+        GlStateManager.glLineWidth(1.0F);
         try {
             for (EntityLivingBase target : meleeTargets) drawTarget(target, event.getPartialTicks(), 0.25F, 1.0F, 0.35F);
             for (EntityLivingBase target : blinkTargets) drawTarget(target, event.getPartialTicks(), 1.0F, 0.25F, 0.3F);
@@ -98,23 +106,129 @@ public final class CombatTargetRenderer {
 
     private void drawSkeleton(EntityLivingBase target, double x, double y, double z,
             float red, float green, float blue) {
-        double h = Math.max(0.5, target.height);
-        double w = Math.max(0.25, target.width);
-        double shoulder = h * 0.72;
-        double hip = h * 0.30;
-        double yaw = Math.toRadians(target.renderYawOffset);
-        double sideX = Math.cos(yaw);
-        double sideZ = -Math.sin(yaw);
-        drawLine(x, y + hip, z, x, y + shoulder, z, red, green, blue);
-        drawLine(x, y + shoulder, z, x, y + h * 0.96, z, red, green, blue);
-        drawLine(x - sideX * w * 0.42, y + shoulder, z - sideZ * w * 0.42,
-            x + sideX * w * 0.42, y + shoulder, z + sideZ * w * 0.42, red, green, blue);
-        drawLine(x - sideX * w * 0.42, y + shoulder, z - sideZ * w * 0.42,
-            x - sideX * w * 0.58, y + h * 0.38, z - sideZ * w * 0.58, red, green, blue);
-        drawLine(x + sideX * w * 0.42, y + shoulder, z + sideZ * w * 0.42,
-            x + sideX * w * 0.58, y + h * 0.38, z + sideZ * w * 0.58, red, green, blue);
-        drawLine(x, y + hip, z, x - sideX * w * 0.30, y, z - sideZ * w * 0.30, red, green, blue);
-        drawLine(x, y + hip, z, x + sideX * w * 0.30, y, z + sideZ * w * 0.30, red, green, blue);
+        SkeletonBasis basis = new SkeletonBasis(x, y, z, Math.max(0.5, target.height),
+            Math.max(0.25, target.width), target.renderYawOffset, red, green, blue);
+        switch (skeletonType(mainModel(target))) {
+            case HUMANOID: drawHumanoidSkeleton(basis); break;
+            case QUADRUPED: drawQuadrupedSkeleton(basis, false); break;
+            case HORSE: drawQuadrupedSkeleton(basis, true); break;
+            case SPIDER: drawSpiderSkeleton(basis); break;
+            case BIRD: drawBirdSkeleton(basis); break;
+            case CREEPER: drawCreeperSkeleton(basis); break;
+            case SEGMENTED: drawSegmentedSkeleton(basis); break;
+            case AQUATIC: drawAquaticSkeleton(basis); break;
+            default: drawGenericSkeleton(basis);
+        }
+    }
+
+    private ModelBase mainModel(EntityLivingBase target) {
+        Render<?> renderer = mc.getRenderManager().getEntityRenderObject(target);
+        return renderer instanceof RenderLivingBase ? ((RenderLivingBase<?>) renderer).getMainModel() : null;
+    }
+
+    static SkeletonType skeletonType(ModelBase model) {
+        if (model == null) return SkeletonType.GENERIC;
+        if (model instanceof ModelHorse) return SkeletonType.HORSE;
+        if (model instanceof ModelSpider) return SkeletonType.SPIDER;
+        if (model instanceof ModelChicken) return SkeletonType.BIRD;
+        if (model instanceof ModelBiped) return SkeletonType.HUMANOID;
+        if (model instanceof ModelQuadruped) return SkeletonType.QUADRUPED;
+        String name = model.getClass().getSimpleName().toLowerCase(java.util.Locale.ROOT);
+        if (name.contains("horse")) return SkeletonType.HORSE;
+        if (name.contains("spider")) return SkeletonType.SPIDER;
+        if (name.contains("chicken") || name.contains("parrot")) return SkeletonType.BIRD;
+        if (name.contains("cow") || name.contains("sheep") || name.contains("pig")
+                || name.contains("wolf") || name.contains("ocelot") || name.contains("rabbit")
+                || name.contains("bear") || name.contains("llama")) return SkeletonType.QUADRUPED;
+        if (name.contains("villager") || name.contains("witch") || name.contains("illager")
+                || name.contains("golem") || name.contains("snowman")) return SkeletonType.HUMANOID;
+        if (name.contains("creeper")) return SkeletonType.CREEPER;
+        if (name.contains("silverfish") || name.contains("endermite")) return SkeletonType.SEGMENTED;
+        if (name.contains("squid") || name.contains("guardian")) return SkeletonType.AQUATIC;
+        return SkeletonType.GENERIC;
+    }
+
+    private void drawHumanoidSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.30, 0, 0, 0.72, 0);
+        localLine(b, 0, 0.72, 0, 0, 0.96, 0);
+        localLine(b, -0.42, 0.72, 0, 0.42, 0.72, 0);
+        localLine(b, -0.42, 0.72, 0, -0.58, 0.38, 0);
+        localLine(b, 0.42, 0.72, 0, 0.58, 0.38, 0);
+        localLine(b, 0, 0.30, 0, -0.30, 0, 0);
+        localLine(b, 0, 0.30, 0, 0.30, 0, 0);
+    }
+
+    private void drawQuadrupedSkeleton(SkeletonBasis b, boolean horse) {
+        double back = horse ? -0.72 : -0.58;
+        double front = horse ? 0.66 : 0.58;
+        double bodyY = horse ? 0.58 : 0.60;
+        localLine(b, 0, bodyY, back, 0, bodyY, front);
+        localLine(b, 0, bodyY, front, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70);
+        localLine(b, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70, 0, horse ? 0.91 : 0.80, horse ? 1.00 : 0.88);
+        double[] ends = {back + 0.10, front - 0.10};
+        for (double longitudinal : ends) {
+            for (double side : new double[] {-0.32, 0.32}) {
+                localLine(b, side, bodyY, longitudinal, side * 1.12, 0.30, longitudinal);
+                localLine(b, side * 1.12, 0.30, longitudinal, side, 0, longitudinal + (horse ? 0.06 : 0));
+            }
+        }
+    }
+
+    private void drawSpiderSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.48, -0.45, 0, 0.48, 0.48);
+        double[] positions = {-0.34, -0.12, 0.12, 0.34};
+        for (int i = 0; i < positions.length; i++) {
+            double forward = positions[i];
+            double sweep = (i - 1.5) * 0.13;
+            for (double side : new double[] {-1.0, 1.0}) {
+                localLine(b, side * 0.16, 0.46, forward, side * 0.45, 0.38, forward + sweep);
+                localLine(b, side * 0.45, 0.38, forward + sweep, side * 0.66, 0.12, forward + sweep * 1.6);
+            }
+        }
+    }
+
+    private void drawBirdSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.35, -0.18, 0, 0.66, 0.18);
+        localLine(b, 0, 0.66, 0.18, 0, 0.88, 0.28);
+        localLine(b, -0.12, 0.54, 0, -0.58, 0.40, -0.06);
+        localLine(b, 0.12, 0.54, 0, 0.58, 0.40, -0.06);
+        localLine(b, -0.16, 0.34, -0.08, -0.16, 0, 0.02);
+        localLine(b, 0.16, 0.34, -0.08, 0.16, 0, 0.02);
+    }
+
+    private void drawCreeperSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.20, 0, 0, 0.88, 0);
+        for (double side : new double[] {-0.28, 0.28}) {
+            localLine(b, 0, 0.24, -0.12, side, 0, -0.28);
+            localLine(b, 0, 0.24, 0.12, side, 0, 0.28);
+        }
+    }
+
+    private void drawSegmentedSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.42, -0.62, 0, 0.42, 0.62);
+        for (double forward : new double[] {-0.48, -0.24, 0, 0.24, 0.48}) {
+            localLine(b, -0.35, 0.38, forward, 0.35, 0.38, forward);
+        }
+    }
+
+    private void drawAquaticSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.22, 0, 0, 0.88, 0);
+        for (int i = 0; i < 8; i++) {
+            double angle = Math.PI * 2.0 * i / 8.0;
+            localLine(b, 0, 0.28, 0, Math.cos(angle) * 0.42, 0, Math.sin(angle) * 0.42);
+        }
+    }
+
+    private void drawGenericSkeleton(SkeletonBasis b) {
+        localLine(b, 0, 0.08, 0, 0, 0.92, 0);
+        localLine(b, -0.46, 0.50, 0, 0.46, 0.50, 0);
+        localLine(b, 0, 0.50, -0.46, 0, 0.50, 0.46);
+    }
+
+    private void localLine(SkeletonBasis b, double side1, double height1, double forward1,
+            double side2, double height2, double forward2) {
+        drawLine(b.x(side1, forward1), b.y(height1), b.z(side1, forward1),
+            b.x(side2, forward2), b.y(height2), b.z(side2, forward2), b.red, b.green, b.blue);
     }
 
     private void drawLine(double x1, double y1, double z1, double x2, double y2, double z2,
@@ -125,5 +239,53 @@ public final class CombatTargetRenderer {
         buffer.pos(x1, y1, z1).endVertex();
         buffer.pos(x2, y2, z2).endVertex();
         Tessellator.getInstance().draw();
+    }
+
+    enum SkeletonType {
+        HUMANOID, QUADRUPED, HORSE, SPIDER, BIRD, CREEPER, SEGMENTED, AQUATIC, GENERIC
+    }
+
+    private static final class SkeletonBasis {
+        private final double baseX;
+        private final double baseY;
+        private final double baseZ;
+        private final double height;
+        private final double width;
+        private final double sideX;
+        private final double sideZ;
+        private final double forwardX;
+        private final double forwardZ;
+        private final float red;
+        private final float green;
+        private final float blue;
+
+        private SkeletonBasis(double x, double y, double z, double height, double width, float yaw,
+                float red, float green, float blue) {
+            double angle = Math.toRadians(yaw);
+            this.baseX = x;
+            this.baseY = y;
+            this.baseZ = z;
+            this.height = height;
+            this.width = width;
+            this.sideX = Math.cos(angle);
+            this.sideZ = -Math.sin(angle);
+            this.forwardX = Math.sin(angle);
+            this.forwardZ = Math.cos(angle);
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+        }
+
+        private double x(double side, double forward) {
+            return baseX + sideX * side * width + forwardX * forward * width;
+        }
+
+        private double y(double normalized) {
+            return baseY + normalized * height;
+        }
+
+        private double z(double side, double forward) {
+            return baseZ + sideZ * side * width + forwardZ * forward * width;
+        }
     }
 }

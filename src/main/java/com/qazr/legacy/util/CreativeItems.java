@@ -33,7 +33,7 @@ public final class CreativeItems {
         effects.appendTag(tag);
         root.setTag("CustomPotionEffects", effects);
         stack.setTagCompound(root);
-        stack.setStackDisplayName("Qazr " + effectName + " " + level);
+        stack.setStackDisplayName("Voris " + effectName + " " + level);
         return giveStack(stack);
     }
 

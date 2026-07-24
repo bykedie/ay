@@ -37,22 +37,22 @@ public final class QazrCommand extends CommandBase {
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
         if (args.length == 0 || "status".equalsIgnoreCase(args[0])) {
-            sender.sendMessage(new TextComponentString("[Qazr] " + modules.statusLine()));
+            sender.sendMessage(new TextComponentString("[Voris] " + modules.statusLine()));
             return;
         }
         if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
             modules.reloadConfig();
-            sender.sendMessage(new TextComponentString("[Qazr] Configuration reloaded."));
+            sender.sendMessage(new TextComponentString("[Voris] 配置已重新加载。"));
             return;
         }
         if (args.length == 2 && "toggle".equalsIgnoreCase(args[0])) {
             try {
                 ModuleId id = ModuleId.parse(args[1]);
                 boolean enabled = modules.toggle(id);
-                sender.sendMessage(new TextComponentString("[Qazr] " + id.displayName() + " = "
+                sender.sendMessage(new TextComponentString("[Voris] " + id.displayName() + " = "
                     + (enabled ? "已开启" : "已关闭")));
             } catch (IllegalArgumentException ex) {
-                sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
+                sender.sendMessage(new TextComponentString("[Voris] " + ex.getMessage()));
             }
             return;
         }
@@ -66,31 +66,31 @@ public final class QazrCommand extends CommandBase {
                 }
                 double value = args.length == 2 ? ModConfig.getRange(id) : parseDouble(args[2], min, max);
                 if (args.length == 3) ModConfig.saveRange(id, value);
-                sender.sendMessage(new TextComponentString("[Qazr] " + id.displayName() + " 范围 = " + value));
+                sender.sendMessage(new TextComponentString("[Voris] " + id.displayName() + " 范围 = " + value));
             } catch (IllegalArgumentException ex) {
-                sender.sendMessage(new TextComponentString("[Qazr] " + ex.getMessage()));
+                sender.sendMessage(new TextComponentString("[Voris] " + ex.getMessage()));
             }
             return;
         }
         if (args.length >= 2 && "give".equalsIgnoreCase(args[0])) {
             if (!modules.isEnabled(ModuleId.CREATIVE_TOOLS)) {
-                sender.sendMessage(new TextComponentString("[Qazr] creativeTools is disabled."));
+                sender.sendMessage(new TextComponentString("[Voris] 创造工具未开启。"));
                 return;
             }
             int count = args.length >= 3 ? parseInt(args[2], 1, 64) : 1;
             int meta = args.length >= 4 ? parseInt(args[3], 0, Short.MAX_VALUE) : 0;
-            sender.sendMessage(new TextComponentString("[Qazr] " + CreativeItems.give(args[1], count, meta)));
+            sender.sendMessage(new TextComponentString("[Voris] " + CreativeItems.give(args[1], count, meta)));
             return;
         }
         if (args.length >= 4 && "potion".equalsIgnoreCase(args[0])) {
             if (!modules.isEnabled(ModuleId.CREATIVE_TOOLS)) {
-                sender.sendMessage(new TextComponentString("[Qazr] creativeTools is disabled."));
+                sender.sendMessage(new TextComponentString("[Voris] 创造工具未开启。"));
                 return;
             }
             int level = parseInt(args[2], 1, 128);
             int seconds = parseInt(args[3], 1, 3600);
             boolean splash = args.length >= 5 && Boolean.parseBoolean(args[4]);
-            sender.sendMessage(new TextComponentString("[Qazr] " + CreativeItems.givePotion(args[1], level, seconds, splash)));
+            sender.sendMessage(new TextComponentString("[Voris] " + CreativeItems.givePotion(args[1], level, seconds, splash)));
             return;
         }
         sender.sendMessage(new TextComponentString(getUsage(sender)));

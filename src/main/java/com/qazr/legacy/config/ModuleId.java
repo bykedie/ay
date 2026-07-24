@@ -4,6 +4,7 @@ public enum ModuleId {
     AUTO_GG("autoGg", "自动发送 GG"),
     AUTO_REPLY("autoReply", "自动回复"),
     AUTO_MINE("autoMine", "自动挖矿"),
+    ORE_VISUALIZER("oreVisualizer", "矿物可视化"),
     CREATIVE_TOOLS("creativeTools", "创造工具"),
     MELEE_AURA("meleeAura", "自动近战"),
     BLINK_STRIKE("blinkStrike", "闪现攻击"),
