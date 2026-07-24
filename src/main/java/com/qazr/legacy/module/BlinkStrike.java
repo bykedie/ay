@@ -68,7 +68,7 @@ public final class BlinkStrike {
                 sent++;
             }
             Vec3d remoteEyes = new Vec3d(destination.x, destination.y + mc.player.getEyeHeight(), destination.z);
-            float[] rotations = CombatSupport.rotations(remoteEyes, target);
+            float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
             mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], false));
             sendRemoteCritical(destination);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
@@ -97,7 +97,7 @@ public final class BlinkStrike {
     }
 
     private void face(EntityLivingBase target) {
-        float[] rotations = CombatSupport.rotations(mc.player.getPositionEyes(1.0F), target);
+        float[] rotations = CombatSupport.rotations(mc.player.getPositionEyes(1.0F), target, ModConfig.blinkAttackPoint);
         mc.player.rotationYaw = rotations[0];
         mc.player.rotationPitch = rotations[1];
     }

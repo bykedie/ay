@@ -26,16 +26,19 @@ public class ModuleIdTest {
         assertEquals("闪现攻击", ModuleId.BLINK_STRIKE.displayName());
         assertEquals("自动暴击", ModuleId.CRITICALS.displayName());
         assertEquals("目标可视化", ModuleId.TARGET_VISUALIZER.displayName());
+        assertEquals("自动搭路", ModuleId.AUTO_BRIDGE.displayName());
         assertEquals("矿物可视化", ModuleId.ORE_VISUALIZER.displayName());
     }
 
     @Test
     public void mapsSettingsToTheirOwningModules() {
-        assertEquals(13, ModuleSetting.forModule(ModuleId.MELEE_AURA).length);
-        assertEquals(16, ModuleSetting.forModule(ModuleId.BLINK_STRIKE).length);
+        assertEquals(14, ModuleSetting.forModule(ModuleId.MELEE_AURA).length);
+        assertEquals(17, ModuleSetting.forModule(ModuleId.BLINK_STRIKE).length);
         assertEquals(0, ModuleSetting.forModule(ModuleId.CRITICALS).length);
         assertEquals(4, ModuleSetting.forModule(ModuleId.TARGET_VISUALIZER).length);
         assertEquals(17, ModuleSetting.forModule(ModuleId.ORE_VISUALIZER).length);
+        assertEquals(12, ModuleSetting.forModule(ModuleId.AUTO_MINE).length);
+        assertEquals(0, ModuleSetting.forModule(ModuleId.AUTO_BRIDGE).length);
         assertEquals(3, ModuleSetting.forModule(ModuleId.AUTO_GG).length);
         assertEquals(2, ModuleSetting.forModule(ModuleId.AUTO_REPLY).length);
         assertTrue(ModuleSetting.MELEE_RANGE.type() == ModuleSetting.Type.NUMBER);

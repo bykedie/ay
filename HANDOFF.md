@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.6.0`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
+Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.7.0`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
 
 用户可见名称已经迁移为 `Voris Hub`，控制面板标题是 `Voris Hub 控制面板`。为了保留旧配置、旧按键记录和安装兼容性，内部仍保留这些历史标识：
 
@@ -25,7 +25,7 @@ Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本�
 - Gradle wrapper: `7.6.1`
 - ForgeGradle: `5.1.77`
 - MCP mappings: `stable_39-1.12`
-- 当前发行 JAR: `build/libs/voris-hub-1.6.0.jar`
+- 当前发行 JAR: `build/libs/voris-hub-1.7.0.jar`
 
 Windows 构建命令：
 
@@ -52,6 +52,7 @@ Windows 构建命令：
 - `src/main/java/com/qazr/legacy/config/ModuleId.java`: 所有功能模块的稳定 key 和中文显示名。
 - `src/main/java/com/qazr/legacy/config/ModuleSetting.java`: GUI 参数定义、范围、类型、中文标签、问号提示说明。
 - `src/main/java/com/qazr/legacy/config/ModConfig.java`: 配置加载、保存、默认值、兼容键。
+- `src/main/java/com/qazr/legacy/config/AttackPoint.java`: 战斗模块攻击部位选项和目标点计算。
 - `src/main/java/com/qazr/legacy/control/ClientControls.java`: 右 Shift 面板入口和模块快捷键绑定。
 - `src/main/java/com/qazr/legacy/gui/ModuleControlScreen.java`: 主控制面板、右键展开参数、问号提示、模块实体选择器。
 - `src/main/java/com/qazr/legacy/gui/MessageEditorScreen.java`: 自动 GG 和自动回复的 5 条消息编辑页。
@@ -60,8 +61,9 @@ Windows 构建命令：
 - `src/main/java/com/qazr/legacy/module/MeleeCombat.java`: 自动近战。
 - `src/main/java/com/qazr/legacy/module/BlinkStrike.java`: 闪现攻击。
 - `src/main/java/com/qazr/legacy/module/CombatTargetRenderer.java`: 战斗/目标可视化方框、射线、骨骼绘制。
-- `src/main/java/com/qazr/legacy/module/OreVisualizer.java`: 矿物可视化扫描、缓存和方框绘制。
-- `src/main/java/com/qazr/legacy/module/AutoMiner.java`: 自动挖矿。
+- `src/main/java/com/qazr/legacy/module/OreVisualizer.java`: 矿物可视化扫描、缓存、相邻矿块外边界绘制。
+- `src/main/java/com/qazr/legacy/module/AutoMiner.java`: 自动挖矿、矿种预设、目标数量和简单寻路。
+- `src/main/java/com/qazr/legacy/module/AutoBridge.java`: 自动搭路，使用快捷栏或临时背包换位放置方块。
 - `src/main/java/com/qazr/legacy/module/ChatAutomation.java`: 自动 GG 和自动回复。
 - `src/main/java/com/qazr/legacy/util/*`: 聊天解析、路径计算、攻击数学和创造工具辅助。
 - `src/main/resources/mcmod.info`: 模组元数据，用户可见名称为 `Voris Hub`。
@@ -83,18 +85,20 @@ Windows 构建命令：
 
 - `autoGg`，中文名 `自动发送 GG`：检测本地玩家击杀相关聊天消息，延迟后随机发送 5 条候选消息之一。空白项不会参与随机。
 - `autoReply`，中文名 `自动回复`：按指定玩家或所有玩家匹配聊天，带冷却，随机发送 5 条候选回复之一。
-- `autoMine`，中文名 `自动挖矿`：在正常可达范围内挖配置矿石，并选择快捷栏中更合适的镐。
-- `oreVisualizer`，中文名 `矿物可视化`：扫描客户端已加载区块，绘制原版矿石方框。默认距离 `150`，最大 `500`。每种矿石有独立开关和颜色。
+- `autoMine`，中文名 `自动挖矿`：保留近距离可见矿优先挖掘，并新增按矿种预设、寻路范围、预定数量进行自动找矿和简单行走寻路。`targetCount=0` 表示不限数量。
+- `autoBridge`，中文名 `自动搭路`：玩家即将走出边缘时，尝试在下一脚下方放置可用实体方块。优先快捷栏，必要时临时从背包换入当前快捷栏槽位再换回。
+- `oreVisualizer`，中文名 `矿物可视化`：扫描客户端已加载区块，绘制原版矿石方框。默认距离 `150`，最大 `500`。每种矿石有独立开关和颜色。相邻同类矿石会合并成外边界线框，九宫格中心和内部边线不再绘制。
 
 矿物类型目前包括：煤矿、铁矿、金矿、红石矿、青金石矿、钻石矿、绿宝石矿、下界石英矿。识别逻辑在 `OreType` 中按方块注册名匹配，避免单元测试环境提前触发 `Blocks` 静态初始化。
 
 ### 战斗
 
 - `meleeAura`，中文名 `自动近战`：自动选择目标并使用正常攻击冷却，距离按玩家眼睛到目标碰撞箱最近点计算。默认 `3.0` 格，最大 `6.0` 格。
-- `blinkStrike`，中文名 `闪现攻击`：实验性扩展距离攻击。它会发送经过碰撞检查的位置包序列，临近目标后攻击，再沿路径返回。默认搜索距离 `12.0`，最大 `200.0`。这不是服务端绕过保证，仍受服务端距离、移动和反作弊检查影响。
+- `blinkStrike`，中文名 `闪现攻击`：实验性扩展距离攻击。它会发送经过碰撞检查的位置包序列，临近目标后发送攻击包，再沿路径返回。默认搜索距离 `12.0`，最大 `200.0`。这不是服务端绕过保证，仍受服务端距离、移动和反作弊检查影响。
 - `criticals`，中文名 `自动暴击`：在攻击前发送短暂的暴击移动序列。
 - 自动近战和闪现攻击互斥。开启其中一个时会关闭另一个。
-- 两个战斗模块都有玩家、敌对生物、动物、和平生物、模组实体、自动选武器、视角追踪、多目标、最大目标数和目标优先级参数。
+- 两个战斗模块都有玩家、敌对生物、动物、和平生物、模组实体、自动选武器、视角追踪、多目标、最大目标数、目标优先级和攻击部位参数。
+- 攻击部位可选 `头部`、`胸口`、`腿部`、`脚部`，用于旋转和发包瞄准点。
 - 最大目标数上限为 `50`。
 
 ### 可视化
@@ -115,6 +119,8 @@ Windows 构建命令：
 主配置文件仍是 `config/qazrlegacy.cfg`。配置分类大致对应模块 key，例如：
 
 - `modules.autoGg`
+- `modules.autoMine`
+- `modules.autoBridge`
 - `modules.meleeAura`
 - `targetVisualizer.range`
 - `oreVisualizer.diamondColor`
@@ -171,6 +177,8 @@ Select-String -Path run\logs\latest.log -Pattern "Voris Hub|Forge Mod Loader has
 ## 7. 已知限制和风险
 
 - `blinkStrike` 是实验性功能。它通过位置包模拟短暂路径，不保证在所有服务器上生效。服务端距离检查、移动检查和反作弊插件可能拒绝或回滚。
+- `autoMine` 的寻路是简单客户端行走路径，只会处理已加载世界和可行走位置，不会自动挖隧道、搭桥、跨维度或处理复杂陷阱。
+- `autoBridge` 依赖服务器接受普通放置行为；被保护区域、延迟、反作弊或缺少相邻可点击方块时可能无法放置。
 - `oreVisualizer` 只能显示客户端已经加载的区块，`500` 格只是配置筛选上限，不代表能看到未加载区块里的矿。
 - `targetVisualizer` 的骨骼是按模型族绘制的简化线框，不是逐个读取 `ModelRenderer` 骨骼节点。对原版常见实体已经区分，但复杂模组实体可能走通用轮廓或近似分类。
 - 1.12.2 没有高版本 mace 等机制，原先相关想法已用剑/斧、暴击和包路径逻辑替代。
@@ -213,14 +221,16 @@ git ls-remote origin refs/heads/main
 
 ## 10. 当前交接状态
 
-截至本文档编写时，项目主功能状态为 `Voris Hub 1.6.0`：
+截至本文档编写时，项目主功能状态为 `Voris Hub 1.7.0`：
 
-- 构建产物名：`voris-hub-1.6.0.jar`
+- 构建产物名：`voris-hub-1.7.0.jar`
 - 面板入口：`Right Shift`
 - 模块快捷键：默认未绑定，由用户自行绑定
 - 目标可视化：默认 `150`，最大 `500`
-- 矿物可视化：默认 `150`，最大 `500`
-- 自动近战和闪现攻击最大目标数：`50`
+- 矿物可视化：默认 `150`，最大 `500`，相邻同类矿石只绘制外边界
+- 自动挖矿：支持矿种预设、寻路范围、预定数量和最近可达矿优先
+- 自动搭路：支持快捷栏/背包方块临时换位放置
+- 自动近战和闪现攻击最大目标数：`50`，并支持攻击部位选择
 - 用户可见品牌：`Voris Hub`
 - 内部兼容品牌：`qazrlegacy` 保留
 

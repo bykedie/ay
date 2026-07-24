@@ -44,7 +44,7 @@ public final class ModuleControlScreen extends GuiScreen {
         new Category("战斗",
             ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.CRITICALS, ModuleId.TARGET_VISUALIZER),
         new Category("自动化",
-            ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE, ModuleId.ORE_VISUALIZER),
+            ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE, ModuleId.AUTO_BRIDGE, ModuleId.ORE_VISUALIZER),
         new Category("工具", ModuleId.CREATIVE_TOOLS)
     };
 

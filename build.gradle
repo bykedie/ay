@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.6.0'
+version = '1.7.0'
 group = 'com.qazr.legacy'
 archivesBaseName = 'voris-hub'
 
@@ -133,6 +133,7 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
             'assets/qazrlegacy/lang/zh_cn.lang',
             'com/qazr/legacy/QazrLegacy.class',
             'com/qazr/legacy/module/AutoMiner.class',
+            'com/qazr/legacy/module/AutoBridge.class',
             'com/qazr/legacy/module/ChatAutomation.class',
             'com/qazr/legacy/module/MeleeCombat.class',
             'com/qazr/legacy/module/BlinkStrike.class',
@@ -142,6 +143,7 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
             'com/qazr/legacy/gui/MessageEditorScreen.class',
             'com/qazr/legacy/gui/ColorEditorScreen.class',
             'com/qazr/legacy/config/ModuleSetting.class',
+            'com/qazr/legacy/config/AttackPoint.class',
             'com/qazr/legacy/config/OreType.class',
             'com/qazr/legacy/util/BlinkPath.class',
             'com/qazr/legacy/util/CreativeItems.class'

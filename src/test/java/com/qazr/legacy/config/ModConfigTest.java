@@ -45,13 +45,21 @@ public class ModConfigTest {
         assertFalse(ModConfig.blinkModded);
         assertFalse(ModConfig.meleePeaceful);
         assertFalse(ModConfig.blinkPeaceful);
+        assertEquals(AttackPoint.CHEST, ModConfig.meleeAttackPoint);
+        assertEquals(AttackPoint.CHEST, ModConfig.blinkAttackPoint);
         assertFalse(ModConfig.targetVisualizer);
         assertFalse(ModConfig.oreVisualizer);
+        assertFalse(ModConfig.autoBridge);
+        assertEquals(32, ModConfig.minePathRange);
+        assertEquals(0, ModConfig.mineTargetCount);
         assertTrue(ModConfig.targetSkeleton);
         assertTrue(ModConfig.targetBox);
         assertFalse(ModConfig.targetRays);
         assertEquals(150.0, ModConfig.targetVisualizerRange, 0.0);
         assertEquals(150.0, ModConfig.oreVisualizerRange, 0.0);
+        assertTrue(ModConfig.isMineOreEnabled(OreType.COAL));
+        assertTrue(ModConfig.isMineOreEnabled(OreType.DIAMOND));
+        assertFalse(ModConfig.isMineOreEnabled(OreType.QUARTZ));
         for (OreType type : OreType.values()) {
             assertTrue(ModConfig.isOreEnabled(type));
             assertEquals(type.defaultColor(), ModConfig.getOreColor(type));
@@ -104,6 +112,8 @@ public class ModConfigTest {
         ModConfig.saveNumber(ModuleSetting.GG_MAX_DELAY, 40.0);
         ModConfig.toggle(ModuleSetting.MELEE_ANIMALS);
         ModConfig.cycleChoice(ModuleSetting.MELEE_PRIORITY);
+        ModConfig.cycleChoice(ModuleSetting.MELEE_ATTACK_POINT);
+        ModConfig.cycleChoice(ModuleSetting.BLINK_ATTACK_POINT);
         ModConfig.reload();
 
         assertEquals(4.4, ModConfig.meleeRange, 0.001);
@@ -112,6 +122,8 @@ public class ModConfigTest {
         assertEquals(40, ModConfig.ggMaxDelayTicks);
         assertTrue(ModConfig.meleeAnimals);
         assertEquals("health", ModConfig.meleePriority);
+        assertEquals(AttackPoint.LEGS, ModConfig.meleeAttackPoint);
+        assertEquals(AttackPoint.LEGS, ModConfig.blinkAttackPoint);
     }
 
     @Test
@@ -201,6 +213,24 @@ public class ModConfigTest {
         assertFalse(ModConfig.isOreEnabled(OreType.DIAMOND));
         assertTrue(ModConfig.isOreEnabled(OreType.IRON));
         assertEquals(0x123ABC, ModConfig.getOreColor(OreType.DIAMOND));
+    }
+
+    @Test
+    public void persistsAutoMiningRouteSettingsAndOrePreset() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.saveModule(ModuleId.AUTO_BRIDGE, true);
+        ModConfig.saveNumber(ModuleSetting.MINE_PATH_RANGE, 64.0);
+        ModConfig.saveNumber(ModuleSetting.MINE_TARGET_COUNT, 12.0);
+        ModConfig.toggle(ModuleSetting.MINE_DIAMOND);
+        ModConfig.toggle(ModuleSetting.MINE_QUARTZ);
+        ModConfig.reload();
+
+        assertTrue(ModConfig.autoBridge);
+        assertEquals(64, ModConfig.minePathRange);
+        assertEquals(12, ModConfig.mineTargetCount);
+        assertFalse(ModConfig.isMineOreEnabled(OreType.DIAMOND));
+        assertTrue(ModConfig.isMineOreEnabled(OreType.QUARTZ));
+        assertTrue(ModConfig.isMineOreEnabled(OreType.IRON));
     }
 
     private File configFile() throws Exception {

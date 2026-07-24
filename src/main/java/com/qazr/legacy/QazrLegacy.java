@@ -4,6 +4,7 @@ import com.qazr.legacy.command.QazrCommand;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.module.ModuleManager;
 import com.qazr.legacy.module.AutoMiner;
+import com.qazr.legacy.module.AutoBridge;
 import com.qazr.legacy.module.ChatAutomation;
 import com.qazr.legacy.module.MeleeCombat;
 import com.qazr.legacy.module.BlinkStrike;
@@ -26,7 +27,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 public final class QazrLegacy {
     public static final String MOD_ID = "qazrlegacy";
     public static final String NAME = "Voris Hub";
-    public static final String VERSION = "1.6.0";
+    public static final String VERSION = "1.7.0";
 
     @Mod.Instance(MOD_ID)
     public static QazrLegacy instance;
@@ -42,6 +43,7 @@ public final class QazrLegacy {
         AutoMiner autoMiner = new AutoMiner(modules);
         modules.addReloadListener(autoMiner::reloadTargets);
         MinecraftForge.EVENT_BUS.register(autoMiner);
+        MinecraftForge.EVENT_BUS.register(new AutoBridge(modules));
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
         MinecraftForge.EVENT_BUS.register(new BlinkStrike(modules));
         MinecraftForge.EVENT_BUS.register(new CombatTargetRenderer(modules));

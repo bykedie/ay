@@ -13,6 +13,7 @@ public final class ModConfig {
     public static boolean autoGg;
     public static boolean autoReply;
     public static boolean autoMine;
+    public static boolean autoBridge;
     public static boolean oreVisualizer;
     public static boolean creativeTools;
     public static boolean meleeAura;
@@ -28,6 +29,9 @@ public final class ModConfig {
     public static int mineRadius;
     public static int mineDelayTicks;
     public static String[] mineBlocks;
+    public static int minePathRange;
+    public static int mineTargetCount;
+    private static final EnumMap<OreType, Boolean> mineOreEnabled = new EnumMap<>(OreType.class);
     public static double oreVisualizerRange;
     private static final EnumMap<OreType, Boolean> oreEnabled = new EnumMap<>(OreType.class);
     private static final EnumMap<OreType, Integer> oreColors = new EnumMap<>(OreType.class);
@@ -44,6 +48,7 @@ public final class ModConfig {
     public static int meleeMaxTargets;
     public static boolean meleeVisualize;
     public static String meleePriority;
+    public static AttackPoint meleeAttackPoint;
     private static final Set<String> meleeExcludedModEntities = new LinkedHashSet<>();
     public static double blinkRange;
     public static double blinkStep;
@@ -61,6 +66,7 @@ public final class ModConfig {
     public static int blinkMaxTargets;
     public static boolean blinkVisualize;
     public static String blinkPriority;
+    public static AttackPoint blinkAttackPoint;
     private static final Set<String> blinkExcludedModEntities = new LinkedHashSet<>();
     public static boolean targetSkeleton;
     public static boolean targetBox;
@@ -88,6 +94,7 @@ public final class ModConfig {
         autoGg = configuration.getBoolean("autoGg", "modules", true, "Send a configurable message after a detected kill.");
         autoReply = configuration.getBoolean("autoReply", "modules", false, "Reply to messages from the selected player.");
         autoMine = configuration.getBoolean("autoMine", "modules", false, "Mine configured nearby ore blocks.");
+        autoBridge = configuration.getBoolean("autoBridge", "modules", false, "Place a block before walking off edges.");
         oreVisualizer = configuration.getBoolean("oreVisualizer", "modules", false, "Draw cached ore block outlines.");
         creativeTools = configuration.getBoolean("creativeTools", "modules", true, "Enable creative item and potion commands.");
         meleeAura = configuration.getBoolean("meleeAura", "modules", false, "Automatically attack nearby entities with swords or axes.");
@@ -106,6 +113,13 @@ public final class ModConfig {
             "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:gold_ore",
             "minecraft:redstone_ore", "minecraft:lapis_ore", "minecraft:diamond_ore", "minecraft:emerald_ore"
         }, "Registry names of blocks to mine.");
+        minePathRange = configuration.getInt("pathRange", "autoMine", 32, 6, 96, "Maximum range for walking to selected ores.");
+        mineTargetCount = configuration.getInt("targetCount", "autoMine", 0, 0, 999, "Number of ore blocks to mine before stopping. Zero means unlimited.");
+        mineOreEnabled.clear();
+        for (OreType type : OreType.values()) {
+            mineOreEnabled.put(type, configuration.getBoolean(type.key() + "Mine", "autoMine",
+                defaultMineOreEnabled(type), "Allow auto mine to target " + type.displayName() + "."));
+        }
         oreVisualizerRange = configuration.getFloat("range", "oreVisualizer", 150.0F, 16.0F, 500.0F,
             "Maximum ore visualization distance. Only client-loaded chunks can be scanned.");
         oreEnabled.clear();
@@ -129,6 +143,7 @@ public final class ModConfig {
         meleeMaxTargets = configuration.getInt("maxTargets", "meleeAura", 3, 1, 50, "Maximum targets attacked per cycle when multi-target is enabled.");
         meleeVisualize = configuration.getBoolean("visualizeTargets", "meleeAura", false, "Draw boxes around selected targets.");
         meleePriority = configuration.getString("priority", "meleeAura", "distance", "Target priority: distance or health.");
+        meleeAttackPoint = AttackPoint.fromKey(configuration.getString("attackPoint", "meleeAura", AttackPoint.CHEST.key(), "Target body point: head, chest, legs or feet."));
         meleeExcludedModEntities.clear();
         meleeExcludedModEntities.addAll(Arrays.asList(configuration.getStringList("excludedModEntities", "meleeAura",
             new String[0], "Mod entity registry names excluded from melee aura.")));
@@ -148,6 +163,7 @@ public final class ModConfig {
         blinkMaxTargets = configuration.getInt("maxTargets", "blinkStrike", 3, 1, 50, "Maximum targets attacked per cycle when multi-target is enabled.");
         blinkVisualize = configuration.getBoolean("visualizeTargets", "blinkStrike", false, "Draw boxes around selected targets.");
         blinkPriority = configuration.getString("priority", "blinkStrike", "distance", "Target priority: distance or health.");
+        blinkAttackPoint = AttackPoint.fromKey(configuration.getString("attackPoint", "blinkStrike", AttackPoint.CHEST.key(), "Target body point: head, chest, legs or feet."));
         blinkExcludedModEntities.clear();
         blinkExcludedModEntities.addAll(Arrays.asList(configuration.getStringList("excludedModEntities", "blinkStrike",
             new String[0], "Mod entity registry names excluded from blink strike.")));
@@ -213,6 +229,8 @@ public final class ModConfig {
             case REPLY_COOLDOWN: return replyCooldownTicks;
             case MINE_RADIUS: return mineRadius;
             case MINE_DELAY: return mineDelayTicks;
+            case MINE_PATH_RANGE: return minePathRange;
+            case MINE_TARGET_COUNT: return mineTargetCount;
             case ORE_RANGE: return oreVisualizerRange;
             case MELEE_RANGE: return meleeRange;
             case MELEE_DELAY: return meleeDelayTicks;
@@ -251,6 +269,8 @@ public final class ModConfig {
             case REPLY_COOLDOWN: replyCooldownTicks = (int) rounded; saveInt("autoReply", "cooldownTicks", replyCooldownTicks); break;
             case MINE_RADIUS: mineRadius = (int) rounded; saveInt("autoMine", "radius", mineRadius); break;
             case MINE_DELAY: mineDelayTicks = (int) rounded; saveInt("autoMine", "delayTicks", mineDelayTicks); break;
+            case MINE_PATH_RANGE: minePathRange = (int) rounded; saveInt("autoMine", "pathRange", minePathRange); break;
+            case MINE_TARGET_COUNT: mineTargetCount = (int) rounded; saveInt("autoMine", "targetCount", mineTargetCount); break;
             case ORE_RANGE: oreVisualizerRange = rounded; saveDouble("oreVisualizer", "range", rounded); break;
             case MELEE_RANGE: meleeRange = rounded; saveDouble("meleeAura", "range", rounded); break;
             case MELEE_DELAY: meleeDelayTicks = (int) rounded; saveInt("meleeAura", "delayTicks", meleeDelayTicks); break;
@@ -270,6 +290,7 @@ public final class ModConfig {
 
     public static boolean getToggle(ModuleSetting setting) {
         OreType ore = setting.oreType();
+        if (ore != null && setting.module() == ModuleId.AUTO_MINE) return isMineOreEnabled(ore);
         if (ore != null && setting.type() == ModuleSetting.Type.TOGGLE) return isOreEnabled(ore);
         switch (setting) {
             case MELEE_PLAYERS: return meleePlayers;
@@ -300,6 +321,12 @@ public final class ModConfig {
     public static boolean toggle(ModuleSetting setting) {
         boolean value = !getToggle(setting);
         OreType ore = setting.oreType();
+        if (ore != null && setting.module() == ModuleId.AUTO_MINE) {
+            mineOreEnabled.put(ore, value);
+            saveBoolean("autoMine", ore.key() + "Mine", value);
+            configuration.save();
+            return value;
+        }
         if (ore != null && setting.type() == ModuleSetting.Type.TOGGLE) {
             oreEnabled.put(ore, value);
             saveBoolean("oreVisualizer", ore.key() + "Enabled", value);
@@ -339,6 +366,11 @@ public final class ModConfig {
         return enabled == null || enabled;
     }
 
+    public static boolean isMineOreEnabled(OreType type) {
+        Boolean enabled = mineOreEnabled.get(type);
+        return enabled == null || enabled;
+    }
+
     public static int getOreColor(OreType type) {
         Integer color = oreColors.get(type);
         return color == null ? type.defaultColor() : color;
@@ -357,6 +389,8 @@ public final class ModConfig {
     public static String getChoice(ModuleSetting setting) {
         if (setting == ModuleSetting.MELEE_PRIORITY) return "health".equalsIgnoreCase(meleePriority) ? "血量" : "距离";
         if (setting == ModuleSetting.BLINK_PRIORITY) return "health".equalsIgnoreCase(blinkPriority) ? "血量" : "距离";
+        if (setting == ModuleSetting.MELEE_ATTACK_POINT) return meleeAttackPoint.displayName();
+        if (setting == ModuleSetting.BLINK_ATTACK_POINT) return blinkAttackPoint.displayName();
         throw new IllegalArgumentException("Setting is not a choice: " + setting);
     }
 
@@ -367,6 +401,12 @@ public final class ModConfig {
         } else if (setting == ModuleSetting.BLINK_PRIORITY) {
             blinkPriority = "health".equalsIgnoreCase(blinkPriority) ? "distance" : "health";
             configuration.get("blinkStrike", "priority", blinkPriority).set(blinkPriority);
+        } else if (setting == ModuleSetting.MELEE_ATTACK_POINT) {
+            meleeAttackPoint = AttackPoint.next(meleeAttackPoint);
+            configuration.get("meleeAura", "attackPoint", meleeAttackPoint.key()).set(meleeAttackPoint.key());
+        } else if (setting == ModuleSetting.BLINK_ATTACK_POINT) {
+            blinkAttackPoint = AttackPoint.next(blinkAttackPoint);
+            configuration.get("blinkStrike", "attackPoint", blinkAttackPoint.key()).set(blinkAttackPoint.key());
         } else {
             throw new IllegalArgumentException("Setting is not a choice: " + setting);
         }
@@ -410,6 +450,13 @@ public final class ModConfig {
 
     private static void saveBoolean(String category, String key, boolean value) {
         configuration.get(category, key, value).set(value);
+    }
+
+    private static boolean defaultMineOreEnabled(OreType type) {
+        for (String name : mineBlocks) {
+            if (type.matchesRegistryName(name)) return true;
+        }
+        return false;
     }
 
     private static String[] fiveMessages(String[] messages, String[] defaults) {

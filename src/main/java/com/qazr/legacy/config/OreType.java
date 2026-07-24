@@ -48,6 +48,18 @@ public enum OreType {
         return defaultColor;
     }
 
+    public boolean matchesRegistryName(String name) {
+        try {
+            ResourceLocation target = new ResourceLocation(name);
+            for (ResourceLocation registryName : registryNames) {
+                if (registryName.equals(target)) return true;
+            }
+            return false;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     public static OreType fromBlock(Block block) {
         return block == null ? null : BY_REGISTRY_NAME.get(block.getRegistryName());
     }

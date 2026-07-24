@@ -6,10 +6,13 @@ import com.qazr.legacy.config.OreType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -97,23 +100,17 @@ public final class OreVisualizer {
         try {
             BufferBuilder buffer = Tessellator.getInstance().getBuffer();
             buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
+            Map<OreType, Set<Long>> markerSets = markerSetsByType();
             for (List<OreMarker> markers : markersByChunk.values()) {
-                Iterator<OreMarker> iterator = markers.iterator();
-                while (iterator.hasNext()) {
-                    OreMarker marker = iterator.next();
+                for (OreMarker marker : markers) {
                     if (!ModConfig.isOreEnabled(marker.type)) continue;
                     double dx = marker.pos.getX() + 0.5 - mc.player.posX;
                     double dy = marker.pos.getY() + 0.5 - mc.player.posY;
                     double dz = marker.pos.getZ() + 0.5 - mc.player.posZ;
                     if (dx * dx + dy * dy + dz * dz > rangeSq) continue;
-                    IBlockState state = mc.world.getBlockState(marker.pos);
-                    OreType current = OreType.fromBlock(state.getBlock());
-                    if (current == null) {
-                        iterator.remove();
-                        continue;
-                    }
-                    addBox(buffer, marker.pos.getX() - viewerX, marker.pos.getY() - viewerY,
-                        marker.pos.getZ() - viewerZ, ModConfig.getOreColor(current));
+                    Set<Long> sameType = markerSets.get(marker.type);
+                    if (sameType != null) addBoundaryBox(buffer, marker.pos, sameType, viewerX, viewerY, viewerZ,
+                        ModConfig.getOreColor(marker.type));
                 }
             }
             Tessellator.getInstance().draw();
@@ -133,34 +130,108 @@ public final class OreVisualizer {
         while (iterator.hasNext()) if (iterator.next().key == key) iterator.remove();
     }
 
-    private static void addBox(BufferBuilder buffer, double x, double y, double z, int color) {
-        double x1 = x + BOX_INSET;
-        double y1 = y + BOX_INSET;
-        double z1 = z + BOX_INSET;
-        double x2 = x + 1.0 - BOX_INSET;
-        double y2 = y + 1.0 - BOX_INSET;
-        double z2 = z + 1.0 - BOX_INSET;
+    private Map<OreType, Set<Long>> markerSetsByType() {
+        Map<OreType, Set<Long>> result = new EnumMap<>(OreType.class);
+        Iterator<Map.Entry<Long, List<OreMarker>>> chunkIterator = markersByChunk.entrySet().iterator();
+        while (chunkIterator.hasNext()) {
+            List<OreMarker> markers = chunkIterator.next().getValue();
+            Iterator<OreMarker> markerIterator = markers.iterator();
+            while (markerIterator.hasNext()) {
+                OreMarker marker = markerIterator.next();
+                IBlockState state = mc.world.getBlockState(marker.pos);
+                OreType current = OreType.fromBlock(state.getBlock());
+                if (current != marker.type) {
+                    markerIterator.remove();
+                    continue;
+                }
+                result.computeIfAbsent(marker.type, ignored -> new HashSet<>()).add(marker.pos.toLong());
+            }
+            if (markers.isEmpty()) chunkIterator.remove();
+        }
+        return result;
+    }
+
+    private static void addBoundaryBox(BufferBuilder buffer, BlockPos pos, Set<Long> sameType,
+            double viewerX, double viewerY, double viewerZ, int color) {
         float red = ((color >> 16) & 0xFF) / 255.0F;
         float green = ((color >> 8) & 0xFF) / 255.0F;
         float blue = (color & 0xFF) / 255.0F;
-        line(buffer, x1, y1, z1, x2, y1, z1, red, green, blue);
-        line(buffer, x2, y1, z1, x2, y1, z2, red, green, blue);
-        line(buffer, x2, y1, z2, x1, y1, z2, red, green, blue);
-        line(buffer, x1, y1, z2, x1, y1, z1, red, green, blue);
-        line(buffer, x1, y2, z1, x2, y2, z1, red, green, blue);
-        line(buffer, x2, y2, z1, x2, y2, z2, red, green, blue);
-        line(buffer, x2, y2, z2, x1, y2, z2, red, green, blue);
-        line(buffer, x1, y2, z2, x1, y2, z1, red, green, blue);
-        line(buffer, x1, y1, z1, x1, y2, z1, red, green, blue);
-        line(buffer, x2, y1, z1, x2, y2, z1, red, green, blue);
-        line(buffer, x2, y1, z2, x2, y2, z2, red, green, blue);
-        line(buffer, x1, y1, z2, x1, y2, z2, red, green, blue);
+        addBoundaryBox(new BufferSink(buffer), pos, sameType, viewerX, viewerY, viewerZ, red, green, blue);
     }
 
-    private static void line(BufferBuilder buffer, double x1, double y1, double z1,
+    static int boundaryLineCount(Set<BlockPos> positions, BlockPos pos) {
+        Set<Long> encoded = new HashSet<>();
+        for (BlockPos block : positions) encoded.add(block.toLong());
+        CountingBuffer buffer = new CountingBuffer();
+        addBoundaryBox(buffer, pos, encoded, 0.0, 0.0, 0.0, 1.0F, 1.0F, 1.0F);
+        return buffer.count;
+    }
+
+    private static void addBoundaryBox(LineSink sink, BlockPos pos, Set<Long> sameType,
+            double viewerX, double viewerY, double viewerZ, float red, float green, float blue) {
+        double x1 = pos.getX() - viewerX + BOX_INSET;
+        double y1 = pos.getY() - viewerY + BOX_INSET;
+        double z1 = pos.getZ() - viewerZ + BOX_INSET;
+        double x2 = pos.getX() - viewerX + 1.0 - BOX_INSET;
+        double y2 = pos.getY() - viewerY + 1.0 - BOX_INSET;
+        double z2 = pos.getZ() - viewerZ + 1.0 - BOX_INSET;
+        boolean west = boundary(sameType, pos.add(-1, 0, 0));
+        boolean east = boundary(sameType, pos.add(1, 0, 0));
+        boolean down = boundary(sameType, pos.add(0, -1, 0));
+        boolean up = boundary(sameType, pos.add(0, 1, 0));
+        boolean north = boundary(sameType, pos.add(0, 0, -1));
+        boolean south = boundary(sameType, pos.add(0, 0, 1));
+        if (down && north) line(sink, x1, y1, z1, x2, y1, z1, red, green, blue);
+        if (down && south) line(sink, x1, y1, z2, x2, y1, z2, red, green, blue);
+        if (up && north) line(sink, x1, y2, z1, x2, y2, z1, red, green, blue);
+        if (up && south) line(sink, x1, y2, z2, x2, y2, z2, red, green, blue);
+        if (down && west) line(sink, x1, y1, z1, x1, y1, z2, red, green, blue);
+        if (down && east) line(sink, x2, y1, z1, x2, y1, z2, red, green, blue);
+        if (up && west) line(sink, x1, y2, z1, x1, y2, z2, red, green, blue);
+        if (up && east) line(sink, x2, y2, z1, x2, y2, z2, red, green, blue);
+        if (west && north) line(sink, x1, y1, z1, x1, y2, z1, red, green, blue);
+        if (east && north) line(sink, x2, y1, z1, x2, y2, z1, red, green, blue);
+        if (west && south) line(sink, x1, y1, z2, x1, y2, z2, red, green, blue);
+        if (east && south) line(sink, x2, y1, z2, x2, y2, z2, red, green, blue);
+    }
+
+    private static boolean boundary(Set<Long> sameType, BlockPos neighbor) {
+        return !sameType.contains(neighbor.toLong());
+    }
+
+    private static void line(LineSink sink, double x1, double y1, double z1,
             double x2, double y2, double z2, float red, float green, float blue) {
-        buffer.pos(x1, y1, z1).color(red, green, blue, 0.9F).endVertex();
-        buffer.pos(x2, y2, z2).color(red, green, blue, 0.9F).endVertex();
+        sink.line(x1, y1, z1, x2, y2, z2, red, green, blue);
+    }
+
+    private interface LineSink {
+        void line(double x1, double y1, double z1, double x2, double y2, double z2,
+            float red, float green, float blue);
+    }
+
+    private static final class CountingBuffer implements LineSink {
+        private int count;
+
+        @Override
+        public void line(double x1, double y1, double z1, double x2, double y2, double z2,
+                float red, float green, float blue) {
+            count++;
+        }
+    }
+
+    private static final class BufferSink implements LineSink {
+        private final BufferBuilder buffer;
+
+        private BufferSink(BufferBuilder buffer) {
+            this.buffer = buffer;
+        }
+
+        @Override
+        public void line(double x1, double y1, double z1, double x2, double y2, double z2,
+                float red, float green, float blue) {
+            buffer.pos(x1, y1, z1).color(red, green, blue, 0.9F).endVertex();
+            buffer.pos(x2, y2, z2).color(red, green, blue, 0.9F).endVertex();
+        }
     }
 
     private static final class ScanTask {

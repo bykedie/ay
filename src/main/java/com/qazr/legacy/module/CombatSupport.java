@@ -2,6 +2,7 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
+import com.qazr.legacy.config.AttackPoint;
 import com.qazr.legacy.util.CombatMath;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -144,9 +145,14 @@ final class CombatSupport {
     }
 
     static float[] rotations(Vec3d fromEyes, EntityLivingBase target) {
-        double dx = target.posX - fromEyes.x;
-        double dy = target.posY + target.getEyeHeight() - fromEyes.y;
-        double dz = target.posZ - fromEyes.z;
+        return rotations(fromEyes, target, AttackPoint.HEAD);
+    }
+
+    static float[] rotations(Vec3d fromEyes, EntityLivingBase target, AttackPoint point) {
+        Vec3d targetPoint = point.point(target);
+        double dx = targetPoint.x - fromEyes.x;
+        double dy = targetPoint.y - fromEyes.y;
+        double dz = targetPoint.z - fromEyes.z;
         return new float[] {CombatMath.yaw(dx, dz), CombatMath.pitch(dx, dy, dz)};
     }
 

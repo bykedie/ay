@@ -27,3 +27,17 @@
 - Added five editable random message slots to automatic GG and reply automation.
 - Added peaceful-target filters and raised both combat multi-target limits to 50.
 - Added an independent target visualizer with skeleton, box and ray switches plus visible/obstructed colors.
+
+## Version 1.6 Voris Hub Update
+
+- Renamed the user-facing project and panel to `Voris Hub` while keeping internal `qazrlegacy` compatibility keys.
+- Added per-ore visualization controls, configurable colors, 150-block defaults and 500-block maximum visualization ranges.
+- Added parameter help icons and right-click expandable module settings throughout the control panel.
+
+## Version 1.7 Automation And Targeting Update
+
+- Added `autoBridge` / `自动搭路`, which places a block below the next walking position and can temporarily swap blocks from inventory without changing the visible held slot for long.
+- Upgraded `autoMine` with per-ore presets, configurable walking range, optional target count, nearest reachable ore selection and simple loaded-world path following.
+- Added combat attack body-point choices for `meleeAura` and `blinkStrike`.
+- Optimized `oreVisualizer` to merge adjacent ore blocks into outer wireframes and skip internal cluster lines such as the center lines in a 3x3 ore group.
+- Added tests for auto-bridge movement, ore-boundary rendering, attack-point persistence and auto-mining preset configuration.

@@ -1,6 +1,7 @@
 module.qazr.autoGg=自动发送 GG
 module.qazr.autoReply=自动回复
 module.qazr.autoMine=自动挖矿
+module.qazr.autoBridge=自动搭路
 module.qazr.oreVisualizer=矿物可视化
 module.qazr.creativeTools=创造工具
 module.qazr.meleeAura=自动近战

@@ -19,6 +19,7 @@ public final class ModuleManager {
         states.put(ModuleId.AUTO_GG, ModConfig.autoGg);
         states.put(ModuleId.AUTO_REPLY, ModConfig.autoReply);
         states.put(ModuleId.AUTO_MINE, ModConfig.autoMine);
+        states.put(ModuleId.AUTO_BRIDGE, ModConfig.autoBridge);
         states.put(ModuleId.ORE_VISUALIZER, ModConfig.oreVisualizer);
         states.put(ModuleId.CREATIVE_TOOLS, ModConfig.creativeTools);
         states.put(ModuleId.MELEE_AURA, ModConfig.meleeAura);

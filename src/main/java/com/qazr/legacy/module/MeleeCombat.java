@@ -63,7 +63,7 @@ public final class MeleeCombat {
 
     private void face(EntityLivingBase target) {
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        float[] rotations = CombatSupport.rotations(eyes, target);
+        float[] rotations = CombatSupport.rotations(eyes, target, ModConfig.meleeAttackPoint);
         mc.player.rotationYaw = rotations[0];
         mc.player.rotationPitch = rotations[1];
     }
