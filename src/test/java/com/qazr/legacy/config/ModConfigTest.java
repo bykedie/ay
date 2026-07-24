@@ -70,6 +70,25 @@ public class ModConfigTest {
         assertFalse(ModConfig.blinkStrike);
     }
 
+    @Test
+    public void persistsExpandablePanelSettings() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.saveNumber(ModuleSetting.MELEE_RANGE, 4.37);
+        ModConfig.saveNumber(ModuleSetting.BLINK_STEP, 5.26);
+        ModConfig.saveNumber(ModuleSetting.GG_MIN_DELAY, 90.0);
+        ModConfig.saveNumber(ModuleSetting.GG_MAX_DELAY, 40.0);
+        ModConfig.toggle(ModuleSetting.MELEE_ANIMALS);
+        ModConfig.cycleChoice(ModuleSetting.MELEE_PRIORITY);
+        ModConfig.reload();
+
+        assertEquals(4.4, ModConfig.meleeRange, 0.001);
+        assertEquals(5.3, ModConfig.blinkStep, 0.001);
+        assertEquals(40, ModConfig.ggMinDelayTicks);
+        assertEquals(40, ModConfig.ggMaxDelayTicks);
+        assertTrue(ModConfig.meleeAnimals);
+        assertEquals("health", ModConfig.meleePriority);
+    }
+
     private File configFile() throws Exception {
         return new File(folder.getRoot(), "qazrlegacy.cfg");
     }

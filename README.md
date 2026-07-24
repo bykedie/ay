@@ -28,6 +28,7 @@ All modules and their detailed settings are stored in `config/qazrlegacy.cfg`.
 
 - `Right Shift`: open the module control screen.
 - Module toggle key bindings are unassigned by default and can be set in Minecraft's Controls screen.
+- Left-click a module to toggle it; right-click it to expand persistent sliders, switches, and choices below the module.
 - `/qazr status`
 - `/qazr toggle <module>`
 - `/qazr reload`
@@ -51,7 +52,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/qazr-legacy-1.2.2.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/qazr-legacy-1.3.0.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

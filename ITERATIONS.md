@@ -19,3 +19,4 @@
 - Added Chinese module names and release verification for the packaged language resource and GUI class.
 - Reworked the module screen into an in-world, multi-column ClickGUI with Chinese categories and live states.
 - Embedded visible Chinese labels in code so legacy clients cannot expose untranslated resource keys.
+- Added right-click module drawers with persistent sliders, toggles, and target-priority controls.

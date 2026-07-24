@@ -110,6 +110,108 @@ public final class ModConfig {
         throw new IllegalArgumentException("Module has no attack range: " + id.key());
     }
 
+    public static double getNumber(ModuleSetting setting) {
+        switch (setting) {
+            case GG_MIN_DELAY: return ggMinDelayTicks;
+            case GG_MAX_DELAY: return ggMaxDelayTicks;
+            case REPLY_COOLDOWN: return replyCooldownTicks;
+            case MINE_RADIUS: return mineRadius;
+            case MINE_DELAY: return mineDelayTicks;
+            case MELEE_RANGE: return meleeRange;
+            case MELEE_DELAY: return meleeDelayTicks;
+            case BLINK_RANGE: return blinkRange;
+            case BLINK_STEP: return blinkStep;
+            case BLINK_ATTACK_DISTANCE: return blinkAttackDistance;
+            case BLINK_PREDICT: return blinkPredictTicks;
+            case BLINK_DELAY: return blinkDelayTicks;
+            default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
+        }
+    }
+
+    public static double saveNumber(ModuleSetting setting, double value) {
+        if (setting.type() != ModuleSetting.Type.NUMBER) {
+            throw new IllegalArgumentException("Setting is not numeric: " + setting);
+        }
+        double clamped = Math.max(setting.min(), Math.min(setting.max(), value));
+        double rounded = Math.round(clamped / setting.step()) * setting.step();
+        rounded = Math.max(setting.min(), Math.min(setting.max(), rounded));
+        switch (setting) {
+            case GG_MIN_DELAY:
+                ggMinDelayTicks = (int) rounded;
+                if (ggMaxDelayTicks < ggMinDelayTicks) ggMaxDelayTicks = ggMinDelayTicks;
+                saveInt("autoGg", "minDelayTicks", ggMinDelayTicks);
+                saveInt("autoGg", "maxDelayTicks", ggMaxDelayTicks);
+                break;
+            case GG_MAX_DELAY:
+                ggMaxDelayTicks = (int) rounded;
+                if (ggMinDelayTicks > ggMaxDelayTicks) ggMinDelayTicks = ggMaxDelayTicks;
+                saveInt("autoGg", "maxDelayTicks", ggMaxDelayTicks);
+                saveInt("autoGg", "minDelayTicks", ggMinDelayTicks);
+                break;
+            case REPLY_COOLDOWN: replyCooldownTicks = (int) rounded; saveInt("autoReply", "cooldownTicks", replyCooldownTicks); break;
+            case MINE_RADIUS: mineRadius = (int) rounded; saveInt("autoMine", "radius", mineRadius); break;
+            case MINE_DELAY: mineDelayTicks = (int) rounded; saveInt("autoMine", "delayTicks", mineDelayTicks); break;
+            case MELEE_RANGE: meleeRange = rounded; saveDouble("meleeAura", "range", rounded); break;
+            case MELEE_DELAY: meleeDelayTicks = (int) rounded; saveInt("meleeAura", "delayTicks", meleeDelayTicks); break;
+            case BLINK_RANGE: blinkRange = rounded; saveDouble("blinkStrike", "range", rounded); break;
+            case BLINK_STEP: blinkStep = rounded; saveDouble("blinkStrike", "step", rounded); break;
+            case BLINK_ATTACK_DISTANCE: blinkAttackDistance = rounded; saveDouble("blinkStrike", "attackDistance", rounded); break;
+            case BLINK_PREDICT: blinkPredictTicks = (int) rounded; saveInt("blinkStrike", "predictTicks", blinkPredictTicks); break;
+            case BLINK_DELAY: blinkDelayTicks = (int) rounded; saveInt("blinkStrike", "delayTicks", blinkDelayTicks); break;
+            default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
+        }
+        configuration.save();
+        return rounded;
+    }
+
+    public static boolean getToggle(ModuleSetting setting) {
+        switch (setting) {
+            case MELEE_PLAYERS: return meleePlayers;
+            case MELEE_HOSTILES: return meleeHostiles;
+            case MELEE_ANIMALS: return meleeAnimals;
+            case MELEE_AUTO_WEAPON: return meleeAutoWeapon;
+            default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
+        }
+    }
+
+    public static boolean toggle(ModuleSetting setting) {
+        boolean value = !getToggle(setting);
+        switch (setting) {
+            case MELEE_PLAYERS: meleePlayers = value; saveBoolean("meleeAura", "players", value); break;
+            case MELEE_HOSTILES: meleeHostiles = value; saveBoolean("meleeAura", "hostiles", value); break;
+            case MELEE_ANIMALS: meleeAnimals = value; saveBoolean("meleeAura", "animals", value); break;
+            case MELEE_AUTO_WEAPON: meleeAutoWeapon = value; saveBoolean("meleeAura", "autoWeapon", value); break;
+            default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
+        }
+        configuration.save();
+        return value;
+    }
+
+    public static String getChoice(ModuleSetting setting) {
+        if (setting != ModuleSetting.MELEE_PRIORITY) throw new IllegalArgumentException("Setting is not a choice: " + setting);
+        return "health".equalsIgnoreCase(meleePriority) ? "血量" : "距离";
+    }
+
+    public static String cycleChoice(ModuleSetting setting) {
+        if (setting != ModuleSetting.MELEE_PRIORITY) throw new IllegalArgumentException("Setting is not a choice: " + setting);
+        meleePriority = "health".equalsIgnoreCase(meleePriority) ? "distance" : "health";
+        configuration.get("meleeAura", "priority", meleePriority).set(meleePriority);
+        configuration.save();
+        return getChoice(setting);
+    }
+
+    private static void saveInt(String category, String key, int value) {
+        configuration.get(category, key, value).set(value);
+    }
+
+    private static void saveDouble(String category, String key, double value) {
+        configuration.get(category, key, value).set(value);
+    }
+
+    private static void saveBoolean(String category, String key, boolean value) {
+        configuration.get(category, key, value).set(value);
+    }
+
     private static void requireRange(ModuleId id, double value, double min, double max) {
         if (!Double.isFinite(value) || value < min || value > max) {
             throw new IllegalArgumentException(id.key() + " range must be between " + min + " and " + max);
