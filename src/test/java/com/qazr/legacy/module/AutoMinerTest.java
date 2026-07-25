@@ -2,7 +2,9 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.OreType;
 import java.util.Arrays;
+import java.util.List;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -37,5 +39,24 @@ public class AutoMinerTest {
     public void pathPriorityGuidesSearchTowardTheNearestGoal() {
         BlockPos goal = new BlockPos(10, 20, 30);
         assertEquals(4, AutoMiner.pathPriority(1, new BlockPos(8, 20, 29), Arrays.asList(goal)));
+    }
+
+    @Test
+    public void corridorCellsKeepHeadAndFeetObstaclesInRouteOrder() {
+        List<BlockPos> cells = AutoMiner.corridorCells(Arrays.asList(
+            new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), 0, 10);
+
+        assertEquals(Arrays.asList(
+            new BlockPos(1, 64, 0), new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), cells);
+    }
+
+    @Test
+    public void miningReachUsesTheNearestPointOnTheBlock() {
+        BlockPos target = new BlockPos(5, 64, 0);
+        Vec3d eyes = new Vec3d(0.5, 64.5, 0.5);
+
+        assertTrue(AutoMiner.withinMiningReach(eyes, target, 4.5));
+        assertFalse(AutoMiner.withinMiningReach(eyes, target, 4.49));
+        assertEquals(new Vec3d(5.5, 64.5, 0.5), AutoMiner.blockCenter(target));
     }
 }

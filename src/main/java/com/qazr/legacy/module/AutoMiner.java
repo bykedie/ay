@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -35,7 +36,6 @@ import org.lwjgl.opengl.GL11;
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 3000;
     private static final int MAX_PATH_TARGETS = 24;
-    private static final double REACHABLE_MINE_DISTANCE_SQ = 25.0;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -47,6 +47,7 @@ public final class AutoMiner {
     private OreType currentOreType;
     private BlockPos miningPos;
     private OreType miningType;
+    private BlockPos clearingPos;
     private BlockPos lastMinedOre;
     private OreType lastMinedType;
     private int pathIndex;
@@ -80,6 +81,12 @@ public final class AutoMiner {
             return;
         }
         if (delay-- > 0) return;
+        if (continueClearingObstacle()) return;
+        if (continueMiningTarget()) return;
+        if (hasActiveRoute()) {
+            followPathToOre();
+            return;
+        }
         MineTarget visible = findNearestReachable();
         if (visible != null) {
             mine(visible);
@@ -106,6 +113,11 @@ public final class AutoMiner {
         try {
             AxisAlignedBB box = new AxisAlignedBB(currentOre).offset(-viewerX, -viewerY, -viewerZ).grow(0.03);
             RenderGlobal.drawSelectionBoundingBox(box, 0.20F, 0.85F, 1.0F, 0.95F);
+            for (BlockPos obstacle : plannedObstacles()) {
+                AxisAlignedBB obstacleBox = new AxisAlignedBB(obstacle)
+                    .offset(-viewerX, -viewerY, -viewerZ).grow(0.02);
+                RenderGlobal.drawSelectionBoundingBox(obstacleBox, 1.0F, 0.45F, 0.10F, 0.95F);
+            }
             BufferBuilder buffer = Tessellator.getInstance().getBuffer();
             buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
             drawRoute(buffer, viewerX, viewerY, viewerZ);
@@ -185,9 +197,44 @@ public final class AutoMiner {
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningPos = target.pos;
         miningType = target.type;
-        currentOre = target.pos;
-        currentOreType = target.type;
+        if (!hasActiveRoute()) {
+            currentOre = target.pos;
+            currentOreType = target.type;
+        }
         delay = ModConfig.mineDelayTicks;
+    }
+
+    private boolean continueMiningTarget() {
+        if (miningPos == null || miningType == null) return false;
+        if (OreType.fromBlock(mc.world.getBlockState(miningPos).getBlock()) != miningType) return false;
+        MineTarget target = visibleTarget(miningPos);
+        if (target == null) {
+            miningPos = null;
+            miningType = null;
+            return false;
+        }
+        mine(target);
+        return true;
+    }
+
+    private boolean continueClearingObstacle() {
+        if (clearingPos == null) return false;
+        if (isPassable(clearingPos)) {
+            clearingPos = null;
+            return false;
+        }
+        if (!damageCorridorBlock(clearingPos)) {
+            clearingPos = null;
+            clearPath();
+            delay = 2;
+            return true;
+        }
+        delay = ModConfig.mineDelayTicks;
+        return true;
+    }
+
+    private boolean hasActiveRoute() {
+        return currentOre != null && pathIndex < path.size();
     }
 
     private void followPathToOre() {
@@ -415,15 +462,48 @@ public final class AutoMiner {
         if (!obstacle.equals(desired) && !obstacle.equals(permittedLower)) return false;
         OreType ore = targetType(obstacle);
         if (ore != null) {
+            if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
             mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit));
             return true;
         }
+        if (!damageCorridorBlock(obstacle)) return false;
+        clearingPos = obstacle.toImmutable();
+        return true;
+    }
+
+    private boolean damageCorridorBlock(BlockPos obstacle) {
         if (!isBreakableBlock(obstacle)) return false;
+        Vec3d eyes = mc.player.getPositionEyes(1.0F);
+        if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
+        Vec3d point = blockCenter(obstacle);
+        RayTraceResult hit = mc.world.rayTraceBlocks(eyes, point, false, true, false);
+        if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
+                || !obstacle.equals(hit.getBlockPos())) return false;
         selectBestPickaxe(mc.world.getBlockState(obstacle));
         face(obstacle);
         mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         return true;
+    }
+
+    private List<BlockPos> plannedObstacles() {
+        List<BlockPos> result = new ArrayList<>();
+        for (BlockPos cell : corridorCells(path, pathIndex, ROUTE_RENDER_LIMIT)) {
+            if (!isPassable(cell)) result.add(cell);
+        }
+        return result;
+    }
+
+    static List<BlockPos> corridorCells(List<BlockPos> path, int start, int limit) {
+        LinkedHashSet<BlockPos> cells = new LinkedHashSet<>();
+        int from = Math.max(0, start);
+        int end = Math.min(path.size(), from + Math.max(0, limit));
+        for (int i = from; i < end; i++) {
+            BlockPos feet = path.get(i);
+            cells.add(feet.up());
+            cells.add(feet);
+        }
+        return new ArrayList<>(cells);
     }
 
     static boolean sameVein(BlockPos first, BlockPos second, OreType firstType, OreType secondType) {
@@ -446,6 +526,7 @@ public final class AutoMiner {
         currentOreType = null;
         miningPos = null;
         miningType = null;
+        clearingPos = null;
         pathIndex = 0;
     }
 
@@ -475,7 +556,6 @@ public final class AutoMiner {
         MineTarget veinTarget = findVisibleVeinTarget(candidates);
         if (veinTarget != null) return veinTarget;
         for (OreVisualizer.CachedOre candidate : candidates) {
-            if (candidate.distanceSq() > REACHABLE_MINE_DISTANCE_SQ) break;
             if (quotaReached(candidate.type())) continue;
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) return visible;
@@ -497,10 +577,29 @@ public final class AutoMiner {
         OreType type = targetType(pos);
         if (type == null) return null;
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        Vec3d center = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+        if (!withinMiningReach(eyes, pos, miningReach())) return null;
+        Vec3d center = blockCenter(pos);
         RayTraceResult hit = mc.world.rayTraceBlocks(eyes, center, false, true, false);
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK || !pos.equals(hit.getBlockPos())) return null;
         return new MineTarget(pos.toImmutable(), type, hit.sideHit);
+    }
+
+    private double miningReach() {
+        return mc.playerController.getBlockReachDistance();
+    }
+
+    static Vec3d blockCenter(BlockPos pos) {
+        return new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
+    static boolean withinMiningReach(Vec3d eyes, BlockPos pos, double reach) {
+        double nearestX = MathHelper.clamp(eyes.x, pos.getX(), pos.getX() + 1.0);
+        double nearestY = MathHelper.clamp(eyes.y, pos.getY(), pos.getY() + 1.0);
+        double nearestZ = MathHelper.clamp(eyes.z, pos.getZ(), pos.getZ() + 1.0);
+        double dx = eyes.x - nearestX;
+        double dy = eyes.y - nearestY;
+        double dz = eyes.z - nearestZ;
+        return dx * dx + dy * dy + dz * dz <= reach * reach;
     }
 
     private void face(BlockPos pos) {
@@ -515,24 +614,33 @@ public final class AutoMiner {
     }
 
     private void drawRoute(BufferBuilder buffer, double viewerX, double viewerY, double viewerZ) {
-        double lastX = mc.player.posX - viewerX;
-        double lastY = mc.player.getEntityBoundingBox().minY + 0.10 - viewerY;
-        double lastZ = mc.player.posZ - viewerZ;
-        int end = Math.min(path.size(), Math.max(pathIndex, 0) + ROUTE_RENDER_LIMIT);
-        for (int i = Math.max(0, pathIndex); i < end; i++) {
-            BlockPos point = path.get(i);
+        BlockPos playerCell = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        double lastX = playerCell.getX() + 0.5 - viewerX;
+        double lastY = playerCell.getY() + 0.5 - viewerY;
+        double lastZ = playerCell.getZ() + 0.5 - viewerZ;
+        for (BlockPos point : plannedRoutePoints()) {
             double x = point.getX() + 0.5 - viewerX;
-            double y = point.getY() + 0.10 - viewerY;
+            double y = point.getY() + 0.5 - viewerY;
             double z = point.getZ() + 0.5 - viewerZ;
             routeLine(buffer, lastX, lastY, lastZ, x, y, z);
             lastX = x;
             lastY = y;
             lastZ = z;
         }
-        double targetX = currentOre.getX() + 0.5 - viewerX;
-        double targetY = currentOre.getY() + 0.5 - viewerY;
-        double targetZ = currentOre.getZ() + 0.5 - viewerZ;
-        routeLine(buffer, lastX, lastY, lastZ, targetX, targetY, targetZ);
+    }
+
+    private List<BlockPos> plannedRoutePoints() {
+        LinkedHashSet<BlockPos> points = new LinkedHashSet<>();
+        int from = Math.max(0, pathIndex);
+        int end = Math.min(path.size(), from + ROUTE_RENDER_LIMIT);
+        for (int i = from; i < end; i++) {
+            BlockPos feet = path.get(i);
+            if (!isPassable(feet.up())) points.add(feet.up());
+            if (!isPassable(feet)) points.add(feet);
+            points.add(feet);
+        }
+        points.add(currentOre);
+        return new ArrayList<>(points);
     }
 
     private void routeLine(BufferBuilder buffer, double x1, double y1, double z1, double x2, double y2, double z2) {
