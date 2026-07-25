@@ -254,6 +254,18 @@ public final class AutoMiner {
             }
         }
         BlockPos next = path.get(pathIndex);
+        BlockPos from = pathIndex == 0
+            ? standPos(new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ))
+            : path.get(pathIndex - 1);
+        if (next.getY() > from.getY() && !isPassable(from.up(2))) {
+            if (!clearCorridorCell(from.up(2), from.up(2))) {
+                clearPath();
+                delay = 2;
+                return;
+            }
+            delay = ModConfig.mineDelayTicks;
+            return;
+        }
         if (!isStandable(next)) {
             if (!clearBlockingObstacle(next)) {
                 clearPath();
@@ -355,8 +367,12 @@ public final class AutoMiner {
             int currentCost, BlockPos next, int verticalPenalty) {
         int stepCost = traversalCost(next);
         if (stepCost < 0) return;
+        int jumpExcavation = next.getY() > from.getY()
+            ? jumpClearanceCost(isPassable(from.up(2)), canClearForCorridor(from.up(2)))
+            : 0;
+        if (jumpExcavation < 0) return;
         if (start.distanceSq(next) > ModConfig.minePathRange * ModConfig.minePathRange) return;
-        int nextCost = currentCost + stepCost + verticalPenalty;
+        int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
         Integer known = costs.get(next);
         if (known != null && known <= nextCost) return;
         previous.put(next, from);
@@ -426,6 +442,11 @@ public final class AutoMiner {
         return (feetClear ? 0 : 1) + (headClear ? 0 : 1);
     }
 
+    static int jumpClearanceCost(boolean clear, boolean breakable) {
+        if (clear) return 0;
+        return breakable ? 1 : -1;
+    }
+
     private boolean hasSolidSupport(BlockPos feet) {
         IBlockState support = mc.world.getBlockState(feet.down());
         return !support.getMaterial().isReplaceable() && support.getMaterial().blocksMovement();
@@ -488,20 +509,31 @@ public final class AutoMiner {
 
     private List<BlockPos> plannedObstacles() {
         List<BlockPos> result = new ArrayList<>();
-        for (BlockPos cell : corridorCells(path, pathIndex, ROUTE_RENDER_LIMIT)) {
+        BlockPos routeStart = pathIndex == 0
+            ? standPos(new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ))
+            : path.get(pathIndex - 1);
+        for (BlockPos cell : corridorCells(path, pathIndex, ROUTE_RENDER_LIMIT, routeStart)) {
             if (!isPassable(cell)) result.add(cell);
         }
         return result;
     }
 
     static List<BlockPos> corridorCells(List<BlockPos> path, int start, int limit) {
+        BlockPos routeStart = start > 0 && start <= path.size() ? path.get(start - 1) : null;
+        return corridorCells(path, start, limit, routeStart);
+    }
+
+    static List<BlockPos> corridorCells(List<BlockPos> path, int start, int limit, BlockPos routeStart) {
         LinkedHashSet<BlockPos> cells = new LinkedHashSet<>();
         int from = Math.max(0, start);
         int end = Math.min(path.size(), from + Math.max(0, limit));
+        BlockPos previous = routeStart;
         for (int i = from; i < end; i++) {
             BlockPos feet = path.get(i);
+            if (previous != null && feet.getY() > previous.getY()) cells.add(previous.up(2));
             cells.add(feet.up());
             cells.add(feet);
+            previous = feet;
         }
         return new ArrayList<>(cells);
     }
@@ -576,6 +608,8 @@ public final class AutoMiner {
     private MineTarget visibleTarget(BlockPos pos) {
         OreType type = targetType(pos);
         if (type == null) return null;
+        BlockPos playerFeet = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        if (!stableMiningPosition(playerFeet, pos)) return null;
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
         if (!withinMiningReach(eyes, pos, miningReach())) return null;
         Vec3d center = blockCenter(pos);
@@ -590,6 +624,14 @@ public final class AutoMiner {
 
     static Vec3d blockCenter(BlockPos pos) {
         return new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
+    static boolean stableMiningPosition(BlockPos playerFeet, BlockPos ore) {
+        int dx = Math.abs(playerFeet.getX() - ore.getX());
+        int dy = ore.getY() - playerFeet.getY();
+        int dz = Math.abs(playerFeet.getZ() - ore.getZ());
+        if (dx == 0 && dz == 0) return dy == -1;
+        return dx + dz == 1 && dy >= -1 && dy <= 2;
     }
 
     static boolean withinMiningReach(Vec3d eyes, BlockPos pos, double reach) {

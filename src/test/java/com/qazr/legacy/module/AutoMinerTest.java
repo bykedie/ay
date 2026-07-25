@@ -51,6 +51,36 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void ascendingRoutesIncludeTheJumpStartHeadClearance() {
+        BlockPos start = new BlockPos(0, 64, 0);
+        List<BlockPos> cells = AutoMiner.corridorCells(Arrays.asList(
+            new BlockPos(1, 65, 0), new BlockPos(2, 65, 0)), 0, 10, start);
+
+        assertEquals(Arrays.asList(
+            new BlockPos(0, 66, 0), new BlockPos(1, 66, 0),
+            new BlockPos(1, 65, 0), new BlockPos(2, 66, 0),
+            new BlockPos(2, 65, 0)), cells);
+    }
+
+    @Test
+    public void jumpClearanceMustBeOpenOrBreakable() {
+        assertEquals(0, AutoMiner.jumpClearanceCost(true, false));
+        assertEquals(1, AutoMiner.jumpClearanceCost(false, true));
+        assertEquals(-1, AutoMiner.jumpClearanceCost(false, false));
+    }
+
+    @Test
+    public void directMiningRequiresAnOrthogonallyAdjacentPosition() {
+        BlockPos feet = new BlockPos(0, 64, 0);
+
+        assertTrue(AutoMiner.stableMiningPosition(feet, new BlockPos(1, 64, 0)));
+        assertTrue(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 63, 0)));
+        assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(1, 64, 1)));
+        assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(4, 64, 0)));
+        assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 66, 0)));
+    }
+
+    @Test
     public void miningReachUsesTheNearestPointOnTheBlock() {
         BlockPos target = new BlockPos(5, 64, 0);
         Vec3d eyes = new Vec3d(0.5, 64.5, 0.5);
