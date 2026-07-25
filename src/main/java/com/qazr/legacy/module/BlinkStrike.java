@@ -21,12 +21,18 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class BlinkStrike {
-    private static final int FLIGHT_SUSPEND_TICKS = 8;
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
+    private static final int RECOVERY_TICKS = 12;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
+    private final Map<Integer, Integer> reachableUntil = new HashMap<>();
+    private final List<BlinkPath.Point> recoveryDestinations = new ArrayList<>();
+    private BlinkPath.Point recoveryOrigin;
+    private BlinkPath.Point lastRecoveryPosition;
+    private boolean recoveryOnGround;
+    private int recoveryUntilTick;
     private int delay;
 
     public BlinkStrike(ModuleManager modules) {
@@ -35,7 +41,9 @@ public final class BlinkStrike {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
+        if (event.phase != TickEvent.Phase.END) return;
+        recoverUnexpectedTeleport();
+        if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
         if (delay > 0) {
@@ -59,8 +67,9 @@ public final class BlinkStrike {
         if (ModConfig.blinkRotate) face(strikes.get(0).target);
 
         boolean attacked = false;
-        FlightController.suspend(FLIGHT_SUSPEND_TICKS);
+        beginRecovery(origin, originOnGround);
         for (PlannedStrike strike : strikes) {
+            recoveryDestinations.add(strike.plan.destination);
             if (strike(strike.target, origin, strike.plan, originOnGround)) attacked = true;
         }
         if (attacked) {
@@ -76,6 +85,9 @@ public final class BlinkStrike {
         boolean transportOnGround = transportOnGround(originOnGround,
             modules.isEnabled(ModuleId.FLIGHT));
         List<BlinkPath.Point> path = plan.path;
+        double originalMotionX = mc.player.motionX;
+        double originalMotionY = mc.player.motionY;
+        double originalMotionZ = mc.player.motionZ;
         int sent = 0;
         try {
             for (BlinkPath.Point point : path) {
@@ -94,14 +106,13 @@ public final class BlinkStrike {
             for (int i = 0; i < returnPath.size(); i++) {
                 sendPosition(returnPath.get(i), transportOnGround);
             }
-            if (returnPath.isEmpty() && transportOnGround) sendPosition(origin, true);
+            sendPosition(origin, originOnGround);
             mc.player.fallDistance = 0.0F;
-            mc.player.motionY = 0.0;
-            mc.player.motionX = 0.0;
-            mc.player.motionZ = 0.0;
+            mc.player.motionX = originalMotionX;
+            mc.player.motionY = originalMotionY;
+            mc.player.motionZ = originalMotionZ;
             mc.player.onGround = originOnGround;
             mc.player.setPosition(origin.x, origin.y, origin.z);
-            FlightController.suspend(FLIGHT_SUSPEND_TICKS);
         }
         return true;
     }
@@ -111,7 +122,52 @@ public final class BlinkStrike {
         if (event.getWorld().isRemote) {
             delay = 0;
             unreachableUntil.clear();
+            reachableUntil.clear();
+            clearRecovery();
         }
+    }
+
+    private void beginRecovery(BlinkPath.Point origin, boolean onGround) {
+        recoveryOrigin = origin;
+        lastRecoveryPosition = origin;
+        recoveryOnGround = onGround;
+        recoveryDestinations.clear();
+        recoveryUntilTick = mc.player.ticksExisted + RECOVERY_TICKS;
+    }
+
+    private void recoverUnexpectedTeleport() {
+        if (mc.player == null || mc.world == null || mc.player.connection == null || recoveryOrigin == null) return;
+        if (mc.player.ticksExisted > recoveryUntilTick) {
+            clearRecovery();
+            return;
+        }
+        BlinkPath.Point current = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
+        if (!shouldRecoverPosition(recoveryOrigin, lastRecoveryPosition, current, recoveryDestinations)) {
+            lastRecoveryPosition = current;
+            return;
+        }
+        mc.player.setPosition(recoveryOrigin.x, recoveryOrigin.y, recoveryOrigin.z);
+        mc.player.fallDistance = 0.0F;
+        sendPosition(recoveryOrigin, recoveryOnGround);
+        lastRecoveryPosition = recoveryOrigin;
+    }
+
+    private void clearRecovery() {
+        recoveryOrigin = null;
+        lastRecoveryPosition = null;
+        recoveryOnGround = false;
+        recoveryDestinations.clear();
+        recoveryUntilTick = 0;
+    }
+
+    static boolean shouldRecoverPosition(BlinkPath.Point origin, BlinkPath.Point previous,
+            BlinkPath.Point current, List<BlinkPath.Point> destinations) {
+        if (origin.distanceTo(current) <= 3.0) return false;
+        if (previous == null || previous.distanceTo(current) <= 4.0) return false;
+        for (BlinkPath.Point destination : destinations) {
+            if (destination.distanceTo(current) <= 4.0) return true;
+        }
+        return false;
     }
 
     private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
@@ -128,9 +184,12 @@ public final class BlinkStrike {
             StrikePlan plan = findStrikePlan(target, origin);
             if (plan == null) {
                 unreachableUntil.put(target.getEntityId(), tick + UNREACHABLE_CACHE_TICKS);
+                reachableUntil.remove(target.getEntityId());
                 continue;
             }
             unreachableUntil.remove(target.getEntityId());
+            reachableUntil.put(target.getEntityId(), tick + Math.max(UNREACHABLE_CACHE_TICKS,
+                ModConfig.blinkDelayTicks + 2));
             result.add(new PlannedStrike(target, plan));
         }
         return result;
@@ -138,6 +197,16 @@ public final class BlinkStrike {
 
     private void pruneUnreachableCache(int tick) {
         unreachableUntil.entrySet().removeIf(entry -> entry.getValue() <= tick);
+        reachableUntil.entrySet().removeIf(entry -> entry.getValue() <= tick);
+    }
+
+    boolean isReachableForRender(EntityLivingBase target) {
+        if (mc.player == null || target == null) return false;
+        int tick = mc.player.ticksExisted;
+        Integer blocked = unreachableUntil.get(target.getEntityId());
+        if (blocked != null && blocked > tick) return false;
+        Integer reachable = reachableUntil.get(target.getEntityId());
+        return reachable != null && reachable > tick;
     }
 
     static int planningBudget(int requestedTargets) {

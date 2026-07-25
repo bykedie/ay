@@ -67,7 +67,9 @@ public final class OreVisualizer {
         removeQueued(key);
         removeChunkMarkers(key);
         if (!cacheNeeded()) return;
-        scanQueue.addFirst(new ScanTask(event.getWorld(), chunk));
+        int centerSection = mc.player == null ? 4
+            : MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
+        scanQueue.addFirst(new ScanTask(event.getWorld(), chunk, centerSection));
     }
 
     @SubscribeEvent
@@ -109,15 +111,15 @@ public final class OreVisualizer {
         seedLoadedChunks();
         int remaining = SECTIONS_PER_TICK;
         while (remaining-- > 0 && !scanQueue.isEmpty()) {
-            ScanTask task = scanQueue.peekFirst();
+            ScanTask task = scanQueue.removeFirst();
             if (task.world != mc.world || !task.chunk.isLoaded()) {
-                scanQueue.removeFirst();
                 continue;
             }
             appendChunkMarkers(task.key, task.scanNextSection());
             if (task.isComplete()) {
                 scannedChunks.add(task.key);
-                scanQueue.removeFirst();
+            } else {
+                scanQueue.addLast(task);
             }
         }
         if (validationDelay-- <= 0) {
@@ -239,7 +241,8 @@ public final class OreVisualizer {
             }
         }
         chunks.sort(Comparator.comparingInt(chunk -> chunk.distanceSq));
-        for (SeededChunk chunk : chunks) queueCachedChunk(mc.world, chunk.chunk);
+        int centerSection = MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
+        for (SeededChunk chunk : chunks) queueCachedChunk(mc.world, chunk.chunk, centerSection);
         prioritizeQueue(centerChunkX, centerChunkZ);
         seededWorld = mc.world;
         seededRadiusChunks = radiusChunks;
@@ -250,6 +253,19 @@ public final class OreVisualizer {
 
     static double effectiveCacheRange(boolean oreEnabled, double oreRange, boolean mineEnabled, double mineRange) {
         return Math.max(oreEnabled ? oreRange : 0.0, mineEnabled ? mineRange : 0.0);
+    }
+
+    static int[] sectionOrder(int sectionCount, int centerSection) {
+        if (sectionCount <= 0) return new int[0];
+        int center = MathHelper.clamp(centerSection, 0, sectionCount - 1);
+        int[] order = new int[sectionCount];
+        int index = 0;
+        order[index++] = center;
+        for (int offset = 1; index < sectionCount; offset++) {
+            if (center - offset >= 0) order[index++] = center - offset;
+            if (index < sectionCount && center + offset < sectionCount) order[index++] = center + offset;
+        }
+        return order;
     }
 
     private void prioritizeQueue(int centerChunkX, int centerChunkZ) {
@@ -271,10 +287,10 @@ public final class OreVisualizer {
         }
     }
 
-    private void queueCachedChunk(World world, Chunk chunk) {
+    private void queueCachedChunk(World world, Chunk chunk, int centerSection) {
         long key = ChunkPos.asLong(chunk.x, chunk.z);
         if (scannedChunks.contains(key) || isQueued(key)) return;
-        scanQueue.addLast(new ScanTask(world, chunk));
+        scanQueue.addLast(new ScanTask(world, chunk, centerSection));
     }
 
     private boolean isQueued(long key) {
@@ -466,19 +482,21 @@ public final class OreVisualizer {
         private final Chunk chunk;
         private final long key;
         private final List<OreMarker> sectionMarkers = new ArrayList<>();
-        private int sectionIndex;
+        private final int[] sectionOrder;
+        private int sectionCursor;
 
-        private ScanTask(World world, Chunk chunk) {
+        private ScanTask(World world, Chunk chunk, int centerSection) {
             this.world = world;
             this.chunk = chunk;
             this.key = ChunkPos.asLong(chunk.x, chunk.z);
+            this.sectionOrder = OreVisualizer.sectionOrder(chunk.getBlockStorageArray().length, centerSection);
         }
 
         private List<OreMarker> scanNextSection() {
             sectionMarkers.clear();
             ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
-            while (sectionIndex < sections.length) {
-                ExtendedBlockStorage section = sections[sectionIndex++];
+            while (sectionCursor < sectionOrder.length) {
+                ExtendedBlockStorage section = sections[sectionOrder[sectionCursor++]];
                 if (section == null || section.isEmpty()) continue;
                 int baseX = chunk.x << 4;
                 int baseY = section.getYLocation();
@@ -497,7 +515,7 @@ public final class OreVisualizer {
         }
 
         private boolean isComplete() {
-            return sectionIndex >= chunk.getBlockStorageArray().length;
+            return sectionCursor >= sectionOrder.length;
         }
 
         private int distanceSq(int centerChunkX, int centerChunkZ) {

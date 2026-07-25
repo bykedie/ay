@@ -94,4 +94,20 @@ public class BlinkStrikeTest {
         assertEquals(50, BlinkStrike.candidateScanLimit(1));
         assertEquals(50, BlinkStrike.candidateScanLimit(50));
     }
+
+    @Test
+    public void recoversOnlyWhenCorrectedNearTheRemoteStrikePosition() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        List<BlinkPath.Point> destinations = java.util.Collections.singletonList(
+            new BlinkPath.Point(20.0, 64.0, 0.0));
+
+        assertEquals(true, BlinkStrike.shouldRecoverPosition(origin, origin,
+            new BlinkPath.Point(20.5, 64.0, 0.0), destinations));
+        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin, origin,
+            new BlinkPath.Point(2.5, 64.0, 0.0), destinations));
+        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin, origin,
+            new BlinkPath.Point(8.0, 64.0, 8.0), destinations));
+        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin,
+            new BlinkPath.Point(16.5, 64.0, 0.0), new BlinkPath.Point(20.5, 64.0, 0.0), destinations));
+    }
 }

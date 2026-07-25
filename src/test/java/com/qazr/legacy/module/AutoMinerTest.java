@@ -1,6 +1,7 @@
 package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.OreType;
+import java.util.Arrays;
 import net.minecraft.util.math.BlockPos;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
@@ -24,5 +25,17 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.sameVein(origin, origin.add(1, 1, -1), OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.sameVein(origin, origin.add(2, 0, 0), OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.sameVein(origin, origin.add(1, 0, 0), OreType.IRON, OreType.GOLD));
+    }
+
+    @Test
+    public void verticalPathNodesRequireThePlayerToDropIntoTheCell() {
+        assertFalse(AutoMiner.reachedPathNode(0.0, -1.0));
+        assertTrue(AutoMiner.reachedPathNode(0.0, -0.20));
+    }
+
+    @Test
+    public void pathPriorityGuidesSearchTowardTheNearestGoal() {
+        BlockPos goal = new BlockPos(10, 20, 30);
+        assertEquals(4, AutoMiner.pathPriority(1, new BlockPos(8, 20, 29), Arrays.asList(goal)));
     }
 }

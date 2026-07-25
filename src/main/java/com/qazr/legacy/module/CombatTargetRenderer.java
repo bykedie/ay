@@ -29,9 +29,11 @@ import org.lwjgl.opengl.GL11;
 public final class CombatTargetRenderer {
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
+    private final BlinkStrike blinkStrike;
 
-    public CombatTargetRenderer(ModuleManager modules) {
+    public CombatTargetRenderer(ModuleManager modules, BlinkStrike blinkStrike) {
         this.modules = modules;
+        this.blinkStrike = blinkStrike;
     }
 
     @SubscribeEvent
@@ -39,8 +41,7 @@ public final class CombatTargetRenderer {
         if (mc.player == null || mc.world == null) return;
         Set<EntityLivingBase> meleeTargets = selectedTargets(ModuleId.MELEE_AURA,
             modules.isEnabled(ModuleId.MELEE_AURA) && ModConfig.meleeVisualize, ModConfig.meleeMultiTarget, ModConfig.meleeMaxTargets);
-        Set<EntityLivingBase> blinkTargets = selectedTargets(ModuleId.BLINK_STRIKE,
-            modules.isEnabled(ModuleId.BLINK_STRIKE) && ModConfig.blinkVisualize, ModConfig.blinkMultiTarget, ModConfig.blinkMaxTargets);
+        Set<EntityLivingBase> blinkTargets = selectedBlinkTargets();
         List<EntityLivingBase> visualTargets = visualizationTargets();
         if (meleeTargets.isEmpty() && blinkTargets.isEmpty() && visualTargets.isEmpty()) return;
 
@@ -54,7 +55,11 @@ public final class CombatTargetRenderer {
         GlStateManager.glLineWidth(0.5F);
         try {
             for (EntityLivingBase target : meleeTargets) drawTarget(target, event.getPartialTicks(), 0.25F, 1.0F, 0.35F);
-            for (EntityLivingBase target : blinkTargets) drawTarget(target, event.getPartialTicks(), 1.0F, 0.25F, 0.3F);
+            for (EntityLivingBase target : blinkTargets) {
+                boolean attackable = blinkStrike.isReachableForRender(target);
+                drawTarget(target, event.getPartialTicks(), attackable ? 0.2F : 1.0F,
+                    attackable ? 1.0F : 0.2F, attackable ? 0.3F : 0.15F);
+            }
             for (EntityLivingBase target : visualTargets) drawAdvancedTarget(target, event.getPartialTicks());
         } finally {
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
@@ -79,6 +84,24 @@ public final class CombatTargetRenderer {
         return new LinkedHashSet<>(targets);
     }
 
+    private Set<EntityLivingBase> selectedBlinkTargets() {
+        if (!modules.isEnabled(ModuleId.BLINK_STRIKE) || !ModConfig.blinkVisualize) {
+            return java.util.Collections.emptySet();
+        }
+        int limit = ModConfig.blinkMultiTarget ? ModConfig.blinkMaxTargets : 1;
+        List<EntityLivingBase> candidates = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE, 50);
+        Set<EntityLivingBase> result = new LinkedHashSet<>();
+        for (EntityLivingBase target : candidates) {
+            if (blinkStrike.isReachableForRender(target)) result.add(target);
+            if (result.size() >= limit) return result;
+        }
+        for (EntityLivingBase target : candidates) {
+            result.add(target);
+            if (result.size() >= limit) break;
+        }
+        return result;
+    }
+
     private void drawTarget(EntityLivingBase target, float partialTicks, float red, float green, float blue) {
         RenderManager render = mc.getRenderManager();
         double x = target.lastTickPosX + (target.posX - target.lastTickPosX) * partialTicks - render.viewerPosX;
@@ -90,10 +113,10 @@ public final class CombatTargetRenderer {
     }
 
     private void drawAdvancedTarget(EntityLivingBase target, float partialTicks) {
-        boolean visible = mc.player.canEntityBeSeen(target);
-        float red = visible ? 0.2F : 1.0F;
-        float green = visible ? 1.0F : 0.2F;
-        float blue = visible ? 0.3F : 0.15F;
+        boolean attackable = attackableForVisualization(target);
+        float red = attackable ? 0.2F : 1.0F;
+        float green = attackable ? 1.0F : 0.2F;
+        float blue = attackable ? 0.3F : 0.15F;
         RenderManager render = mc.getRenderManager();
         double x = target.lastTickPosX + (target.posX - target.lastTickPosX) * partialTicks - render.viewerPosX;
         double y = target.lastTickPosY + (target.posY - target.lastTickPosY) * partialTicks - render.viewerPosY;
@@ -102,6 +125,17 @@ public final class CombatTargetRenderer {
         if (ModConfig.targetBox) RenderGlobal.drawSelectionBoundingBox(box, red, green, blue, 0.95F);
         if (ModConfig.targetSkeleton) drawSkeleton(target, x, y, z, partialTicks, red, green, blue);
         if (ModConfig.targetRays) drawLine(0.0, 0.0, 0.0, x, y + target.height * 0.5, z, red, green, blue);
+    }
+
+    private boolean attackableForVisualization(EntityLivingBase target) {
+        if (modules.isEnabled(ModuleId.BLINK_STRIKE)) return blinkStrike.isReachableForRender(target);
+        if (modules.isEnabled(ModuleId.MELEE_AURA)) {
+            double rangeSq = ModConfig.meleeRange * ModConfig.meleeRange;
+            return mc.player.canEntityBeSeen(target)
+                && CombatSupport.distanceSqToHitbox(mc.player.getPositionEyes(1.0F),
+                    target.getEntityBoundingBox()) <= rangeSq;
+        }
+        return mc.player.canEntityBeSeen(target);
     }
 
     private void drawSkeleton(EntityLivingBase target, double x, double y, double z, float partialTicks,

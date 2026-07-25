@@ -14,8 +14,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class FlightController {
-    private static int suspendTicks;
-
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private EntityPlayerSP controlledPlayer;
@@ -27,20 +25,11 @@ public final class FlightController {
         this.modules = modules;
     }
 
-    public static void suspend(int ticks) {
-        suspendTicks = Math.max(suspendTicks, ticks);
-    }
-
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         boolean normalFlight = modules.isEnabled(ModuleId.FLIGHT) && ModConfig.flightElytra && !ModConfig.flightBoat;
         if (!normalFlight || mc.player == null || mc.world == null) restoreCapabilities();
-        if (suspendTicks > 0) {
-            stabilizeDuringSuspend();
-            suspendTicks--;
-            return;
-        }
         if (!modules.isEnabled(ModuleId.FLIGHT)) return;
         if (mc.player == null || mc.world == null || mc.player.connection == null || mc.currentScreen != null) return;
         if (ModConfig.flightBoat) boatFlight();
@@ -51,7 +40,6 @@ public final class FlightController {
     public void onWorldUnload(WorldEvent.Unload event) {
         if (!event.getWorld().isRemote) return;
         restoreCapabilities();
-        suspendTicks = 0;
     }
 
     private void normalFlight() {
@@ -85,15 +73,6 @@ public final class FlightController {
         riding.fallDistance = 0.0F;
         mc.player.fallDistance = 0.0F;
         mc.player.connection.sendPacket(new CPacketVehicleMove(riding));
-    }
-
-    private void stabilizeDuringSuspend() {
-        if (mc.player == null || mc.world == null) return;
-        mc.player.fallDistance = 0.0F;
-        if (!modules.isEnabled(ModuleId.FLIGHT)) return;
-        mc.player.motionX = 0.0;
-        mc.player.motionY = 0.0;
-        mc.player.motionZ = 0.0;
     }
 
     private void captureCapabilities() {

@@ -50,8 +50,9 @@ public final class QazrLegacy {
         MinecraftForge.EVENT_BUS.register(new AutoBridge(modules));
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
         MinecraftForge.EVENT_BUS.register(new FlightController(modules));
-        MinecraftForge.EVENT_BUS.register(new BlinkStrike(modules));
-        MinecraftForge.EVENT_BUS.register(new CombatTargetRenderer(modules));
+        BlinkStrike blinkStrike = new BlinkStrike(modules);
+        MinecraftForge.EVENT_BUS.register(blinkStrike);
+        MinecraftForge.EVENT_BUS.register(new CombatTargetRenderer(modules, blinkStrike));
         MinecraftForge.EVENT_BUS.register(new CountOverlay(modules, oreVisualizer));
     }
 

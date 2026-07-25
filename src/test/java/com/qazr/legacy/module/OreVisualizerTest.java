@@ -6,6 +6,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
 public class OreVisualizerTest {
@@ -15,6 +16,12 @@ public class OreVisualizerTest {
         assertEquals(96.0, OreVisualizer.effectiveCacheRange(false, 150.0, true, 96.0), 0.0);
         assertEquals(150.0, OreVisualizer.effectiveCacheRange(true, 150.0, true, 96.0), 0.0);
         assertEquals(0.0, OreVisualizer.effectiveCacheRange(false, 150.0, false, 96.0), 0.0);
+    }
+
+    @Test
+    public void scansPlayerHeightBeforeAlternatingDownAndUp() {
+        assertArrayEquals(new int[] {4, 3, 5, 2, 6, 1, 7, 0},
+            OreVisualizer.sectionOrder(8, 4));
     }
 
     @Test

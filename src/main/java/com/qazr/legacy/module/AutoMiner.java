@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL11;
 
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 3000;
-    private static final int MAX_PATH_TARGETS = 12;
+    private static final int MAX_PATH_TARGETS = 24;
     private static final double REACHABLE_MINE_DISTANCE_SQ = 25.0;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
@@ -224,17 +224,24 @@ public final class AutoMiner {
             delay = 2;
             return;
         }
-        if (distanceSq < 0.20) {
+        double verticalDistance = next.getY() - mc.player.getEntityBoundingBox().minY;
+        if (reachedPathNode(distanceSq, verticalDistance)) {
             pathIndex++;
             return;
         }
-        double length = Math.sqrt(distanceSq);
-        mc.player.motionX += MathHelper.clamp(dx / length * 0.18, -0.18, 0.18);
-        mc.player.motionZ += MathHelper.clamp(dz / length * 0.18, -0.18, 0.18);
+        if (distanceSq > 0.0001) {
+            double length = Math.sqrt(distanceSq);
+            mc.player.motionX += MathHelper.clamp(dx / length * 0.18, -0.18, 0.18);
+            mc.player.motionZ += MathHelper.clamp(dz / length * 0.18, -0.18, 0.18);
+        }
         if (next.getY() > MathHelper.floor(mc.player.getEntityBoundingBox().minY) && mc.player.onGround) {
             mc.player.jump();
         }
         delay = 1;
+    }
+
+    static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {
+        return horizontalDistanceSq < 0.20 && Math.abs(verticalDistance) < 0.35;
     }
 
     private PathTarget findNearestPathTarget() {
@@ -269,10 +276,13 @@ public final class AutoMiner {
         if (goals.isEmpty()) return null;
         Set<BlockPos> goalSet = new HashSet<>(goals);
         if (goalSet.contains(start)) return new PathRoute(java.util.Collections.emptyList(), 0);
-        PriorityQueue<PathNode> queue = new PriorityQueue<>((left, right) -> Integer.compare(left.cost, right.cost));
+        PriorityQueue<PathNode> queue = new PriorityQueue<>((left, right) -> {
+            int priority = Integer.compare(left.priority, right.priority);
+            return priority != 0 ? priority : Integer.compare(left.cost, right.cost);
+        });
         Map<BlockPos, BlockPos> previous = new HashMap<>();
         Map<BlockPos, Integer> costs = new HashMap<>();
-        queue.add(new PathNode(start, 0));
+        queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
         previous.put(start, null);
         costs.put(start, 0);
         int visited = 0;
@@ -284,19 +294,38 @@ public final class AutoMiner {
             for (EnumFacing facing : EnumFacing.HORIZONTALS) {
                 for (int dy : new int[] {0, 1, -1}) {
                     BlockPos next = standPos(pos.offset(facing).add(0, dy, 0));
-                    int stepCost = traversalCost(next);
-                    if (stepCost < 0) continue;
-                    if (start.distanceSq(next) > ModConfig.minePathRange * ModConfig.minePathRange) continue;
-                    int nextCost = node.cost + stepCost + Math.abs(dy) * 2;
-                    Integer known = costs.get(next);
-                    if (known != null && known <= nextCost) continue;
-                    previous.put(next, pos);
-                    costs.put(next, nextCost);
-                    queue.add(new PathNode(next, nextCost));
+                    addPathNeighbor(queue, previous, costs, start, goals, pos, node.cost, next,
+                        Math.abs(dy) * 2);
                 }
             }
+            addPathNeighbor(queue, previous, costs, start, goals, pos, node.cost, pos.down(), 2);
         }
         return null;
+    }
+
+    private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
+            Map<BlockPos, Integer> costs, BlockPos start, List<BlockPos> goals, BlockPos from,
+            int currentCost, BlockPos next, int verticalPenalty) {
+        int stepCost = traversalCost(next);
+        if (stepCost < 0) return;
+        if (start.distanceSq(next) > ModConfig.minePathRange * ModConfig.minePathRange) return;
+        int nextCost = currentCost + stepCost + verticalPenalty;
+        Integer known = costs.get(next);
+        if (known != null && known <= nextCost) return;
+        previous.put(next, from);
+        costs.put(next, nextCost);
+        queue.add(new PathNode(next, nextCost, pathPriority(nextCost, next, goals)));
+    }
+
+    static int pathPriority(int cost, BlockPos pos, List<BlockPos> goals) {
+        int nearest = Integer.MAX_VALUE;
+        for (BlockPos goal : goals) {
+            int distance = Math.abs(pos.getX() - goal.getX())
+                + Math.abs(pos.getY() - goal.getY())
+                + Math.abs(pos.getZ() - goal.getZ());
+            nearest = Math.min(nearest, distance);
+        }
+        return nearest == Integer.MAX_VALUE ? cost : cost + nearest;
     }
 
     private List<BlockPos> standPositionsAround(BlockPos ore) {
@@ -550,10 +579,12 @@ public final class AutoMiner {
     private static final class PathNode {
         private final BlockPos pos;
         private final int cost;
+        private final int priority;
 
-        private PathNode(BlockPos pos, int cost) {
+        private PathNode(BlockPos pos, int cost, int priority) {
             this.pos = pos;
             this.cost = cost;
+            this.priority = priority;
         }
     }
 }
