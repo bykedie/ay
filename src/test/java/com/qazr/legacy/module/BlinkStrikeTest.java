@@ -81,4 +81,17 @@ public class BlinkStrikeTest {
             assertEquals(2.16, Math.sqrt(dx * dx + dz * dz), 0.0001);
         }
     }
+
+    @Test
+    public void boundsExpensivePathPlanningPerTick() {
+        assertEquals(4, BlinkStrike.planningBudget(1));
+        assertEquals(6, BlinkStrike.planningBudget(3));
+        assertEquals(50, BlinkStrike.planningBudget(50));
+    }
+
+    @Test
+    public void scansPastBlockedPriorityTargets() {
+        assertEquals(50, BlinkStrike.candidateScanLimit(1));
+        assertEquals(50, BlinkStrike.candidateScanLimit(50));
+    }
 }

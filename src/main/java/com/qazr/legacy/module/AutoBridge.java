@@ -108,9 +108,11 @@ public final class AutoBridge {
         Set<BlockPos> candidates = new LinkedHashSet<>();
         for (int dy = 0; dy < scanDepth; dy++) {
             for (double lookahead : lookaheads) {
-                int x = MathHelper.floor(mc.player.posX + offset[0] * lookahead);
-                int z = MathHelper.floor(mc.player.posZ + offset[1] * lookahead);
-                candidates.add(new BlockPos(x, firstY - dy, z));
+                double motionScale = lookahead <= 0.0 ? 0.0 : Math.min(1.5, lookahead / 0.35);
+                double predictedX = mc.player.posX + offset[0] * lookahead + mc.player.motionX * motionScale;
+                double predictedZ = mc.player.posZ + offset[1] * lookahead + mc.player.motionZ * motionScale;
+                addSupportCandidates(candidates, mc.player.posX, mc.player.posZ,
+                    predictedX, predictedZ, firstY - dy);
             }
         }
         for (BlockPos candidate : candidates) {
@@ -127,6 +129,21 @@ public final class AutoBridge {
         return feetFirst
             ? new double[] {0.0, near, middle, configured}
             : new double[] {near, middle, configured, 0.0};
+    }
+
+    static void addSupportCandidates(Set<BlockPos> candidates, double currentX, double currentZ,
+            double predictedX, double predictedZ, int y) {
+        int currentBlockX = MathHelper.floor(currentX);
+        int currentBlockZ = MathHelper.floor(currentZ);
+        int predictedBlockX = MathHelper.floor(predictedX);
+        int predictedBlockZ = MathHelper.floor(predictedZ);
+        if (predictedBlockX != currentBlockX && predictedBlockZ != currentBlockZ) {
+            candidates.add(new BlockPos(predictedBlockX, y, currentBlockZ));
+            candidates.add(new BlockPos(predictedBlockX, y, predictedBlockZ));
+            candidates.add(new BlockPos(currentBlockX, y, predictedBlockZ));
+            return;
+        }
+        candidates.add(new BlockPos(predictedBlockX, y, predictedBlockZ));
     }
 
     static boolean isJumpApex(double previousMotionY, double motionY, boolean onGround) {

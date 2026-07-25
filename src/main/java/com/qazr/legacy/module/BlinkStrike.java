@@ -4,7 +4,9 @@ import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.util.BlinkPath;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.init.MobEffects;
@@ -20,8 +22,11 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class BlinkStrike {
     private static final int FLIGHT_SUSPEND_TICKS = 8;
+    private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
+    private static final int UNREACHABLE_CACHE_TICKS = 12;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
+    private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
     private int delay;
 
     public BlinkStrike(ModuleManager modules) {
@@ -40,16 +45,23 @@ public final class BlinkStrike {
         if (mc.player.getCooledAttackStrength(0.0F) < 0.95F) return;
 
         int targetLimit = ModConfig.blinkMultiTarget ? ModConfig.blinkMaxTargets : 1;
-        List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE, targetLimit);
-        if (targets.isEmpty()) return;
-        if (ModConfig.blinkAutoWeapon) CombatSupport.selectBestWeapon(mc);
-        if (ModConfig.blinkRotate) face(targets.get(0));
-
         BlinkPath.Point origin = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
+        boolean originOnGround = originOnGround(origin);
+        if (!originOnGround && !safeAirborneOrigin()) return;
+        List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE,
+            candidateScanLimit(targetLimit));
+        List<PlannedStrike> strikes = planStrikes(targets, origin, targetLimit, planningBudget(targetLimit));
+        if (strikes.isEmpty()) {
+            delay = 2;
+            return;
+        }
+        if (ModConfig.blinkAutoWeapon) CombatSupport.selectBestWeapon(mc);
+        if (ModConfig.blinkRotate) face(strikes.get(0).target);
+
         boolean attacked = false;
         FlightController.suspend(FLIGHT_SUSPEND_TICKS);
-        for (EntityLivingBase target : targets) {
-            if (strike(target, origin)) attacked = true;
+        for (PlannedStrike strike : strikes) {
+            if (strike(strike.target, origin, strike.plan, originOnGround)) attacked = true;
         }
         if (attacked) {
             mc.player.resetCooldown();
@@ -59,11 +71,8 @@ public final class BlinkStrike {
         }
     }
 
-    private boolean strike(EntityLivingBase target, BlinkPath.Point origin) {
-        StrikePlan plan = findStrikePlan(target, origin);
-        if (plan == null) return false;
-        boolean originOnGround = originOnGround(origin);
-        if (!originOnGround && !safeAirborneOrigin()) return false;
+    private boolean strike(EntityLivingBase target, BlinkPath.Point origin, StrikePlan plan,
+            boolean originOnGround) {
         boolean transportOnGround = transportOnGround(originOnGround,
             modules.isEnabled(ModuleId.FLIGHT));
         List<BlinkPath.Point> path = plan.path;
@@ -99,7 +108,46 @@ public final class BlinkStrike {
 
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
-        if (event.getWorld().isRemote) delay = 0;
+        if (event.getWorld().isRemote) {
+            delay = 0;
+            unreachableUntil.clear();
+        }
+    }
+
+    private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
+            int targetLimit, int planningBudget) {
+        List<PlannedStrike> result = new ArrayList<>();
+        int tick = mc.player.ticksExisted;
+        pruneUnreachableCache(tick);
+        int checked = 0;
+        for (EntityLivingBase target : targets) {
+            if (result.size() >= targetLimit || checked >= planningBudget) break;
+            Integer blockedUntil = unreachableUntil.get(target.getEntityId());
+            if (blockedUntil != null && blockedUntil > tick) continue;
+            checked++;
+            StrikePlan plan = findStrikePlan(target, origin);
+            if (plan == null) {
+                unreachableUntil.put(target.getEntityId(), tick + UNREACHABLE_CACHE_TICKS);
+                continue;
+            }
+            unreachableUntil.remove(target.getEntityId());
+            result.add(new PlannedStrike(target, plan));
+        }
+        return result;
+    }
+
+    private void pruneUnreachableCache(int tick) {
+        unreachableUntil.entrySet().removeIf(entry -> entry.getValue() <= tick);
+    }
+
+    static int planningBudget(int requestedTargets) {
+        int requested = Math.max(1, Math.min(50, requestedTargets));
+        if (requested <= 6) return Math.min(MAX_PLAN_CHECKS_PER_TICK, Math.max(4, requested * 2));
+        return Math.min(50, requested * 2);
+    }
+
+    static int candidateScanLimit(int requestedTargets) {
+        return 50;
     }
 
     private StrikePlan findStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
@@ -108,9 +156,16 @@ public final class BlinkStrike {
         double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
         AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
             predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
+        Vec3d targetPoint = ModConfig.blinkAttackPoint.point(target);
+        Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
+            targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
+            targetPoint.z + predictedZ - target.posZ);
         if (CombatSupport.distanceSqToHitbox(new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z), predictedBox)
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) {
-            return new StrikePlan(origin, java.util.Collections.emptyList());
+            Vec3d originEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
+            if (hasAttackLine(originEyes, attackPoint)) {
+                return new StrikePlan(origin, java.util.Collections.emptyList());
+            }
         }
         for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
                 ModConfig.blinkAttackDistance)) {
@@ -118,12 +173,17 @@ public final class BlinkStrike {
             Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
             if (CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                     > ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) continue;
+            if (!hasAttackLine(eyes, attackPoint)) continue;
             for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
                 if (!isRouteClear(origin, waypoints)) continue;
                 return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep));
             }
         }
         return null;
+    }
+
+    private boolean hasAttackLine(Vec3d eyes, Vec3d attackPoint) {
+        return mc.world.rayTraceBlocks(eyes, attackPoint, false, true, false) == null;
     }
 
     static List<List<BlinkPath.Point>> routeWaypoints(BlinkPath.Point origin, BlinkPath.Point destination) {
@@ -252,6 +312,16 @@ public final class BlinkStrike {
         private StrikePlan(BlinkPath.Point destination, List<BlinkPath.Point> path) {
             this.destination = destination;
             this.path = path;
+        }
+    }
+
+    private static final class PlannedStrike {
+        private final EntityLivingBase target;
+        private final StrikePlan plan;
+
+        private PlannedStrike(EntityLivingBase target, StrikePlan plan) {
+            this.target = target;
+            this.plan = plan;
         }
     }
 }

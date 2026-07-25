@@ -53,6 +53,11 @@ public class CombatTargetRendererTest {
         assertEquals(-180.0F, CombatTargetRenderer.interpolateAngle(-170.0F, 170.0F, 0.5F), 0.0001F);
     }
 
+    @Test
+    public void horseHeadStaysInsideItsModelLength() {
+        assertEquals(0.38, CombatTargetRenderer.horseSkeletonMaxLongitudinal(), 0.0001);
+    }
+
     private static void assertBasis(double forwardX, double forwardZ, double[] basis) {
         assertEquals(forwardX, basis[2], 0.0001);
         assertEquals(forwardZ, basis[3], 0.0001);

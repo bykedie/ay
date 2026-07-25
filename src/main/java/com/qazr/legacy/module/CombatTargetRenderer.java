@@ -114,8 +114,8 @@ public final class CombatTargetRenderer {
             Math.max(0.25, target.width), facingYaw, headYaw, red, green, blue);
         switch (skeletonType(mainModel(target))) {
             case HUMANOID: drawHumanoidSkeleton(basis); break;
-            case QUADRUPED: drawQuadrupedSkeleton(basis, false); break;
-            case HORSE: drawQuadrupedSkeleton(basis, true); break;
+            case QUADRUPED: drawQuadrupedSkeleton(basis); break;
+            case HORSE: drawHorseSkeleton(basis); break;
             case SPIDER: drawSpiderSkeleton(basis); break;
             case BIRD: drawBirdSkeleton(basis); break;
             case CREEPER: drawCreeperSkeleton(basis); break;
@@ -173,23 +173,41 @@ public final class CombatTargetRenderer {
         localLine(b, 0, 0.30, 0, 0.30, 0, 0);
     }
 
-    private void drawQuadrupedSkeleton(SkeletonBasis b, boolean horse) {
-        double back = horse ? -0.72 : -0.58;
-        double front = horse ? 0.66 : 0.58;
-        double bodyY = horse ? 0.58 : 0.60;
+    private void drawQuadrupedSkeleton(SkeletonBasis b) {
+        double back = -0.58;
+        double front = 0.58;
+        double bodyY = 0.60;
         localLine(b, 0, bodyY, back, 0, bodyY, front);
-        double neckLength = horse ? 0.28 : 0.20;
-        double headLength = horse ? 0.30 : 0.24;
-        pivotHeadLine(b, front, bodyY, 0.0, 0.0, horse ? 0.88 : 0.78, neckLength);
-        pivotHeadLine(b, front, horse ? 0.88 : 0.78, neckLength, 0.0,
-            horse ? 0.91 : 0.80, neckLength + headLength);
+        double neckLength = 0.20;
+        double headLength = 0.24;
+        pivotHeadLine(b, front, bodyY, 0.0, 0.0, 0.78, neckLength);
+        pivotHeadLine(b, front, 0.78, neckLength, 0.0, 0.80, neckLength + headLength);
         double[] ends = {back + 0.10, front - 0.10};
         for (double longitudinal : ends) {
             for (double side : new double[] {-0.32, 0.32}) {
                 localLine(b, side, bodyY, longitudinal, side * 1.12, 0.30, longitudinal);
-                localLine(b, side * 1.12, 0.30, longitudinal, side, 0, longitudinal + (horse ? 0.06 : 0));
+                localLine(b, side * 1.12, 0.30, longitudinal, side, 0, longitudinal);
             }
         }
+    }
+
+    private void drawHorseSkeleton(SkeletonBasis b) {
+        double back = -0.34;
+        double front = 0.26;
+        double bodyY = 0.58;
+        localLine(b, 0, bodyY, back, 0, bodyY, front);
+        pivotHeadLine(b, front, bodyY, 0.0, 0.0, 0.83, 0.08);
+        pivotHeadLine(b, front, 0.83, 0.08, 0.0, 0.88, 0.12);
+        for (double longitudinal : new double[] {back + 0.06, front - 0.06}) {
+            for (double side : new double[] {-0.18, 0.18}) {
+                localLine(b, side, bodyY, longitudinal, side * 1.08, 0.30, longitudinal);
+                localLine(b, side * 1.08, 0.30, longitudinal, side, 0, longitudinal + 0.03);
+            }
+        }
+    }
+
+    static double horseSkeletonMaxLongitudinal() {
+        return 0.26 + 0.12;
     }
 
     private void drawSpiderSkeleton(SkeletonBasis b) {

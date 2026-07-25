@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityBoat;
+import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.network.play.client.CPacketVehicleMove;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -68,6 +69,7 @@ public final class FlightController {
             mc.gameSettings.keyBindSneak.isKeyDown(), ModConfig.flightVerticalSpeed);
         mc.player.motionZ = horizontal[1];
         mc.player.fallDistance = 0.0F;
+        mc.player.connection.sendPacket(new CPacketPlayer(true));
     }
 
     private void boatFlight() {
@@ -75,11 +77,13 @@ public final class FlightController {
         Entity riding = mc.player.getRidingEntity();
         if (!(riding instanceof EntityBoat)) return;
         double[] motion = requestedMotion();
+        riding.prevRotationYaw = riding.rotationYaw;
+        riding.rotationYaw = mc.player.rotationYaw;
         riding.motionX = motion[0];
         riding.motionY = motion[1];
         riding.motionZ = motion[2];
         riding.fallDistance = 0.0F;
-        riding.setPosition(riding.posX + motion[0], riding.posY + motion[1], riding.posZ + motion[2]);
+        mc.player.fallDistance = 0.0F;
         mc.player.connection.sendPacket(new CPacketVehicleMove(riding));
     }
 
@@ -103,6 +107,7 @@ public final class FlightController {
 
     private void restoreCapabilities() {
         if (controlledPlayer == null) return;
+        controlledPlayer.fallDistance = 0.0F;
         controlledPlayer.capabilities.isFlying = restoredFlying(originalFlying, originalAllowFlying,
             controlledPlayer.capabilities.allowFlying, controlledPlayer.capabilities.isFlying);
         controlledPlayer.capabilities.setFlySpeed(originalFlySpeed);

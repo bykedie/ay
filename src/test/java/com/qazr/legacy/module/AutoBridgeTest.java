@@ -1,5 +1,8 @@
 package com.qazr.legacy.module;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import net.minecraft.util.math.BlockPos;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -43,6 +46,17 @@ public class AutoBridgeTest {
         assertEquals(63, AutoBridge.candidateY(64.8, 0));
         assertEquals(62, AutoBridge.candidateY(64.8, 1));
         assertEquals(60, AutoBridge.candidateY(64.8, 3));
+    }
+
+    @Test
+    public void diagonalPredictionAddsAxisSupportsBeforeTheCorner() {
+        Set<BlockPos> candidates = new LinkedHashSet<>();
+        AutoBridge.addSupportCandidates(candidates, 0.8, 0.8, 1.2, 1.2, 63);
+
+        BlockPos[] positions = candidates.toArray(new BlockPos[0]);
+        assertEquals(new BlockPos(1, 63, 0), positions[0]);
+        assertEquals(new BlockPos(1, 63, 1), positions[1]);
+        assertEquals(new BlockPos(0, 63, 1), positions[2]);
     }
 
     private static void assertOffset(double x, double z, double[] offset) {
