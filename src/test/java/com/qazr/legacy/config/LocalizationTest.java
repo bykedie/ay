@@ -22,6 +22,7 @@ public class LocalizationTest {
         for (ModuleId id : ModuleId.values()) assertNotNull(translations.getProperty(id.translationKey()));
         assertEquals("自动近战", translations.getProperty(ModuleId.MELEE_AURA.translationKey()));
         assertEquals("闪现攻击", translations.getProperty(ModuleId.BLINK_STRIKE.translationKey()));
+        assertEquals("飞行", translations.getProperty(ModuleId.FLIGHT.translationKey()));
         assertEquals("自动搭路", translations.getProperty(ModuleId.AUTO_BRIDGE.translationKey()));
         assertEquals("矿物可视化", translations.getProperty(ModuleId.ORE_VISUALIZER.translationKey()));
         assertEquals("Voris Hub 控制面板", translations.getProperty("gui.qazr.title"));

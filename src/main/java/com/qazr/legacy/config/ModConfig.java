@@ -18,6 +18,7 @@ public final class ModConfig {
     public static boolean creativeTools;
     public static boolean meleeAura;
     public static boolean blinkStrike;
+    public static boolean flight;
     public static boolean criticals;
     public static boolean targetVisualizer;
     public static String[] ggMessages;
@@ -26,13 +27,19 @@ public final class ModConfig {
     public static String replyTarget;
     public static String[] replyMessages;
     public static int replyCooldownTicks;
-    public static int mineRadius;
     public static int mineDelayTicks;
     public static String[] mineBlocks;
     public static int minePathRange;
-    public static int mineTargetCount;
+    public static int mineManualPauseTicks;
+    public static boolean mineVisualizePath;
     private static final EnumMap<OreType, Boolean> mineOreEnabled = new EnumMap<>(OreType.class);
+    private static final EnumMap<OreType, Integer> mineTargetCounts = new EnumMap<>(OreType.class);
+    public static double bridgeLookahead;
+    public static int bridgeDownScan;
+    public static int bridgeDelayTicks;
+    public static boolean bridgeAvoidFeet;
     public static double oreVisualizerRange;
+    public static boolean oreCountHud;
     private static final EnumMap<OreType, Boolean> oreEnabled = new EnumMap<>(OreType.class);
     private static final EnumMap<OreType, Integer> oreColors = new EnumMap<>(OreType.class);
     public static double meleeRange;
@@ -68,10 +75,16 @@ public final class ModConfig {
     public static String blinkPriority;
     public static AttackPoint blinkAttackPoint;
     private static final Set<String> blinkExcludedModEntities = new LinkedHashSet<>();
+    public static boolean flightElytra;
+    public static boolean flightBoat;
+    public static double flightSpeed;
+    public static double flightVerticalSpeed;
     public static boolean targetSkeleton;
     public static boolean targetBox;
     public static boolean targetRays;
     public static double targetVisualizerRange;
+    public static boolean targetCountHud;
+    public static HudPosition countHudPosition;
 
     private static final String[] DEFAULT_GG_MESSAGES = {
         "gg {player}", "good fight {player}", "well played {player}",
@@ -99,6 +112,7 @@ public final class ModConfig {
         creativeTools = configuration.getBoolean("creativeTools", "modules", true, "Enable creative item and potion commands.");
         meleeAura = configuration.getBoolean("meleeAura", "modules", false, "Automatically attack nearby entities with swords or axes.");
         blinkStrike = configuration.getBoolean("blinkStrike", "modules", false, "Attack through a temporary packet-position excursion and return.");
+        flight = configuration.getBoolean("flight", "modules", false, "Packet-assisted survival movement modes.");
         criticals = configuration.getBoolean("criticals", "modules", false, "Send a critical movement sequence before melee attacks.");
         targetVisualizer = configuration.getBoolean("targetVisualizer", "modules", false, "Draw configurable target overlays.");
         ggMessages = fiveMessages(configuration.getStringList("messages", "autoGg", DEFAULT_GG_MESSAGES, "Messages sent after a detected kill."), DEFAULT_GG_MESSAGES);
@@ -107,21 +121,32 @@ public final class ModConfig {
         replyTarget = configuration.getString("target", "autoReply", "", "Only messages from this player trigger a reply. Empty accepts anyone.");
         replyMessages = fiveMessages(configuration.getStringList("messages", "autoReply", DEFAULT_REPLY_MESSAGES, "Random automatic replies."), DEFAULT_REPLY_MESSAGES);
         replyCooldownTicks = configuration.getInt("cooldownTicks", "autoReply", 100, 20, 1200, "Minimum delay between replies.");
-        mineRadius = configuration.getInt("radius", "autoMine", 4, 1, 6, "Block scan radius. Only reachable blocks are mined.");
         mineDelayTicks = configuration.getInt("delayTicks", "autoMine", 2, 0, 40, "Delay between mining actions.");
         mineBlocks = configuration.getStringList("blocks", "autoMine", new String[] {
             "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:gold_ore",
             "minecraft:redstone_ore", "minecraft:lapis_ore", "minecraft:diamond_ore", "minecraft:emerald_ore"
         }, "Registry names of blocks to mine.");
         minePathRange = configuration.getInt("pathRange", "autoMine", 32, 6, 96, "Maximum range for walking to selected ores.");
-        mineTargetCount = configuration.getInt("targetCount", "autoMine", 0, 0, 999, "Number of ore blocks to mine before stopping. Zero means unlimited.");
+        mineManualPauseTicks = configuration.getInt("manualPauseTicks", "autoMine", 30, 0, 100, "Ticks to pause pathing after manual movement input.");
+        mineVisualizePath = configuration.getBoolean("visualizePath", "autoMine", true, "Draw the current mining target and planned route.");
+        int legacyTargetCount = configuration.getInt("targetCount", "autoMine", 0, 0, 999,
+            "Legacy global target count. New configs use per-ore target counts.");
         mineOreEnabled.clear();
+        mineTargetCounts.clear();
         for (OreType type : OreType.values()) {
             mineOreEnabled.put(type, configuration.getBoolean(type.key() + "Mine", "autoMine",
                 defaultMineOreEnabled(type), "Allow auto mine to target " + type.displayName() + "."));
+            mineTargetCounts.put(type, configuration.getInt(type.key() + "TargetCount", "autoMine", legacyTargetCount,
+                0, 999, "Number of " + type.displayName() + " blocks to mine before skipping that ore. Zero means unlimited."));
         }
+        bridgeLookahead = configuration.getFloat("lookAhead", "autoBridge", 0.95F, 0.30F, 1.60F,
+            "Distance ahead of player movement to check for bridge placement.");
+        bridgeDownScan = configuration.getInt("downScan", "autoBridge", 2, 1, 4, "How far below the feet auto bridge can place while jumping or falling.");
+        bridgeDelayTicks = configuration.getInt("delayTicks", "autoBridge", 1, 0, 10, "Delay between bridge placements.");
+        bridgeAvoidFeet = configuration.getBoolean("avoidFeetCollision", "autoBridge", true, "Skip placements that may intersect the player's feet.");
         oreVisualizerRange = configuration.getFloat("range", "oreVisualizer", 150.0F, 16.0F, 500.0F,
             "Maximum ore visualization distance. Only client-loaded chunks can be scanned.");
+        oreCountHud = configuration.getBoolean("countHud", "oreVisualizer", false, "Show nearby cached ore count on the HUD.");
         oreEnabled.clear();
         oreColors.clear();
         for (OreType type : OreType.values()) {
@@ -167,10 +192,20 @@ public final class ModConfig {
         blinkExcludedModEntities.clear();
         blinkExcludedModEntities.addAll(Arrays.asList(configuration.getStringList("excludedModEntities", "blinkStrike",
             new String[0], "Mod entity registry names excluded from blink strike.")));
+        flightElytra = configuration.getBoolean("elytraPackets", "flight", true, "Use elytra start-flying packets for flight movement.");
+        flightBoat = configuration.getBoolean("boatPackets", "flight", false, "Use vehicle movement packets while riding a boat.");
+        if (flightElytra && flightBoat) {
+            flightBoat = false;
+            configuration.get("flight", "boatPackets", false).set(false);
+        }
+        flightSpeed = configuration.getFloat("speed", "flight", 0.32F, 0.05F, 1.20F, "Horizontal flight speed in blocks per tick.");
+        flightVerticalSpeed = configuration.getFloat("verticalSpeed", "flight", 0.20F, 0.02F, 0.80F, "Vertical flight speed in blocks per tick.");
         targetSkeleton = configuration.getBoolean("skeleton", "targetVisualizer", true, "Draw stick-figure skeletons.");
         targetBox = configuration.getBoolean("box", "targetVisualizer", true, "Draw target bounding boxes.");
         targetRays = configuration.getBoolean("rays", "targetVisualizer", false, "Draw lines from the camera to targets.");
         targetVisualizerRange = configuration.getFloat("range", "targetVisualizer", 150.0F, 3.0F, 500.0F, "Maximum visualization distance.");
+        targetCountHud = configuration.getBoolean("countHud", "targetVisualizer", false, "Show nearby living entity count on the HUD.");
+        countHudPosition = HudPosition.fromKey(configuration.getString("countHudPosition", "hud", HudPosition.TOP_LEFT.key(), "Shared count HUD position."));
         configuration.get("autoGg", "messages", DEFAULT_GG_MESSAGES).set(ggMessages);
         configuration.get("autoReply", "messages", DEFAULT_REPLY_MESSAGES).set(replyMessages);
         if (configuration.hasChanged()) configuration.save();
@@ -223,14 +258,20 @@ public final class ModConfig {
     }
 
     public static double getNumber(ModuleSetting setting) {
+        OreType ore = setting.oreType();
+        if (ore != null && setting.module() == ModuleId.AUTO_MINE && setting.type() == ModuleSetting.Type.NUMBER) {
+            return getMineTargetCount(ore);
+        }
         switch (setting) {
             case GG_MIN_DELAY: return ggMinDelayTicks;
             case GG_MAX_DELAY: return ggMaxDelayTicks;
             case REPLY_COOLDOWN: return replyCooldownTicks;
-            case MINE_RADIUS: return mineRadius;
             case MINE_DELAY: return mineDelayTicks;
             case MINE_PATH_RANGE: return minePathRange;
-            case MINE_TARGET_COUNT: return mineTargetCount;
+            case MINE_MANUAL_PAUSE: return mineManualPauseTicks;
+            case BRIDGE_LOOKAHEAD: return bridgeLookahead;
+            case BRIDGE_DOWN_SCAN: return bridgeDownScan;
+            case BRIDGE_DELAY: return bridgeDelayTicks;
             case ORE_RANGE: return oreVisualizerRange;
             case MELEE_RANGE: return meleeRange;
             case MELEE_DELAY: return meleeDelayTicks;
@@ -241,6 +282,8 @@ public final class ModConfig {
             case BLINK_PREDICT: return blinkPredictTicks;
             case BLINK_DELAY: return blinkDelayTicks;
             case BLINK_MAX_TARGETS: return blinkMaxTargets;
+            case FLIGHT_SPEED: return flightSpeed;
+            case FLIGHT_VERTICAL: return flightVerticalSpeed;
             case TARGET_RANGE: return targetVisualizerRange;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
@@ -253,6 +296,14 @@ public final class ModConfig {
         double clamped = Math.max(setting.min(), Math.min(setting.max(), value));
         double rounded = Math.round(clamped / setting.step()) * setting.step();
         rounded = Math.max(setting.min(), Math.min(setting.max(), rounded));
+        OreType ore = setting.oreType();
+        if (ore != null && setting.module() == ModuleId.AUTO_MINE && setting.type() == ModuleSetting.Type.NUMBER) {
+            int count = (int) rounded;
+            mineTargetCounts.put(ore, count);
+            saveInt("autoMine", ore.key() + "TargetCount", count);
+            configuration.save();
+            return count;
+        }
         switch (setting) {
             case GG_MIN_DELAY:
                 ggMinDelayTicks = (int) rounded;
@@ -267,10 +318,12 @@ public final class ModConfig {
                 saveInt("autoGg", "minDelayTicks", ggMinDelayTicks);
                 break;
             case REPLY_COOLDOWN: replyCooldownTicks = (int) rounded; saveInt("autoReply", "cooldownTicks", replyCooldownTicks); break;
-            case MINE_RADIUS: mineRadius = (int) rounded; saveInt("autoMine", "radius", mineRadius); break;
             case MINE_DELAY: mineDelayTicks = (int) rounded; saveInt("autoMine", "delayTicks", mineDelayTicks); break;
             case MINE_PATH_RANGE: minePathRange = (int) rounded; saveInt("autoMine", "pathRange", minePathRange); break;
-            case MINE_TARGET_COUNT: mineTargetCount = (int) rounded; saveInt("autoMine", "targetCount", mineTargetCount); break;
+            case MINE_MANUAL_PAUSE: mineManualPauseTicks = (int) rounded; saveInt("autoMine", "manualPauseTicks", mineManualPauseTicks); break;
+            case BRIDGE_LOOKAHEAD: bridgeLookahead = rounded; saveDouble("autoBridge", "lookAhead", rounded); break;
+            case BRIDGE_DOWN_SCAN: bridgeDownScan = (int) rounded; saveInt("autoBridge", "downScan", bridgeDownScan); break;
+            case BRIDGE_DELAY: bridgeDelayTicks = (int) rounded; saveInt("autoBridge", "delayTicks", bridgeDelayTicks); break;
             case ORE_RANGE: oreVisualizerRange = rounded; saveDouble("oreVisualizer", "range", rounded); break;
             case MELEE_RANGE: meleeRange = rounded; saveDouble("meleeAura", "range", rounded); break;
             case MELEE_DELAY: meleeDelayTicks = (int) rounded; saveInt("meleeAura", "delayTicks", meleeDelayTicks); break;
@@ -281,6 +334,8 @@ public final class ModConfig {
             case BLINK_PREDICT: blinkPredictTicks = (int) rounded; saveInt("blinkStrike", "predictTicks", blinkPredictTicks); break;
             case BLINK_DELAY: blinkDelayTicks = (int) rounded; saveInt("blinkStrike", "delayTicks", blinkDelayTicks); break;
             case BLINK_MAX_TARGETS: blinkMaxTargets = (int) rounded; saveInt("blinkStrike", "maxTargets", blinkMaxTargets); break;
+            case FLIGHT_SPEED: flightSpeed = rounded; saveDouble("flight", "speed", rounded); break;
+            case FLIGHT_VERTICAL: flightVerticalSpeed = rounded; saveDouble("flight", "verticalSpeed", rounded); break;
             case TARGET_RANGE: targetVisualizerRange = rounded; saveDouble("targetVisualizer", "range", rounded); break;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
@@ -311,9 +366,15 @@ public final class ModConfig {
             case BLINK_ROTATE: return blinkRotate;
             case BLINK_MULTI: return blinkMultiTarget;
             case BLINK_VISUALIZE: return blinkVisualize;
+            case FLIGHT_ELYTRA: return flightElytra;
+            case FLIGHT_BOAT: return flightBoat;
+            case MINE_VISUALIZE_PATH: return mineVisualizePath;
+            case BRIDGE_AVOID_FEET: return bridgeAvoidFeet;
             case TARGET_SKELETON: return targetSkeleton;
             case TARGET_BOX: return targetBox;
             case TARGET_RAYS: return targetRays;
+            case TARGET_COUNT_HUD: return targetCountHud;
+            case ORE_COUNT_HUD: return oreCountHud;
             default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
         }
     }
@@ -352,9 +413,25 @@ public final class ModConfig {
             case BLINK_ROTATE: blinkRotate = value; saveBoolean("blinkStrike", "rotateView", value); break;
             case BLINK_MULTI: blinkMultiTarget = value; saveBoolean("blinkStrike", "multiTarget", value); break;
             case BLINK_VISUALIZE: blinkVisualize = value; saveBoolean("blinkStrike", "visualizeTargets", value); break;
+            case MINE_VISUALIZE_PATH: mineVisualizePath = value; saveBoolean("autoMine", "visualizePath", value); break;
+            case BRIDGE_AVOID_FEET: bridgeAvoidFeet = value; saveBoolean("autoBridge", "avoidFeetCollision", value); break;
+            case FLIGHT_ELYTRA:
+                flightElytra = value;
+                if (value) flightBoat = false;
+                saveBoolean("flight", "elytraPackets", flightElytra);
+                saveBoolean("flight", "boatPackets", flightBoat);
+                break;
+            case FLIGHT_BOAT:
+                flightBoat = value;
+                if (value) flightElytra = false;
+                saveBoolean("flight", "boatPackets", flightBoat);
+                saveBoolean("flight", "elytraPackets", flightElytra);
+                break;
             case TARGET_SKELETON: targetSkeleton = value; saveBoolean("targetVisualizer", "skeleton", value); break;
             case TARGET_BOX: targetBox = value; saveBoolean("targetVisualizer", "box", value); break;
             case TARGET_RAYS: targetRays = value; saveBoolean("targetVisualizer", "rays", value); break;
+            case TARGET_COUNT_HUD: targetCountHud = value; saveBoolean("targetVisualizer", "countHud", value); break;
+            case ORE_COUNT_HUD: oreCountHud = value; saveBoolean("oreVisualizer", "countHud", value); break;
             default: throw new IllegalArgumentException("Setting is not a toggle: " + setting);
         }
         configuration.save();
@@ -369,6 +446,11 @@ public final class ModConfig {
     public static boolean isMineOreEnabled(OreType type) {
         Boolean enabled = mineOreEnabled.get(type);
         return enabled == null || enabled;
+    }
+
+    public static int getMineTargetCount(OreType type) {
+        Integer count = mineTargetCounts.get(type);
+        return count == null ? 0 : count;
     }
 
     public static int getOreColor(OreType type) {
@@ -391,6 +473,7 @@ public final class ModConfig {
         if (setting == ModuleSetting.BLINK_PRIORITY) return "health".equalsIgnoreCase(blinkPriority) ? "血量" : "距离";
         if (setting == ModuleSetting.MELEE_ATTACK_POINT) return meleeAttackPoint.displayName();
         if (setting == ModuleSetting.BLINK_ATTACK_POINT) return blinkAttackPoint.displayName();
+        if (setting == ModuleSetting.TARGET_COUNT_POSITION || setting == ModuleSetting.ORE_COUNT_POSITION) return countHudPosition.displayName();
         throw new IllegalArgumentException("Setting is not a choice: " + setting);
     }
 
@@ -407,6 +490,9 @@ public final class ModConfig {
         } else if (setting == ModuleSetting.BLINK_ATTACK_POINT) {
             blinkAttackPoint = AttackPoint.next(blinkAttackPoint);
             configuration.get("blinkStrike", "attackPoint", blinkAttackPoint.key()).set(blinkAttackPoint.key());
+        } else if (setting == ModuleSetting.TARGET_COUNT_POSITION || setting == ModuleSetting.ORE_COUNT_POSITION) {
+            countHudPosition = HudPosition.next(countHudPosition);
+            configuration.get("hud", "countHudPosition", countHudPosition.key()).set(countHudPosition.key());
         } else {
             throw new IllegalArgumentException("Setting is not a choice: " + setting);
         }

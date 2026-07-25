@@ -6,6 +6,7 @@ module.qazr.oreVisualizer=矿物可视化
 module.qazr.creativeTools=创造工具
 module.qazr.meleeAura=自动近战
 module.qazr.blinkStrike=闪现攻击
+module.qazr.flight=飞行
 module.qazr.criticals=自动暴击
 module.qazr.targetVisualizer=目标可视化
 gui.qazr.title=Voris Hub 控制面板

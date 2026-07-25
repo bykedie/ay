@@ -41,3 +41,19 @@
 - Added combat attack body-point choices for `meleeAura` and `blinkStrike`.
 - Optimized `oreVisualizer` to merge adjacent ore blocks into outer wireframes and skip internal cluster lines such as the center lines in a 3x3 ore group.
 - Added tests for auto-bridge movement, ore-boundary rendering, attack-point persistence and auto-mining preset configuration.
+
+## Version 1.8 Flight And HUD Update
+
+- Added `flight` / `飞行` to the Combat panel with mutually exclusive elytra-packet and boat-packet modes plus configurable horizontal and vertical speed.
+- Hardened `blinkStrike` for Survival use by keeping packet excursions on the origin Y level, restoring the original grounded flag, resetting fall accumulation and briefly suspending flight packets around strikes.
+- Added compact selectable-corner count HUD items for target and ore visualization.
+- Improved quadruped and horse skeleton heading so body bones follow body yaw while neck/head bones follow head yaw.
+- Added tests for flight movement math, HUD/config persistence and wrapped head-yaw interpolation.
+
+## Version 1.9 Automation Performance Update
+
+- Reworked `autoMine` to reuse the shared ore cache instead of scanning a large cube every tick.
+- Replaced the old global auto-mine target count with per-ore target count sliders and preserved the legacy count as the initial default for new per-ore values.
+- Added auto-mine route visualization, current-target highlighting and a manual-movement pause setting.
+- Added configurable `autoBridge` lookahead, down-scan, placement delay and anti-foot-collision settings for jump/fall bridging.
+- Reduced ore visualizer overhead with chunk-level distance culling and throttled cache validation.

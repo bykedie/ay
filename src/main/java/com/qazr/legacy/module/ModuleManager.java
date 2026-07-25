@@ -24,6 +24,7 @@ public final class ModuleManager {
         states.put(ModuleId.CREATIVE_TOOLS, ModConfig.creativeTools);
         states.put(ModuleId.MELEE_AURA, ModConfig.meleeAura);
         states.put(ModuleId.BLINK_STRIKE, ModConfig.blinkStrike);
+        states.put(ModuleId.FLIGHT, ModConfig.flight);
         states.put(ModuleId.CRITICALS, ModConfig.criticals);
         states.put(ModuleId.TARGET_VISUALIZER, ModConfig.targetVisualizer);
         if (isEnabled(ModuleId.MELEE_AURA) && isEnabled(ModuleId.BLINK_STRIKE)) {

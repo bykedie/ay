@@ -9,6 +9,8 @@ import com.qazr.legacy.module.ChatAutomation;
 import com.qazr.legacy.module.MeleeCombat;
 import com.qazr.legacy.module.BlinkStrike;
 import com.qazr.legacy.module.CombatTargetRenderer;
+import com.qazr.legacy.module.CountOverlay;
+import com.qazr.legacy.module.FlightController;
 import com.qazr.legacy.module.OreVisualizer;
 import com.qazr.legacy.control.ClientControls;
 import net.minecraftforge.client.ClientCommandHandler;
@@ -27,7 +29,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 public final class QazrLegacy {
     public static final String MOD_ID = "qazrlegacy";
     public static final String NAME = "Voris Hub";
-    public static final String VERSION = "1.7.0";
+    public static final String VERSION = "1.9.0";
 
     @Mod.Instance(MOD_ID)
     public static QazrLegacy instance;
@@ -40,14 +42,17 @@ public final class QazrLegacy {
         modules = new ModuleManager();
         MinecraftForge.EVENT_BUS.register(modules);
         MinecraftForge.EVENT_BUS.register(new ChatAutomation(modules));
-        AutoMiner autoMiner = new AutoMiner(modules);
+        OreVisualizer oreVisualizer = new OreVisualizer(modules);
+        MinecraftForge.EVENT_BUS.register(oreVisualizer);
+        AutoMiner autoMiner = new AutoMiner(modules, oreVisualizer);
         modules.addReloadListener(autoMiner::reloadTargets);
         MinecraftForge.EVENT_BUS.register(autoMiner);
         MinecraftForge.EVENT_BUS.register(new AutoBridge(modules));
         MinecraftForge.EVENT_BUS.register(new MeleeCombat(modules));
+        MinecraftForge.EVENT_BUS.register(new FlightController(modules));
         MinecraftForge.EVENT_BUS.register(new BlinkStrike(modules));
         MinecraftForge.EVENT_BUS.register(new CombatTargetRenderer(modules));
-        MinecraftForge.EVENT_BUS.register(new OreVisualizer(modules));
+        MinecraftForge.EVENT_BUS.register(new CountOverlay(modules, oreVisualizer));
     }
 
     @Mod.EventHandler

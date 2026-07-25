@@ -80,6 +80,22 @@ final class CombatSupport {
         return result;
     }
 
+    static int countVisualizationTargets(Minecraft mc, double range) {
+        int count = 0;
+        double maxDistanceSq = range * range;
+        for (net.minecraft.entity.Entity entity : mc.world.loadedEntityList) {
+            if (!(entity instanceof EntityLivingBase)) continue;
+            EntityLivingBase target = (EntityLivingBase) entity;
+            if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) continue;
+            if (target instanceof EntityPlayer) {
+                EntityPlayer player = (EntityPlayer) target;
+                if (player.isSpectator() || player.capabilities.isCreativeMode || mc.player.isOnSameTeam(player)) continue;
+            }
+            if (mc.player.getDistanceSq(target) <= maxDistanceSq) count++;
+        }
+        return count;
+    }
+
     static boolean canAttack(Minecraft mc, EntityLivingBase target, ModuleId module, boolean requireVisible) {
         if (target == mc.player || target.isDead || target.getHealth() <= 0.0F || target.isInvisible()) return false;
         if (requireVisible && !mc.player.canEntityBeSeen(target)) return false;

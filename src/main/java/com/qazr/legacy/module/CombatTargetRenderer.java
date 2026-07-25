@@ -51,7 +51,7 @@ public final class CombatTargetRenderer {
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
-        GlStateManager.glLineWidth(1.0F);
+        GlStateManager.glLineWidth(0.5F);
         try {
             for (EntityLivingBase target : meleeTargets) drawTarget(target, event.getPartialTicks(), 0.25F, 1.0F, 0.35F);
             for (EntityLivingBase target : blinkTargets) drawTarget(target, event.getPartialTicks(), 1.0F, 0.25F, 0.3F);
@@ -100,14 +100,18 @@ public final class CombatTargetRenderer {
         double z = target.lastTickPosZ + (target.posZ - target.lastTickPosZ) * partialTicks - render.viewerPosZ;
         AxisAlignedBB box = target.getEntityBoundingBox().offset(x - target.posX, y - target.posY, z - target.posZ).grow(0.04);
         if (ModConfig.targetBox) RenderGlobal.drawSelectionBoundingBox(box, red, green, blue, 0.95F);
-        if (ModConfig.targetSkeleton) drawSkeleton(target, x, y, z, red, green, blue);
+        if (ModConfig.targetSkeleton) drawSkeleton(target, x, y, z, partialTicks, red, green, blue);
         if (ModConfig.targetRays) drawLine(0.0, 0.0, 0.0, x, y + target.height * 0.5, z, red, green, blue);
     }
 
-    private void drawSkeleton(EntityLivingBase target, double x, double y, double z,
+    private void drawSkeleton(EntityLivingBase target, double x, double y, double z, float partialTicks,
             float red, float green, float blue) {
+        float bodyYaw = interpolateAngle(target.prevRenderYawOffset, target.renderYawOffset, partialTicks);
+        float headYaw = interpolateAngle(target.prevRotationYawHead, target.rotationYawHead, partialTicks);
+        SkeletonType type = skeletonType(mainModel(target));
+        float facingYaw = facingYaw(type, bodyYaw, headYaw);
         SkeletonBasis basis = new SkeletonBasis(x, y, z, Math.max(0.5, target.height),
-            Math.max(0.25, target.width), target.renderYawOffset, red, green, blue);
+            Math.max(0.25, target.width), facingYaw, headYaw, red, green, blue);
         switch (skeletonType(mainModel(target))) {
             case HUMANOID: drawHumanoidSkeleton(basis); break;
             case QUADRUPED: drawQuadrupedSkeleton(basis, false); break;
@@ -124,6 +128,11 @@ public final class CombatTargetRenderer {
     private ModelBase mainModel(EntityLivingBase target) {
         Render<?> renderer = mc.getRenderManager().getEntityRenderObject(target);
         return renderer instanceof RenderLivingBase ? ((RenderLivingBase<?>) renderer).getMainModel() : null;
+    }
+
+    static float facingYaw(SkeletonType type, float bodyYaw, float headYaw) {
+        if (type == SkeletonType.QUADRUPED || type == SkeletonType.HORSE) return headYaw;
+        return bodyYaw;
     }
 
     static SkeletonType skeletonType(ModelBase model) {
@@ -163,8 +172,8 @@ public final class CombatTargetRenderer {
         double front = horse ? 0.66 : 0.58;
         double bodyY = horse ? 0.58 : 0.60;
         localLine(b, 0, bodyY, back, 0, bodyY, front);
-        localLine(b, 0, bodyY, front, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70);
-        localLine(b, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70, 0, horse ? 0.91 : 0.80, horse ? 1.00 : 0.88);
+        localHeadLine(b, 0, bodyY, front, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70);
+        headLine(b, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70, 0, horse ? 0.91 : 0.80, horse ? 1.00 : 0.88);
         double[] ends = {back + 0.10, front - 0.10};
         for (double longitudinal : ends) {
             for (double side : new double[] {-0.32, 0.32}) {
@@ -231,6 +240,22 @@ public final class CombatTargetRenderer {
             b.x(side2, forward2), b.y(height2), b.z(side2, forward2), b.red, b.green, b.blue);
     }
 
+    private void localHeadLine(SkeletonBasis b, double side1, double height1, double forward1,
+            double side2, double height2, double forward2) {
+        drawLine(b.x(side1, forward1), b.y(height1), b.z(side1, forward1),
+            b.headX(side2, forward2), b.y(height2), b.headZ(side2, forward2), b.red, b.green, b.blue);
+    }
+
+    private void headLine(SkeletonBasis b, double side1, double height1, double forward1,
+            double side2, double height2, double forward2) {
+        drawLine(b.headX(side1, forward1), b.y(height1), b.headZ(side1, forward1),
+            b.headX(side2, forward2), b.y(height2), b.headZ(side2, forward2), b.red, b.green, b.blue);
+    }
+
+    static float interpolateAngle(float previous, float current, float partialTicks) {
+        return previous + net.minecraft.util.math.MathHelper.wrapDegrees(current - previous) * partialTicks;
+    }
+
     private void drawLine(double x1, double y1, double z1, double x2, double y2, double z2,
             float red, float green, float blue) {
         GlStateManager.color(red, green, blue, 0.95F);
@@ -255,13 +280,18 @@ public final class CombatTargetRenderer {
         private final double sideZ;
         private final double forwardX;
         private final double forwardZ;
+        private final double headSideX;
+        private final double headSideZ;
+        private final double headForwardX;
+        private final double headForwardZ;
         private final float red;
         private final float green;
         private final float blue;
 
-        private SkeletonBasis(double x, double y, double z, double height, double width, float yaw,
+        private SkeletonBasis(double x, double y, double z, double height, double width, float yaw, float headYaw,
                 float red, float green, float blue) {
             double angle = Math.toRadians(yaw);
+            double headAngle = Math.toRadians(headYaw);
             this.baseX = x;
             this.baseY = y;
             this.baseZ = z;
@@ -271,6 +301,10 @@ public final class CombatTargetRenderer {
             this.sideZ = -Math.sin(angle);
             this.forwardX = Math.sin(angle);
             this.forwardZ = Math.cos(angle);
+            this.headSideX = Math.cos(headAngle);
+            this.headSideZ = -Math.sin(headAngle);
+            this.headForwardX = Math.sin(headAngle);
+            this.headForwardZ = Math.cos(headAngle);
             this.red = red;
             this.green = green;
             this.blue = blue;
@@ -286,6 +320,14 @@ public final class CombatTargetRenderer {
 
         private double z(double side, double forward) {
             return baseZ + sideZ * side * width + forwardZ * forward * width;
+        }
+
+        private double headX(double side, double forward) {
+            return baseX + headSideX * side * width + headForwardX * forward * width;
+        }
+
+        private double headZ(double side, double forward) {
+            return baseZ + headSideZ * side * width + headForwardZ * forward * width;
         }
     }
 }

@@ -16,20 +16,21 @@ The included wrapper pins Gradle 7.6.1 and ForgeGradle 5.1.77.
 
 - `autoGg`: detects local-player kills from chat death messages and sends a delayed configurable response.
 - `autoReply`: responds to a selected player's common chat format with rate limiting.
-- `autoMine`: mines selected ore presets, prioritizes nearby visible ore, can walk toward the nearest reachable selected ore in loaded chunks, and stops at an optional target count.
-- `autoBridge`: places a solid block under the next walking position before the player steps off an edge, using hotbar blocks first and temporary inventory swaps when needed.
+- `autoMine`: mines selected ore presets from the shared ore cache, prioritizes nearby visible ore, walks planned routes to cached targets, pauses when you move manually, and supports per-ore target counts.
+- `autoBridge`: places a solid block under or ahead of the next walking position, including jump/fall gaps, with configurable lookahead, down-scan, delay, and anti-foot-collision behavior.
 - `oreVisualizer`: incrementally scans client-loaded chunks and draws configurable colored outlines for each vanilla ore type, merging adjacent ore blocks into outer boundary wireframes.
 - `creativeTools`: enables commands that create normal items and NBT custom potions in Creative mode.
 - `meleeAura`: targets visible players, hostile mobs, animals or peaceful entities with normal 1.9+ attack cooldown handling and sword/axe selection.
 - `blinkStrike`: experimental extended-range attack that sends a collision-checked sequence of temporary position packets, attacks near the target, then returns along the same path.
+- `flight`: packet-assisted survival movement with mutually exclusive elytra-packet and boat-packet modes plus horizontal and vertical speed settings.
 - `criticals`: sends a short grounded critical movement sequence before sword/axe attacks.
 - `targetVisualizer`: independently draws model-aware target skeletons, boxes and camera rays within a configurable range, using green for visible targets and red for obstructed targets.
 
-`meleeAura` measures its range from the player's eyes to the nearest point of a target's hitbox. Its default is `3.0` blocks and its configurable maximum is `6.0`. `blinkStrike` measures between entity positions and has a separate `3.0`-`200.0` acquisition range (default `12.0`); it is mutually exclusive with `meleeAura`. It advances the server-side position in configurable steps, sends the attack from `2.5` blocks away by default, and retraces the path without moving the local camera. Both combat modules expose a selectable attack body point (`head`, `chest`, `legs`, or `feet`) for rotation and aiming behavior. Longer settings, modified servers, and anti-cheat plugins may behave differently, so extended-range hits remain experimental and are not guaranteed.
+`meleeAura` measures its range from the player's eyes to the nearest point of a target's hitbox. Its default is `3.0` blocks and its configurable maximum is `6.0`. `blinkStrike` measures between entity positions and has a separate `3.0`-`200.0` acquisition range (default `12.0`); it is mutually exclusive with `meleeAura`. It advances the server-side position in configurable horizontal steps, sends the attack from `2.5` blocks away by default, suspends flight packets while striking, resets local fall accumulation, and retraces the path without moving the local camera. Both combat modules expose a selectable attack body point (`head`, `chest`, `legs`, or `feet`) for rotation and aiming behavior. Longer settings, modified servers, and anti-cheat plugins may behave differently, so extended-range hits remain experimental and are not guaranteed.
 
-Target and ore visualization both default to `150` blocks and can be configured up to `500`. Ore visualization can only inspect chunks currently loaded by the client. Each vanilla ore has an independent switch and RGB outline color. Adjacent ore blocks are rendered as a shared outer wireframe so internal nine-grid style lines are skipped.
+Target and ore visualization both default to `150` blocks and can be configured up to `500`. Ore visualization can only inspect chunks currently loaded by the client. Each vanilla ore has an independent switch and RGB outline color. Adjacent ore blocks are rendered as a shared outer wireframe so internal nine-grid style lines are skipped. Both visualizers can show compact nearby-count HUD items, sharing the same selectable screen corner. Ore scanning is chunk-cached, distance-culled, and reused by auto mining to avoid repeated large cube scans.
 
-Auto mining keeps the legacy close-range reachable mining behavior, then falls back to simple client-side walking paths toward selected ore blocks in loaded chunks. Its `targetCount` setting uses `0` as unlimited.
+Auto mining uses `pathRange` for both target acquisition and route planning; the old close-range radius setting is no longer used. Each ore type has its own target count slider, where `0` means unlimited for that ore. When route visualization is enabled, the current target is boxed and the planned route is drawn as a thin line.
 
 All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. The legacy file name, internal mod ID, and `/qazr` command are retained so existing installations keep their settings and key bindings after the Voris Hub rename.
 
@@ -39,8 +40,8 @@ All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. T
 - Module toggle key bindings are unassigned by default and can be set in Minecraft's Controls screen.
 - Left-click a module to toggle it; right-click it to expand persistent sliders, switches, color editors, and choices below the module.
 - Hover the small question-mark icon beside any parameter for its purpose and usage.
-- Combat modules have independent player, hostile, animal, peaceful and mod-entity filters, camera rotation, attack body point, and multi-target limits up to 50. The separate target visualizer has skeleton, box and ray switches.
-- Auto mine exposes per-ore switches, path range, mining delay, close-range scan radius, and target count. Auto bridge has no extra parameters yet.
+- Combat modules have independent player, hostile, animal, peaceful and mod-entity filters, camera rotation, attack body point, and multi-target limits up to 50. The separate target visualizer has skeleton, box, ray and nearby-count switches.
+- Auto mine exposes per-ore switches and target counts, path range, mining delay, manual-movement pause, and route visualization. Auto bridge exposes lookahead, down-scan, place delay, and anti-foot-collision settings.
 - Auto GG and auto reply expose five editable random message slots; blank slots are skipped and `{player}` inserts the matched player name.
 - `/qazr status`
 - `/qazr toggle <module>`
@@ -65,7 +66,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.7.0.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.9.0.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

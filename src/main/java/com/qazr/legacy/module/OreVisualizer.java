@@ -5,6 +5,8 @@ import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.config.OreType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -15,12 +17,14 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ChunkProviderClient;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
@@ -32,13 +36,19 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
 
 public final class OreVisualizer {
-    private static final int SECTIONS_PER_TICK = 2;
+    private static final int SECTIONS_PER_TICK = 4;
+    private static final int VALIDATION_CHUNKS_PER_TICK = 2;
     private static final double BOX_INSET = 0.002;
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private final Map<Long, List<OreMarker>> markersByChunk = new HashMap<>();
+    private final Map<OreType, Set<Long>> markerSetsByType = new EnumMap<>(OreType.class);
     private final Deque<ScanTask> scanQueue = new ArrayDeque<>();
+    private int validationIndex;
+    private int validationDelay;
+    private World seededWorld;
+    private int seededRadiusChunks;
 
     public OreVisualizer(ModuleManager modules) {
         this.modules = modules;
@@ -50,7 +60,7 @@ public final class OreVisualizer {
         Chunk chunk = event.getChunk();
         long key = ChunkPos.asLong(chunk.x, chunk.z);
         removeQueued(key);
-        markersByChunk.remove(key);
+        removeChunkMarkers(key);
         scanQueue.addLast(new ScanTask(event.getWorld(), chunk));
     }
 
@@ -58,7 +68,7 @@ public final class OreVisualizer {
     public void onChunkUnload(ChunkEvent.Unload event) {
         if (!event.getWorld().isRemote) return;
         long key = ChunkPos.asLong(event.getChunk().x, event.getChunk().z);
-        markersByChunk.remove(key);
+        removeChunkMarkers(key);
         removeQueued(key);
     }
 
@@ -66,18 +76,29 @@ public final class OreVisualizer {
     public void onWorldUnload(WorldEvent.Unload event) {
         if (!event.getWorld().isRemote) return;
         markersByChunk.clear();
+        markerSetsByType.clear();
         scanQueue.clear();
+        validationIndex = 0;
+        validationDelay = 0;
+        seededWorld = null;
+        seededRadiusChunks = 0;
     }
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || mc.world == null) return;
+        if (!cacheNeeded()) return;
+        seedLoadedChunks();
         int remaining = SECTIONS_PER_TICK;
         while (remaining-- > 0 && !scanQueue.isEmpty()) {
             ScanTask task = scanQueue.removeFirst();
             if (task.world != mc.world || !task.chunk.isLoaded()) continue;
-            if (task.scanNextSection()) markersByChunk.put(task.key, task.markers);
+            if (task.scanNextSection()) replaceChunkMarkers(task.key, task.markers);
             else scanQueue.addLast(task);
+        }
+        if (validationDelay-- <= 0) {
+            validateCachedMarkers(VALIDATION_CHUNKS_PER_TICK);
+            validationDelay = 4;
         }
     }
 
@@ -96,19 +117,17 @@ public final class OreVisualizer {
         GlStateManager.disableTexture2D();
         GlStateManager.disableDepth();
         GlStateManager.depthMask(false);
-        GlStateManager.glLineWidth(1.0F);
+        GlStateManager.glLineWidth(0.5F);
         try {
             BufferBuilder buffer = Tessellator.getInstance().getBuffer();
             buffer.begin(GL11.GL_LINES, DefaultVertexFormats.POSITION_COLOR);
-            Map<OreType, Set<Long>> markerSets = markerSetsByType();
-            for (List<OreMarker> markers : markersByChunk.values()) {
+            for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
+                if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, ModConfig.oreVisualizerRange)) continue;
+                List<OreMarker> markers = entry.getValue();
                 for (OreMarker marker : markers) {
                     if (!ModConfig.isOreEnabled(marker.type)) continue;
-                    double dx = marker.pos.getX() + 0.5 - mc.player.posX;
-                    double dy = marker.pos.getY() + 0.5 - mc.player.posY;
-                    double dz = marker.pos.getZ() + 0.5 - mc.player.posZ;
-                    if (dx * dx + dy * dy + dz * dz > rangeSq) continue;
-                    Set<Long> sameType = markerSets.get(marker.type);
+                    if (distanceSq(marker.pos) > rangeSq) continue;
+                    Set<Long> sameType = markerSetsByType.get(marker.type);
                     if (sameType != null) addBoundaryBox(buffer, marker.pos, sameType, viewerX, viewerY, viewerZ,
                         ModConfig.getOreColor(marker.type));
                 }
@@ -125,30 +144,161 @@ public final class OreVisualizer {
         }
     }
 
+    public int countVisibleOres() {
+        if (mc.player == null || mc.world == null) return 0;
+        double rangeSq = ModConfig.oreVisualizerRange * ModConfig.oreVisualizerRange;
+        int count = 0;
+        for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
+            if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, ModConfig.oreVisualizerRange)) continue;
+            List<OreMarker> markers = entry.getValue();
+            for (OreMarker marker : markers) {
+                if (ModConfig.isOreEnabled(marker.type) && distanceSq(marker.pos) <= rangeSq) count++;
+            }
+        }
+        return count;
+    }
+
+    public List<CachedOre> cachedMineOres(double range) {
+        if (mc.player == null || mc.world == null) return Collections.emptyList();
+        double rangeSq = range * range;
+        List<CachedOre> result = new ArrayList<>();
+        for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
+            if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, range)) continue;
+            List<OreMarker> markers = entry.getValue();
+            for (OreMarker marker : markers) {
+                if (!ModConfig.isMineOreEnabled(marker.type)) continue;
+                double distanceSq = distanceSq(marker.pos);
+                if (distanceSq <= rangeSq) result.add(new CachedOre(marker.pos, marker.type, distanceSq));
+            }
+        }
+        result.sort(Comparator.comparingDouble(CachedOre::distanceSq));
+        return result;
+    }
+
+    public void removeMarker(BlockPos pos) {
+        long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
+        List<OreMarker> markers = markersByChunk.get(key);
+        if (markers == null) return;
+        Iterator<OreMarker> iterator = markers.iterator();
+        while (iterator.hasNext()) {
+            OreMarker marker = iterator.next();
+            if (!marker.pos.equals(pos)) continue;
+            iterator.remove();
+            removeTypeMarker(marker);
+        }
+        if (markers.isEmpty()) markersByChunk.remove(key);
+    }
+
+    private boolean cacheNeeded() {
+        return modules.isEnabled(ModuleId.ORE_VISUALIZER) || modules.isEnabled(ModuleId.AUTO_MINE);
+    }
+
+    private void seedLoadedChunks() {
+        if (mc.player == null || mc.world == null) return;
+        if (!(mc.world.getChunkProvider() instanceof ChunkProviderClient)) return;
+        int radiusChunks = Math.max(1, (int) Math.ceil(ModConfig.oreVisualizerRange / 16.0D));
+        if (seededWorld == mc.world && radiusChunks <= seededRadiusChunks) return;
+        ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
+        int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
+        int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
+        List<SeededChunk> chunks = new ArrayList<>();
+        for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
+            for (int dz = -radiusChunks; dz <= radiusChunks; dz++) {
+                int distanceSq = dx * dx + dz * dz;
+                if (distanceSq > radiusChunks * radiusChunks) continue;
+                Chunk chunk = provider.getLoadedChunk(centerChunkX + dx, centerChunkZ + dz);
+                if (chunk != null) chunks.add(new SeededChunk(chunk, distanceSq));
+            }
+        }
+        chunks.sort(Comparator.comparingInt(chunk -> chunk.distanceSq));
+        for (SeededChunk chunk : chunks) queueCachedChunk(mc.world, chunk.chunk);
+        seededWorld = mc.world;
+        seededRadiusChunks = radiusChunks;
+        validationDelay = 0;
+    }
+
+    private void queueCachedChunk(World world, Chunk chunk) {
+        long key = ChunkPos.asLong(chunk.x, chunk.z);
+        if (markersByChunk.containsKey(key) || isQueued(key)) return;
+        scanQueue.addLast(new ScanTask(world, chunk));
+    }
+
+    private boolean isQueued(long key) {
+        for (ScanTask task : scanQueue) if (task.key == key) return true;
+        return false;
+    }
+
+    private double distanceSq(BlockPos pos) {
+        double dx = pos.getX() + 0.5 - mc.player.posX;
+        double dy = pos.getY() + 0.5 - mc.player.posY;
+        double dz = pos.getZ() + 0.5 - mc.player.posZ;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    static boolean chunkPossiblyInRange(long key, double playerX, double playerZ, double range) {
+        int chunkX = (int) key;
+        int chunkZ = (int) (key >> 32);
+        double minX = chunkX * 16.0;
+        double maxX = minX + 16.0;
+        double minZ = chunkZ * 16.0;
+        double maxZ = minZ + 16.0;
+        double dx = playerX < minX ? minX - playerX : playerX > maxX ? playerX - maxX : 0.0;
+        double dz = playerZ < minZ ? minZ - playerZ : playerZ > maxZ ? playerZ - maxZ : 0.0;
+        double padded = range + 1.5;
+        return dx * dx + dz * dz <= padded * padded;
+    }
+
+    private void replaceChunkMarkers(long key, List<OreMarker> markers) {
+        removeChunkMarkers(key);
+        if (markers.isEmpty()) return;
+        List<OreMarker> stored = new ArrayList<>(markers);
+        markersByChunk.put(key, stored);
+        for (OreMarker marker : stored) addTypeMarker(marker);
+    }
+
+    private void removeChunkMarkers(long key) {
+        List<OreMarker> markers = markersByChunk.remove(key);
+        if (markers == null) return;
+        for (OreMarker marker : markers) removeTypeMarker(marker);
+    }
+
+    private void addTypeMarker(OreMarker marker) {
+        markerSetsByType.computeIfAbsent(marker.type, ignored -> new HashSet<>()).add(marker.pos.toLong());
+    }
+
+    private void removeTypeMarker(OreMarker marker) {
+        Set<Long> markers = markerSetsByType.get(marker.type);
+        if (markers == null) return;
+        markers.remove(marker.pos.toLong());
+        if (markers.isEmpty()) markerSetsByType.remove(marker.type);
+    }
+
+    private void validateCachedMarkers(int chunkBudget) {
+        if (markersByChunk.isEmpty()) return;
+        List<Long> keys = new ArrayList<>(markersByChunk.keySet());
+        for (int i = 0; i < chunkBudget && !keys.isEmpty(); i++) {
+            if (validationIndex >= keys.size()) validationIndex = 0;
+            validateChunk(keys.get(validationIndex++));
+        }
+    }
+
+    private void validateChunk(long key) {
+        List<OreMarker> markers = markersByChunk.get(key);
+        if (markers == null) return;
+        Iterator<OreMarker> iterator = markers.iterator();
+        while (iterator.hasNext()) {
+            OreMarker marker = iterator.next();
+            IBlockState state = mc.world.getBlockState(marker.pos);
+            if (OreType.fromBlock(state.getBlock()) == marker.type) continue;
+            iterator.remove();
+            removeTypeMarker(marker);
+        }
+        if (markers.isEmpty()) markersByChunk.remove(key);
+    }
+
     private void removeQueued(long key) {
         Iterator<ScanTask> iterator = scanQueue.iterator();
         while (iterator.hasNext()) if (iterator.next().key == key) iterator.remove();
-    }
-
-    private Map<OreType, Set<Long>> markerSetsByType() {
-        Map<OreType, Set<Long>> result = new EnumMap<>(OreType.class);
-        Iterator<Map.Entry<Long, List<OreMarker>>> chunkIterator = markersByChunk.entrySet().iterator();
-        while (chunkIterator.hasNext()) {
-            List<OreMarker> markers = chunkIterator.next().getValue();
-            Iterator<OreMarker> markerIterator = markers.iterator();
-            while (markerIterator.hasNext()) {
-                OreMarker marker = markerIterator.next();
-                IBlockState state = mc.world.getBlockState(marker.pos);
-                OreType current = OreType.fromBlock(state.getBlock());
-                if (current != marker.type) {
-                    markerIterator.remove();
-                    continue;
-                }
-                result.computeIfAbsent(marker.type, ignored -> new HashSet<>()).add(marker.pos.toLong());
-            }
-            if (markers.isEmpty()) chunkIterator.remove();
-        }
-        return result;
     }
 
     private static void addBoundaryBox(BufferBuilder buffer, BlockPos pos, Set<Long> sameType,
@@ -234,6 +384,30 @@ public final class OreVisualizer {
         }
     }
 
+    public static final class CachedOre {
+        private final BlockPos pos;
+        private final OreType type;
+        private final double distanceSq;
+
+        private CachedOre(BlockPos pos, OreType type, double distanceSq) {
+            this.pos = pos;
+            this.type = type;
+            this.distanceSq = distanceSq;
+        }
+
+        public BlockPos pos() {
+            return pos;
+        }
+
+        public OreType type() {
+            return type;
+        }
+
+        public double distanceSq() {
+            return distanceSq;
+        }
+    }
+
     private static final class ScanTask {
         private final World world;
         private final Chunk chunk;
@@ -276,6 +450,16 @@ public final class OreVisualizer {
         private OreMarker(BlockPos pos, OreType type) {
             this.pos = pos;
             this.type = type;
+        }
+    }
+
+    private static final class SeededChunk {
+        private final Chunk chunk;
+        private final int distanceSq;
+
+        private SeededChunk(Chunk chunk, int distanceSq) {
+            this.chunk = chunk;
+            this.distanceSq = distanceSq;
         }
     }
 }

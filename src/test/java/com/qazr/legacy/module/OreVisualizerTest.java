@@ -3,6 +3,7 @@ package com.qazr.legacy.module;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -36,6 +37,13 @@ public class OreVisualizerTest {
         assertEquals(0, OreVisualizer.boundaryLineCount(positions, new BlockPos(1, 0, 1)));
         assertEquals(28, totalLines(positions));
         assertTrue(totalLines(positions) < 9 * 12);
+    }
+
+    @Test
+    public void cullsChunksOutsideHorizontalVisualizationRange() {
+        assertTrue(OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(0, 0), 8.0, 8.0, 16.0));
+        assertTrue(OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(1, 0), 8.0, 8.0, 16.0));
+        assertTrue(!OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(4, 0), 8.0, 8.0, 16.0));
     }
 
     private static int totalLines(Set<BlockPos> positions) {

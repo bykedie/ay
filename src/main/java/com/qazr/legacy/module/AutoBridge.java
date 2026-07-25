@@ -1,5 +1,6 @@
 package com.qazr.legacy.module;
 
+import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
@@ -10,6 +11,7 @@ import net.minecraft.network.play.client.CPacketHeldItemChange;
 import net.minecraft.network.play.client.CPacketPlayerTryUseItemOnBlock;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraftforge.event.world.WorldEvent;
@@ -20,6 +22,7 @@ public final class AutoBridge {
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private int delay;
+    private double lastMotionY;
 
     public AutoBridge(ModuleManager modules) {
         this.modules = modules;
@@ -30,9 +33,17 @@ public final class AutoBridge {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.AUTO_BRIDGE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
-        if (delay-- > 0 || mc.player.capabilities.isFlying) return;
+        double motionY = mc.player.motionY;
+        boolean atApex = lastMotionY > 0.0D && motionY <= 0.0D && !mc.player.onGround;
+        lastMotionY = motionY;
+        if (delay > 0) {
+            delay--;
+            if (!atApex) return;
+        }
+        if (mc.player.capabilities.isFlying) return;
         BlockPos placePos = supportPosition();
-        if (placePos == null || !isReplaceable(placePos)) return;
+        if (placePos == null && atApex) placePos = apexSupportPosition();
+        if (placePos == null) return;
         Placement placement = placementFor(placePos);
         if (placement == null) return;
         int slot = findHotbarBlock(placePos);
@@ -59,25 +70,41 @@ public final class AutoBridge {
                     ClickType.SWAP, mc.player);
             }
         }
-        delay = 2;
+        delay = ModConfig.bridgeDelayTicks;
     }
 
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
-        if (event.getWorld().isRemote) delay = 0;
+        if (event.getWorld().isRemote) {
+            delay = 0;
+            lastMotionY = 0.0;
+        }
     }
 
     private BlockPos supportPosition() {
         double[] offset = movementOffset(mc.player.rotationYaw,
             mc.player.movementInput.moveForward, mc.player.movementInput.moveStrafe);
         if (offset[0] == 0.0 && offset[1] == 0.0) return null;
-        int x = MathHelper.floor(mc.player.posX + offset[0] * 0.85);
+        int x = MathHelper.floor(mc.player.posX + offset[0] * ModConfig.bridgeLookahead);
+        int z = MathHelper.floor(mc.player.posZ + offset[1] * ModConfig.bridgeLookahead);
+        int firstY = MathHelper.floor(mc.player.getEntityBoundingBox().minY) - 1;
+        for (int dy = 0; dy < ModConfig.bridgeDownScan; dy++) {
+            BlockPos candidate = new BlockPos(x, firstY - dy, z);
+            if (!isReplaceable(candidate)) continue;
+            if (ModConfig.bridgeAvoidFeet && collidesWithPlayer(candidate)) continue;
+            if (placementFor(candidate) != null) return candidate;
+        }
+        return null;
+    }
+
+    private BlockPos apexSupportPosition() {
+        int x = MathHelper.floor(mc.player.posX);
+        int z = MathHelper.floor(mc.player.posZ);
         int y = MathHelper.floor(mc.player.getEntityBoundingBox().minY) - 1;
-        int z = MathHelper.floor(mc.player.posZ + offset[1] * 0.85);
-        BlockPos ahead = new BlockPos(x, y, z);
-        if (!mc.world.getCollisionBoxes(mc.player, mc.player.getEntityBoundingBox().offset(
-                offset[0] * 0.65, -1.0, offset[1] * 0.65)).isEmpty()) return null;
-        return ahead;
+        BlockPos candidate = new BlockPos(x, y, z);
+        if (!isReplaceable(candidate)) return null;
+        if (ModConfig.bridgeAvoidFeet && collidesWithPlayer(candidate)) return null;
+        return placementFor(candidate) != null ? candidate : null;
     }
 
     static double[] movementOffset(float yaw, float forward, float strafe) {
@@ -93,8 +120,17 @@ public final class AutoBridge {
         return new double[] {x, z};
     }
 
+    static int candidateY(double feetY, int downOffset) {
+        return MathHelper.floor(feetY) - 1 - Math.max(0, downOffset);
+    }
+
     private boolean isReplaceable(BlockPos pos) {
         return mc.world.getBlockState(pos).getBlock().isReplaceable(mc.world, pos);
+    }
+
+    private boolean collidesWithPlayer(BlockPos pos) {
+        AxisAlignedBB block = new AxisAlignedBB(pos);
+        return block.intersects(mc.player.getEntityBoundingBox().grow(0.02, 0.0, 0.02));
     }
 
     private Placement placementFor(BlockPos pos) {

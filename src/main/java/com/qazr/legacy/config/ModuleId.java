@@ -9,6 +9,7 @@ public enum ModuleId {
     CREATIVE_TOOLS("creativeTools", "创造工具"),
     MELEE_AURA("meleeAura", "自动近战"),
     BLINK_STRIKE("blinkStrike", "闪现攻击"),
+    FLIGHT("flight", "飞行"),
     CRITICALS("criticals", "自动暴击"),
     TARGET_VISUALIZER("targetVisualizer", "目标可视化");
 

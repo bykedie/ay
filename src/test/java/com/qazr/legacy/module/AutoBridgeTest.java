@@ -19,6 +19,13 @@ public class AutoBridgeTest {
         assertEquals(offset[0], offset[1], 0.0001);
     }
 
+    @Test
+    public void supportsJumpAndFallPlacementOffsets() {
+        assertEquals(63, AutoBridge.candidateY(64.8, 0));
+        assertEquals(62, AutoBridge.candidateY(64.8, 1));
+        assertEquals(60, AutoBridge.candidateY(64.8, 3));
+    }
+
     private static void assertOffset(double x, double z, double[] offset) {
         assertEquals(x, offset[0], 0.0001);
         assertEquals(z, offset[1], 0.0001);

@@ -14,10 +14,12 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.world.WorldEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class BlinkStrike {
+    private static final int FLIGHT_SUSPEND_TICKS = 8;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private int delay;
@@ -26,7 +28,7 @@ public final class BlinkStrike {
         this.modules = modules;
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
@@ -45,6 +47,7 @@ public final class BlinkStrike {
 
         BlinkPath.Point origin = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
         boolean attacked = false;
+        FlightController.suspend(FLIGHT_SUSPEND_TICKS);
         for (EntityLivingBase target : targets) {
             if (strike(target, origin)) attacked = true;
         }
@@ -57,6 +60,7 @@ public final class BlinkStrike {
     }
 
     private boolean strike(EntityLivingBase target, BlinkPath.Point origin) {
+        boolean originOnGround = originOnGround(origin);
         BlinkPath.Point destination = destinationFor(target, origin);
         List<BlinkPath.Point> path = BlinkPath.interpolate(origin, destination, ModConfig.blinkStep);
         if (!isPathClear(origin, destination)) return false;
@@ -70,14 +74,21 @@ public final class BlinkStrike {
             Vec3d remoteEyes = new Vec3d(destination.x, destination.y + mc.player.getEyeHeight(), destination.z);
             float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
             mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], false));
-            sendRemoteCritical(destination);
+            sendRemoteCritical(destination, originOnGround);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
             List<BlinkPath.Point> returnPath = BlinkPath.returnPath(origin, path, sent);
             for (int i = 0; i < returnPath.size(); i++) {
-                sendPosition(returnPath.get(i), i == returnPath.size() - 1 && mc.player.onGround);
+                sendPosition(returnPath.get(i), i == returnPath.size() - 1 && originOnGround);
             }
+            mc.player.fallDistance = 0.0F;
+            mc.player.motionY = 0.0;
+            mc.player.motionX = 0.0;
+            mc.player.motionZ = 0.0;
+            mc.player.onGround = originOnGround;
+            mc.player.setPosition(origin.x, origin.y, origin.z);
+            FlightController.suspend(FLIGHT_SUSPEND_TICKS);
         }
         return true;
     }
@@ -89,7 +100,7 @@ public final class BlinkStrike {
 
     private BlinkPath.Point destinationFor(EntityLivingBase target, BlinkPath.Point origin) {
         double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
-        double predictedY = target.posY;
+        double predictedY = origin.y;
         double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
         BlinkPath.Point predicted = new BlinkPath.Point(predictedX, predictedY, predictedZ);
         BlinkPath.Point limited = BlinkPath.limitDistance(origin, predicted, ModConfig.blinkRange);
@@ -118,6 +129,14 @@ public final class BlinkStrike {
         return true;
     }
 
+    private boolean originOnGround(BlinkPath.Point origin) {
+        if (mc.player.onGround) return true;
+        AxisAlignedBB box = mc.player.getEntityBoundingBox()
+            .offset(origin.x - mc.player.posX, origin.y - mc.player.posY, origin.z - mc.player.posZ)
+            .offset(0.0, -0.04, 0.0);
+        return !mc.world.getCollisionBoxes(mc.player, box).isEmpty();
+    }
+
     private void sendPosition(BlinkPath.Point point) {
         sendPosition(point, false);
     }
@@ -126,8 +145,8 @@ public final class BlinkStrike {
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, onGround));
     }
 
-    private void sendRemoteCritical(BlinkPath.Point point) {
-        if (!modules.isEnabled(ModuleId.CRITICALS) || !mc.player.onGround) return;
+    private void sendRemoteCritical(BlinkPath.Point point, boolean originOnGround) {
+        if (!modules.isEnabled(ModuleId.CRITICALS) || !originOnGround) return;
         if (mc.player.isInWater() || mc.player.isInLava() || mc.player.isOnLadder() || mc.player.isRiding()
                 || mc.player.isPotionActive(MobEffects.BLINDNESS)) return;
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0625, point.z, false));

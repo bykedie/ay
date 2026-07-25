@@ -29,6 +29,7 @@ public class ModConfigTest {
 
         assertFalse(ModConfig.meleeAura);
         assertFalse(ModConfig.blinkStrike);
+        assertFalse(ModConfig.flight);
         assertEquals(3.0, ModConfig.meleeRange, 0.0);
         assertEquals(12.0, ModConfig.blinkRange, 0.0);
         assertEquals(4.0, ModConfig.blinkStep, 0.0);
@@ -47,14 +48,28 @@ public class ModConfigTest {
         assertFalse(ModConfig.blinkPeaceful);
         assertEquals(AttackPoint.CHEST, ModConfig.meleeAttackPoint);
         assertEquals(AttackPoint.CHEST, ModConfig.blinkAttackPoint);
+        assertTrue(ModConfig.flightElytra);
+        assertFalse(ModConfig.flightBoat);
+        assertEquals(0.32, ModConfig.flightSpeed, 0.001);
+        assertEquals(0.20, ModConfig.flightVerticalSpeed, 0.001);
         assertFalse(ModConfig.targetVisualizer);
         assertFalse(ModConfig.oreVisualizer);
         assertFalse(ModConfig.autoBridge);
         assertEquals(32, ModConfig.minePathRange);
-        assertEquals(0, ModConfig.mineTargetCount);
+        assertEquals(30, ModConfig.mineManualPauseTicks);
+        assertTrue(ModConfig.mineVisualizePath);
+        assertEquals(0, ModConfig.getMineTargetCount(OreType.COAL));
+        assertEquals(0, ModConfig.getMineTargetCount(OreType.DIAMOND));
+        assertEquals(0.95, ModConfig.bridgeLookahead, 0.001);
+        assertEquals(2, ModConfig.bridgeDownScan);
+        assertEquals(1, ModConfig.bridgeDelayTicks);
+        assertTrue(ModConfig.bridgeAvoidFeet);
         assertTrue(ModConfig.targetSkeleton);
         assertTrue(ModConfig.targetBox);
         assertFalse(ModConfig.targetRays);
+        assertFalse(ModConfig.targetCountHud);
+        assertFalse(ModConfig.oreCountHud);
+        assertEquals(HudPosition.TOP_LEFT, ModConfig.countHudPosition);
         assertEquals(150.0, ModConfig.targetVisualizerRange, 0.0);
         assertEquals(150.0, ModConfig.oreVisualizerRange, 0.0);
         assertTrue(ModConfig.isMineOreEnabled(OreType.COAL));
@@ -185,6 +200,8 @@ public class ModConfigTest {
         ModConfig.toggle(ModuleSetting.TARGET_SKELETON);
         ModConfig.toggle(ModuleSetting.TARGET_BOX);
         ModConfig.toggle(ModuleSetting.TARGET_RAYS);
+        ModConfig.toggle(ModuleSetting.TARGET_COUNT_HUD);
+        ModConfig.cycleChoice(ModuleSetting.TARGET_COUNT_POSITION);
         ModConfig.saveNumber(ModuleSetting.TARGET_RANGE, 500.0);
         ModConfig.reload();
 
@@ -196,6 +213,8 @@ public class ModConfigTest {
         assertFalse(ModConfig.targetSkeleton);
         assertFalse(ModConfig.targetBox);
         assertTrue(ModConfig.targetRays);
+        assertTrue(ModConfig.targetCountHud);
+        assertEquals(HudPosition.BOTTOM_LEFT, ModConfig.countHudPosition);
         assertEquals(500.0, ModConfig.targetVisualizerRange, 0.0);
     }
 
@@ -205,6 +224,8 @@ public class ModConfigTest {
         ModConfig.saveModule(ModuleId.ORE_VISUALIZER, true);
         ModConfig.saveNumber(ModuleSetting.ORE_RANGE, 500.0);
         ModConfig.toggle(ModuleSetting.ORE_DIAMOND);
+        ModConfig.toggle(ModuleSetting.ORE_COUNT_HUD);
+        ModConfig.cycleChoice(ModuleSetting.ORE_COUNT_POSITION);
         ModConfig.saveOreColor(OreType.DIAMOND, 0x123ABC);
         ModConfig.reload();
 
@@ -212,6 +233,8 @@ public class ModConfigTest {
         assertEquals(500.0, ModConfig.oreVisualizerRange, 0.0);
         assertFalse(ModConfig.isOreEnabled(OreType.DIAMOND));
         assertTrue(ModConfig.isOreEnabled(OreType.IRON));
+        assertTrue(ModConfig.oreCountHud);
+        assertEquals(HudPosition.BOTTOM_LEFT, ModConfig.countHudPosition);
         assertEquals(0x123ABC, ModConfig.getOreColor(OreType.DIAMOND));
     }
 
@@ -220,17 +243,50 @@ public class ModConfigTest {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.AUTO_BRIDGE, true);
         ModConfig.saveNumber(ModuleSetting.MINE_PATH_RANGE, 64.0);
-        ModConfig.saveNumber(ModuleSetting.MINE_TARGET_COUNT, 12.0);
+        ModConfig.saveNumber(ModuleSetting.MINE_MANUAL_PAUSE, 55.0);
+        ModConfig.toggle(ModuleSetting.MINE_VISUALIZE_PATH);
+        ModConfig.saveNumber(ModuleSetting.MINE_COAL_COUNT, 12.0);
+        ModConfig.saveNumber(ModuleSetting.MINE_DIAMOND_COUNT, 3.0);
+        ModConfig.saveNumber(ModuleSetting.BRIDGE_LOOKAHEAD, 1.24);
+        ModConfig.saveNumber(ModuleSetting.BRIDGE_DOWN_SCAN, 4.0);
+        ModConfig.saveNumber(ModuleSetting.BRIDGE_DELAY, 2.0);
+        ModConfig.toggle(ModuleSetting.BRIDGE_AVOID_FEET);
         ModConfig.toggle(ModuleSetting.MINE_DIAMOND);
         ModConfig.toggle(ModuleSetting.MINE_QUARTZ);
         ModConfig.reload();
 
         assertTrue(ModConfig.autoBridge);
         assertEquals(64, ModConfig.minePathRange);
-        assertEquals(12, ModConfig.mineTargetCount);
+        assertEquals(55, ModConfig.mineManualPauseTicks);
+        assertFalse(ModConfig.mineVisualizePath);
+        assertEquals(12, ModConfig.getMineTargetCount(OreType.COAL));
+        assertEquals(3, ModConfig.getMineTargetCount(OreType.DIAMOND));
+        assertEquals(1.25, ModConfig.bridgeLookahead, 0.001);
+        assertEquals(4, ModConfig.bridgeDownScan);
+        assertEquals(2, ModConfig.bridgeDelayTicks);
+        assertFalse(ModConfig.bridgeAvoidFeet);
         assertFalse(ModConfig.isMineOreEnabled(OreType.DIAMOND));
         assertTrue(ModConfig.isMineOreEnabled(OreType.QUARTZ));
         assertTrue(ModConfig.isMineOreEnabled(OreType.IRON));
+    }
+
+    @Test
+    public void persistsFlightModeSettingsMutuallyExclusively() throws Exception {
+        ModConfig.load(configFile());
+        ModConfig.saveModule(ModuleId.FLIGHT, true);
+        ModConfig.toggle(ModuleSetting.FLIGHT_BOAT);
+        ModConfig.saveNumber(ModuleSetting.FLIGHT_SPEED, 0.48);
+        ModConfig.saveNumber(ModuleSetting.FLIGHT_VERTICAL, 0.27);
+        ModConfig.reload();
+
+        assertTrue(ModConfig.flight);
+        assertFalse(ModConfig.flightElytra);
+        assertTrue(ModConfig.flightBoat);
+        assertEquals(0.5, ModConfig.flightSpeed, 0.001);
+        assertEquals(0.28, ModConfig.flightVerticalSpeed, 0.001);
+        assertTrue(ModConfig.toggle(ModuleSetting.FLIGHT_ELYTRA));
+        assertTrue(ModConfig.flightElytra);
+        assertFalse(ModConfig.flightBoat);
     }
 
     private File configFile() throws Exception {
