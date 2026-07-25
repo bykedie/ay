@@ -52,6 +52,7 @@ public final class OreVisualizer {
     private int seededRadiusChunks;
     private int seededCenterChunkX = Integer.MIN_VALUE;
     private int seededCenterChunkZ = Integer.MIN_VALUE;
+    private boolean cacheActive;
 
     public OreVisualizer(ModuleManager modules) {
         this.modules = modules;
@@ -65,6 +66,7 @@ public final class OreVisualizer {
         scannedChunks.remove(key);
         removeQueued(key);
         removeChunkMarkers(key);
+        if (!cacheNeeded()) return;
         scanQueue.addFirst(new ScanTask(event.getWorld(), chunk));
     }
 
@@ -90,12 +92,20 @@ public final class OreVisualizer {
         seededRadiusChunks = 0;
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
+        cacheActive = false;
     }
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || mc.world == null) return;
-        if (!cacheNeeded()) return;
+        if (!cacheNeeded()) {
+            cacheActive = false;
+            return;
+        }
+        if (!cacheActive) {
+            cacheActive = true;
+            seededWorld = null;
+        }
         seedLoadedChunks();
         int remaining = SECTIONS_PER_TICK;
         while (remaining-- > 0 && !scanQueue.isEmpty()) {
@@ -216,7 +226,8 @@ public final class OreVisualizer {
         ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
         int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
-        if (seededWorld == mc.world && radiusChunks <= seededRadiusChunks
+        pruneQueue(centerChunkX, centerChunkZ, radiusChunks);
+        if (seededWorld == mc.world && radiusChunks == seededRadiusChunks
                 && centerChunkX == seededCenterChunkX && centerChunkZ == seededCenterChunkZ) return;
         List<SeededChunk> chunks = new ArrayList<>();
         for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
@@ -246,6 +257,18 @@ public final class OreVisualizer {
         tasks.sort(Comparator.comparingInt(task -> task.distanceSq(centerChunkX, centerChunkZ)));
         scanQueue.clear();
         scanQueue.addAll(tasks);
+    }
+
+    private void pruneQueue(int centerChunkX, int centerChunkZ, int radiusChunks) {
+        int maxDistanceSq = radiusChunks * radiusChunks;
+        Iterator<ScanTask> iterator = scanQueue.iterator();
+        while (iterator.hasNext()) {
+            ScanTask task = iterator.next();
+            if (task.distanceSq(centerChunkX, centerChunkZ) <= maxDistanceSq) continue;
+            removeChunkMarkers(task.key);
+            scannedChunks.remove(task.key);
+            iterator.remove();
+        }
     }
 
     private void queueCachedChunk(World world, Chunk chunk) {

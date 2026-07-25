@@ -14,6 +14,7 @@ public class OreVisualizerTest {
         assertEquals(150.0, OreVisualizer.effectiveCacheRange(true, 150.0, false, 96.0), 0.0);
         assertEquals(96.0, OreVisualizer.effectiveCacheRange(false, 150.0, true, 96.0), 0.0);
         assertEquals(150.0, OreVisualizer.effectiveCacheRange(true, 150.0, true, 96.0), 0.0);
+        assertEquals(0.0, OreVisualizer.effectiveCacheRange(false, 150.0, false, 96.0), 0.0);
     }
 
     @Test

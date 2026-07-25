@@ -225,7 +225,7 @@ public enum ModuleSetting {
             case BLINK_VISUALIZE: return "用红色方框标出闪现攻击本次选中的目标。";
             case BLINK_PRIORITY: return "选择按距离最近或血量最低排列闪现攻击目标。点击切换。";
             case BLINK_ATTACK_POINT: return "选择闪现攻击发包时瞄准目标的部位，用于远端旋转和命中点。";
-            case FLIGHT_ELYTRA: return "参考 WWE Flight 的普通能力飞行，直接控制水平与升降速度；开启后自动关闭船发包模式。";
+            case FLIGHT_ELYTRA: return "参考 WWE Flight，仅接管当前飞行状态和移动速度，不修改游戏模式的飞行权限；开启后自动关闭船发包模式。";
             case FLIGHT_BOAT: return "骑乘船时用载具移动数据包控制船的位置；开启后自动关闭普通飞行模式。";
             case FLIGHT_SPEED: return "飞行水平移动速度。数值越高越容易被服务器移动检查回拉。";
             case FLIGHT_VERTICAL: return "按跳跃或潜行时的上升/下降速度。";

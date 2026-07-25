@@ -12,7 +12,6 @@ import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.network.play.client.CPacketUseEntity;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -61,27 +60,32 @@ public final class BlinkStrike {
     }
 
     private boolean strike(EntityLivingBase target, BlinkPath.Point origin) {
-        BlinkPath.Point destination = findDestination(target, origin);
-        if (destination == null) return false;
+        StrikePlan plan = findStrikePlan(target, origin);
+        if (plan == null) return false;
         boolean originOnGround = originOnGround(origin);
-        List<BlinkPath.Point> path = BlinkPath.interpolate(origin, destination, ModConfig.blinkStep);
+        if (!originOnGround && !safeAirborneOrigin()) return false;
+        boolean transportOnGround = transportOnGround(originOnGround,
+            modules.isEnabled(ModuleId.FLIGHT));
+        List<BlinkPath.Point> path = plan.path;
         int sent = 0;
         try {
             for (BlinkPath.Point point : path) {
-                sendPosition(point);
+                sendPosition(point, transportOnGround);
                 sent++;
             }
-            Vec3d remoteEyes = new Vec3d(destination.x, destination.y + mc.player.getEyeHeight(), destination.z);
+            Vec3d remoteEyes = new Vec3d(plan.destination.x,
+                plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
             float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
-            mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], false));
-            sendRemoteCritical(destination, originOnGround);
+            mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], transportOnGround));
+            sendRemoteCritical(plan.destination, originOnGround);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
             List<BlinkPath.Point> returnPath = BlinkPath.returnPath(origin, path, sent);
             for (int i = 0; i < returnPath.size(); i++) {
-                sendPosition(returnPath.get(i), i == returnPath.size() - 1 && originOnGround);
+                sendPosition(returnPath.get(i), transportOnGround);
             }
+            if (returnPath.isEmpty() && transportOnGround) sendPosition(origin, true);
             mc.player.fallDistance = 0.0F;
             mc.player.motionY = 0.0;
             mc.player.motionX = 0.0;
@@ -98,23 +102,61 @@ public final class BlinkStrike {
         if (event.getWorld().isRemote) delay = 0;
     }
 
-    private BlinkPath.Point findDestination(EntityLivingBase target, BlinkPath.Point origin) {
+    private StrikePlan findStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
         double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
         double predictedY = target.getEntityBoundingBox().minY + target.motionY * ModConfig.blinkPredictTicks;
         double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
         AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
             predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
         if (CombatSupport.distanceSqToHitbox(new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z), predictedBox)
-                <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) return origin;
+                <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) {
+            return new StrikePlan(origin, java.util.Collections.emptyList());
+        }
         for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
                 ModConfig.blinkAttackDistance)) {
             if (origin.distanceTo(candidate) > ModConfig.blinkRange) continue;
             Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
             if (CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                     > ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) continue;
-            if (isPathClear(origin, candidate)) return candidate;
+            for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
+                if (!isRouteClear(origin, waypoints)) continue;
+                return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep));
+            }
         }
         return null;
+    }
+
+    static List<List<BlinkPath.Point>> routeWaypoints(BlinkPath.Point origin, BlinkPath.Point destination) {
+        List<List<BlinkPath.Point>> routes = new ArrayList<>(4);
+        routes.add(java.util.Collections.singletonList(destination));
+        addRoute(routes, new BlinkPath.Point(destination.x, origin.y, destination.z), destination);
+        addRoute(routes, new BlinkPath.Point(origin.x, destination.y, origin.z), destination);
+        double raisedY = Math.max(origin.y, destination.y) + 1.0;
+        List<BlinkPath.Point> raised = new ArrayList<>(3);
+        raised.add(new BlinkPath.Point(origin.x, raisedY, origin.z));
+        raised.add(new BlinkPath.Point(destination.x, raisedY, destination.z));
+        raised.add(destination);
+        routes.add(raised);
+        return routes;
+    }
+
+    private static void addRoute(List<List<BlinkPath.Point>> routes, BlinkPath.Point waypoint,
+            BlinkPath.Point destination) {
+        List<BlinkPath.Point> route = new ArrayList<>(2);
+        route.add(waypoint);
+        if (waypoint.distanceTo(destination) > 0.0001) route.add(destination);
+        routes.add(route);
+    }
+
+    static List<BlinkPath.Point> buildPath(BlinkPath.Point origin, List<BlinkPath.Point> waypoints,
+            double maxStep) {
+        List<BlinkPath.Point> path = new ArrayList<>();
+        BlinkPath.Point previous = origin;
+        for (BlinkPath.Point waypoint : waypoints) {
+            path.addAll(BlinkPath.interpolate(previous, waypoint, maxStep));
+            previous = waypoint;
+        }
+        return path;
     }
 
     static List<BlinkPath.Point> candidatePositions(BlinkPath.Point origin, double targetX, double targetY,
@@ -142,9 +184,18 @@ public final class BlinkStrike {
         mc.player.rotationPitch = rotations[1];
     }
 
-    private boolean isPathClear(BlinkPath.Point origin, BlinkPath.Point destination) {
+    private boolean isRouteClear(BlinkPath.Point origin, List<BlinkPath.Point> waypoints) {
+        BlinkPath.Point previous = origin;
+        for (BlinkPath.Point waypoint : waypoints) {
+            if (!isSegmentClear(origin, previous, waypoint)) return false;
+            previous = waypoint;
+        }
+        return true;
+    }
+
+    private boolean isSegmentClear(BlinkPath.Point origin, BlinkPath.Point from, BlinkPath.Point destination) {
         AxisAlignedBB base = mc.player.getEntityBoundingBox();
-        for (BlinkPath.Point point : BlinkPath.interpolate(origin, destination, 0.4)) {
+        for (BlinkPath.Point point : BlinkPath.interpolate(from, destination, 0.4)) {
             AxisAlignedBB box = base.offset(point.x - origin.x, point.y - origin.y, point.z - origin.z).shrink(0.02);
             if (!mc.world.getWorldBorder().contains(box) || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
                 return false;
@@ -161,8 +212,17 @@ public final class BlinkStrike {
         return !mc.world.getCollisionBoxes(mc.player, box).isEmpty();
     }
 
-    private void sendPosition(BlinkPath.Point point) {
-        sendPosition(point, false);
+    private boolean safeAirborneOrigin() {
+        return safeAirborneOrigin(mc.player.isInWater(), mc.player.isInLava(), mc.player.isOnLadder(),
+            mc.player.capabilities.isFlying);
+    }
+
+    static boolean safeAirborneOrigin(boolean inWater, boolean inLava, boolean onLadder, boolean flying) {
+        return inWater || inLava || onLadder || flying;
+    }
+
+    static boolean transportOnGround(boolean originOnGround, boolean flightEnabled) {
+        return originOnGround || flightEnabled;
     }
 
     private void sendPosition(BlinkPath.Point point, boolean onGround) {
@@ -172,11 +232,26 @@ public final class BlinkStrike {
     private void sendRemoteCritical(BlinkPath.Point point, boolean originOnGround) {
         if (!modules.isEnabled(ModuleId.CRITICALS) || !originOnGround) return;
         if (mc.player.isInWater() || mc.player.isInLava() || mc.player.isOnLadder() || mc.player.isRiding()
-                || mc.player.isPotionActive(MobEffects.BLINDNESS)
-                || mc.world.getBlockState(new BlockPos(point.x, point.y, point.z)).getMaterial().isLiquid()) return;
+                || mc.player.isPotionActive(MobEffects.BLINDNESS) || isLiquidAt(point)) return;
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0625, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0125, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, false));
+    }
+
+    private boolean isLiquidAt(BlinkPath.Point point) {
+        AxisAlignedBB remoteBox = mc.player.getEntityBoundingBox().offset(
+            point.x - mc.player.posX, point.y - mc.player.posY, point.z - mc.player.posZ);
+        return mc.world.containsAnyLiquid(remoteBox);
+    }
+
+    private static final class StrikePlan {
+        private final BlinkPath.Point destination;
+        private final List<BlinkPath.Point> path;
+
+        private StrikePlan(BlinkPath.Point destination, List<BlinkPath.Point> path) {
+            this.destination = destination;
+            this.path = path;
+        }
     }
 }

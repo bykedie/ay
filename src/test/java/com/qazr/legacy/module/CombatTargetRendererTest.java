@@ -13,6 +13,14 @@ import static org.junit.Assert.assertEquals;
 
 public class CombatTargetRendererTest {
     @Test
+    public void mapsMinecraftYawToWorldFacingDirections() {
+        assertBasis(0.0, 1.0, CombatTargetRenderer.basisForYaw(0.0F));
+        assertBasis(-1.0, 0.0, CombatTargetRenderer.basisForYaw(90.0F));
+        assertBasis(0.0, -1.0, CombatTargetRenderer.basisForYaw(180.0F));
+        assertBasis(1.0, 0.0, CombatTargetRenderer.basisForYaw(-90.0F));
+    }
+
+    @Test
     public void selectsSkeletonFromActualRenderModel() {
         assertEquals(CombatTargetRenderer.SkeletonType.HUMANOID,
             CombatTargetRenderer.skeletonType(new ModelBiped()));
@@ -43,5 +51,10 @@ public class CombatTargetRendererTest {
     public void interpolatesHeadYawAcrossWrappedAngles() {
         assertEquals(180.0F, CombatTargetRenderer.interpolateAngle(170.0F, -170.0F, 0.5F), 0.0001F);
         assertEquals(-180.0F, CombatTargetRenderer.interpolateAngle(-170.0F, 170.0F, 0.5F), 0.0001F);
+    }
+
+    private static void assertBasis(double forwardX, double forwardZ, double[] basis) {
+        assertEquals(forwardX, basis[2], 0.0001);
+        assertEquals(forwardZ, basis[3], 0.0001);
     }
 }

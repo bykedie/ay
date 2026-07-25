@@ -5,6 +5,12 @@ import static org.junit.Assert.assertEquals;
 
 public class AutoBridgeTest {
     @Test
+    public void scansOnlyTheBridgeLevelUnlessJumpingOrFalling() {
+        assertEquals(1, AutoBridge.scanDepth(4, false));
+        assertEquals(4, AutoBridge.scanDepth(4, true));
+    }
+
+    @Test
     public void prioritizesFeetWhileFallingAndLookaheadWhileWalking() {
         assertEquals(0.0, AutoBridge.candidateLookaheads(1.2, true)[0], 0.0);
         assertEquals(1.2, AutoBridge.candidateLookaheads(1.2, false)[2], 0.0);

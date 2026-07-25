@@ -8,6 +8,51 @@ import static org.junit.Assert.assertTrue;
 
 public class BlinkStrikeTest {
     @Test
+    public void rejectsOrdinaryFreeFallButAllowsControlledAirborneOrigins() {
+        assertEquals(false, BlinkStrike.safeAirborneOrigin(false, false, false, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(true, false, false, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, true, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, false, true));
+    }
+
+    @Test
+    public void groundsTransportPacketsForGroundAndFlightOrigins() {
+        assertEquals(true, BlinkStrike.transportOnGround(true, false));
+        assertEquals(true, BlinkStrike.transportOnGround(false, true));
+        assertEquals(false, BlinkStrike.transportOnGround(false, false));
+    }
+
+    @Test
+    public void offersDirectAndDoglegRoutesForUnevenTargets() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = new BlinkPath.Point(8.0, 58.0, 4.0);
+        List<List<BlinkPath.Point>> routes = BlinkStrike.routeWaypoints(origin, destination);
+
+        assertEquals(4, routes.size());
+        assertEquals(1, routes.get(0).size());
+        assertEquals(64.0, routes.get(1).get(0).y, 0.0);
+        assertEquals(58.0, routes.get(2).get(0).y, 0.0);
+        assertEquals(65.0, routes.get(3).get(0).y, 0.0);
+    }
+
+    @Test
+    public void buildsEveryDoglegSegmentWithBoundedPacketSteps() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = new BlinkPath.Point(8.0, 58.0, 0.0);
+        List<BlinkPath.Point> path = BlinkStrike.buildPath(origin,
+            BlinkStrike.routeWaypoints(origin, destination).get(1), 3.0);
+
+        BlinkPath.Point previous = origin;
+        for (BlinkPath.Point point : path) {
+            assertTrue(previous.distanceTo(point) <= 3.0);
+            previous = point;
+        }
+        assertEquals(destination.x, previous.x, 0.0);
+        assertEquals(destination.y, previous.y, 0.0);
+        assertEquals(destination.z, previous.z, 0.0);
+    }
+
+    @Test
     public void generatesNearSideCandidateFirst() {
         BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
         List<BlinkPath.Point> candidates = BlinkStrike.candidatePositions(origin, 10.0, 61.0, 0.0, 2.5);

@@ -104,11 +104,12 @@ public final class AutoBridge {
             mc.player.movementInput.moveForward, mc.player.movementInput.moveStrafe);
         double[] lookaheads = candidateLookaheads(ModConfig.bridgeLookahead, atApex || mc.player.motionY < 0.0);
         int firstY = MathHelper.floor(mc.player.getEntityBoundingBox().minY) - 1;
+        int scanDepth = scanDepth(ModConfig.bridgeDownScan, atApex || mc.player.motionY < 0.0);
         Set<BlockPos> candidates = new LinkedHashSet<>();
-        for (double lookahead : lookaheads) {
-            int x = MathHelper.floor(mc.player.posX + offset[0] * lookahead);
-            int z = MathHelper.floor(mc.player.posZ + offset[1] * lookahead);
-            for (int dy = 0; dy < ModConfig.bridgeDownScan; dy++) {
+        for (int dy = 0; dy < scanDepth; dy++) {
+            for (double lookahead : lookaheads) {
+                int x = MathHelper.floor(mc.player.posX + offset[0] * lookahead);
+                int z = MathHelper.floor(mc.player.posZ + offset[1] * lookahead);
                 candidates.add(new BlockPos(x, firstY - dy, z));
             }
         }
@@ -130,6 +131,10 @@ public final class AutoBridge {
 
     static boolean isJumpApex(double previousMotionY, double motionY, boolean onGround) {
         return previousMotionY > 0.0 && motionY <= 0.0 && !onGround;
+    }
+
+    static int scanDepth(int configuredDepth, boolean airborne) {
+        return airborne ? Math.max(1, configuredDepth) : 1;
     }
 
     static double[] movementOffset(float yaw, float forward, float strafe) {

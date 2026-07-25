@@ -5,6 +5,14 @@ import static org.junit.Assert.assertEquals;
 
 public class FlightControllerTest {
     @Test
+    public void restoresFlyingOnlyWhenTheCurrentModeStillAllowsIt() {
+        assertEquals(true, FlightController.restoredFlying(true, true, true, true));
+        assertEquals(false, FlightController.restoredFlying(true, true, false, true));
+        assertEquals(false, FlightController.restoredFlying(false, true, true, true));
+        assertEquals(true, FlightController.restoredFlying(false, false, true, true));
+    }
+
+    @Test
     public void mapsConfiguredSpeedToVanillaFlySpeed() {
         assertEquals(0.032F, FlightController.flySpeedFor(0.32), 0.0001F);
         assertEquals(0.12F, FlightController.flySpeedFor(1.20), 0.0001F);

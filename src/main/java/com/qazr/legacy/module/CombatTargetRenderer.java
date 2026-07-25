@@ -134,6 +134,13 @@ public final class CombatTargetRenderer {
         return bodyYaw;
     }
 
+    static double[] basisForYaw(float yaw) {
+        double angle = Math.toRadians(yaw);
+        double sin = Math.sin(angle);
+        double cos = Math.cos(angle);
+        return new double[] {cos, sin, -sin, cos};
+    }
+
     static SkeletonType skeletonType(ModelBase model) {
         if (model == null) return SkeletonType.GENERIC;
         if (model instanceof ModelHorse) return SkeletonType.HORSE;
@@ -288,21 +295,21 @@ public final class CombatTargetRenderer {
 
         private SkeletonBasis(double x, double y, double z, double height, double width, float yaw, float headYaw,
                 float red, float green, float blue) {
-            double angle = Math.toRadians(yaw);
-            double headAngle = Math.toRadians(headYaw);
+            double[] bodyBasis = basisForYaw(yaw);
+            double[] headBasis = basisForYaw(headYaw);
             this.baseX = x;
             this.baseY = y;
             this.baseZ = z;
             this.height = height;
             this.width = width;
-            this.sideX = Math.cos(angle);
-            this.sideZ = -Math.sin(angle);
-            this.forwardX = Math.sin(angle);
-            this.forwardZ = Math.cos(angle);
-            this.headSideX = Math.cos(headAngle);
-            this.headSideZ = -Math.sin(headAngle);
-            this.headForwardX = Math.sin(headAngle);
-            this.headForwardZ = Math.cos(headAngle);
+            this.sideX = bodyBasis[0];
+            this.sideZ = bodyBasis[1];
+            this.forwardX = bodyBasis[2];
+            this.forwardZ = bodyBasis[3];
+            this.headSideX = headBasis[0];
+            this.headSideZ = headBasis[1];
+            this.headForwardX = headBasis[2];
+            this.headForwardZ = headBasis[3];
             this.red = red;
             this.green = green;
             this.blue = blue;

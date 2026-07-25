@@ -59,7 +59,6 @@ public final class FlightController {
             return;
         }
         captureCapabilities();
-        mc.player.capabilities.allowFlying = true;
         mc.player.capabilities.isFlying = true;
         mc.player.capabilities.setFlySpeed(flySpeedFor(ModConfig.flightSpeed));
         double[] horizontal = movementFor(mc.player.rotationYaw, mc.player.movementInput.moveForward,
@@ -104,8 +103,8 @@ public final class FlightController {
 
     private void restoreCapabilities() {
         if (controlledPlayer == null) return;
-        controlledPlayer.capabilities.allowFlying = originalAllowFlying;
-        controlledPlayer.capabilities.isFlying = originalFlying;
+        controlledPlayer.capabilities.isFlying = restoredFlying(originalFlying, originalAllowFlying,
+            controlledPlayer.capabilities.allowFlying, controlledPlayer.capabilities.isFlying);
         controlledPlayer.capabilities.setFlySpeed(originalFlySpeed);
         controlledPlayer = null;
     }
@@ -120,6 +119,12 @@ public final class FlightController {
 
     static float flySpeedFor(double blocksPerTick) {
         return (float) Math.max(0.005, Math.min(1.0, blocksPerTick / 10.0));
+    }
+
+    static boolean restoredFlying(boolean originallyFlying, boolean allowedAtCapture,
+            boolean allowedNow, boolean currentlyFlying) {
+        if (allowedAtCapture != allowedNow) return currentlyFlying && allowedNow;
+        return originallyFlying && allowedNow;
     }
 
     static double verticalMotion(boolean jump, boolean sneak, double speed) {
