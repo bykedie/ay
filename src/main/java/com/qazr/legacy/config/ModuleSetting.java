@@ -85,7 +85,7 @@ public enum ModuleSetting {
     BLINK_VISUALIZE(ModuleId.BLINK_STRIKE, "目标可视化", Type.TOGGLE),
     BLINK_PRIORITY(ModuleId.BLINK_STRIKE, "目标优先级", Type.CHOICE),
     BLINK_ATTACK_POINT(ModuleId.BLINK_STRIKE, "攻击部位", Type.CHOICE),
-    FLIGHT_ELYTRA(ModuleId.FLIGHT, "鞘翅发包", Type.TOGGLE),
+    FLIGHT_ELYTRA(ModuleId.FLIGHT, "普通飞行", Type.TOGGLE),
     FLIGHT_BOAT(ModuleId.FLIGHT, "船发包", Type.TOGGLE),
     FLIGHT_SPEED(ModuleId.FLIGHT, "飞行速度", Type.NUMBER, 0.05, 1.20, 0.05, " 格/tick"),
     FLIGHT_VERTICAL(ModuleId.FLIGHT, "升降速度", Type.NUMBER, 0.02, 0.80, 0.02, " 格/tick"),
@@ -225,8 +225,8 @@ public enum ModuleSetting {
             case BLINK_VISUALIZE: return "用红色方框标出闪现攻击本次选中的目标。";
             case BLINK_PRIORITY: return "选择按距离最近或血量最低排列闪现攻击目标。点击切换。";
             case BLINK_ATTACK_POINT: return "选择闪现攻击发包时瞄准目标的部位，用于远端旋转和命中点。";
-            case FLIGHT_ELYTRA: return "使用鞘翅开始飞行数据包维持移动；开启此项会自动关闭船发包模式。";
-            case FLIGHT_BOAT: return "骑乘船时用载具移动数据包控制船的位置；开启此项会自动关闭鞘翅发包模式。";
+            case FLIGHT_ELYTRA: return "参考 WWE Flight 的普通能力飞行，直接控制水平与升降速度；开启后自动关闭船发包模式。";
+            case FLIGHT_BOAT: return "骑乘船时用载具移动数据包控制船的位置；开启后自动关闭普通飞行模式。";
             case FLIGHT_SPEED: return "飞行水平移动速度。数值越高越容易被服务器移动检查回拉。";
             case FLIGHT_VERTICAL: return "按跳跃或潜行时的上升/下降速度。";
             case TARGET_RANGE: return "目标骨骼、方框和射线的最大绘制距离，范围为 3 到 500 格。";

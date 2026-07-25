@@ -3,6 +3,7 @@ package com.qazr.legacy.module;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.util.BlinkPath;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.EntityLivingBase;
@@ -11,7 +12,7 @@ import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.network.play.client.CPacketUseEntity;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -60,11 +61,10 @@ public final class BlinkStrike {
     }
 
     private boolean strike(EntityLivingBase target, BlinkPath.Point origin) {
+        BlinkPath.Point destination = findDestination(target, origin);
+        if (destination == null) return false;
         boolean originOnGround = originOnGround(origin);
-        BlinkPath.Point destination = destinationFor(target, origin);
         List<BlinkPath.Point> path = BlinkPath.interpolate(origin, destination, ModConfig.blinkStep);
-        if (!isPathClear(origin, destination)) return false;
-
         int sent = 0;
         try {
             for (BlinkPath.Point point : path) {
@@ -98,13 +98,42 @@ public final class BlinkStrike {
         if (event.getWorld().isRemote) delay = 0;
     }
 
-    private BlinkPath.Point destinationFor(EntityLivingBase target, BlinkPath.Point origin) {
+    private BlinkPath.Point findDestination(EntityLivingBase target, BlinkPath.Point origin) {
         double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
-        double predictedY = origin.y;
+        double predictedY = target.getEntityBoundingBox().minY + target.motionY * ModConfig.blinkPredictTicks;
         double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
-        BlinkPath.Point predicted = new BlinkPath.Point(predictedX, predictedY, predictedZ);
-        BlinkPath.Point limited = BlinkPath.limitDistance(origin, predicted, ModConfig.blinkRange);
-        return BlinkPath.approach(origin, limited, ModConfig.blinkAttackDistance);
+        AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
+            predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
+        if (CombatSupport.distanceSqToHitbox(new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z), predictedBox)
+                <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) return origin;
+        for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
+                ModConfig.blinkAttackDistance)) {
+            if (origin.distanceTo(candidate) > ModConfig.blinkRange) continue;
+            Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
+            if (CombatSupport.distanceSqToHitbox(eyes, predictedBox)
+                    > ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) continue;
+            if (isPathClear(origin, candidate)) return candidate;
+        }
+        return null;
+    }
+
+    static List<BlinkPath.Point> candidatePositions(BlinkPath.Point origin, double targetX, double targetY,
+            double targetZ, double attackDistance) {
+        double dx = origin.x - targetX;
+        double dz = origin.z - targetZ;
+        double length = Math.sqrt(dx * dx + dz * dz);
+        double baseAngle = length > 0.001 ? Math.atan2(dz, dx) : 0.0;
+        double radius = Math.max(0.65, attackDistance * 0.72);
+        List<BlinkPath.Point> result = new ArrayList<>(16);
+        double[] heights = {targetY, origin.y};
+        for (double height : heights) {
+            for (int i = 0; i < 8; i++) {
+                double angle = baseAngle + Math.PI * 2.0 * i / 8.0;
+                result.add(new BlinkPath.Point(targetX + Math.cos(angle) * radius, height,
+                    targetZ + Math.sin(angle) * radius));
+            }
+        }
+        return result;
     }
 
     private void face(EntityLivingBase target) {
@@ -114,14 +143,9 @@ public final class BlinkStrike {
     }
 
     private boolean isPathClear(BlinkPath.Point origin, BlinkPath.Point destination) {
-        Vec3d startEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
-        Vec3d endEyes = new Vec3d(destination.x, destination.y + mc.player.getEyeHeight(), destination.z);
-        RayTraceResult hit = mc.world.rayTraceBlocks(startEyes, endEyes, false, true, false);
-        if (hit != null) return false;
-
         AxisAlignedBB base = mc.player.getEntityBoundingBox();
-        for (BlinkPath.Point point : BlinkPath.interpolate(origin, destination, 0.5)) {
-            AxisAlignedBB box = base.offset(point.x - origin.x, point.y - origin.y, point.z - origin.z);
+        for (BlinkPath.Point point : BlinkPath.interpolate(origin, destination, 0.4)) {
+            AxisAlignedBB box = base.offset(point.x - origin.x, point.y - origin.y, point.z - origin.z).shrink(0.02);
             if (!mc.world.getWorldBorder().contains(box) || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
                 return false;
             }
@@ -148,7 +172,8 @@ public final class BlinkStrike {
     private void sendRemoteCritical(BlinkPath.Point point, boolean originOnGround) {
         if (!modules.isEnabled(ModuleId.CRITICALS) || !originOnGround) return;
         if (mc.player.isInWater() || mc.player.isInLava() || mc.player.isOnLadder() || mc.player.isRiding()
-                || mc.player.isPotionActive(MobEffects.BLINDNESS)) return;
+                || mc.player.isPotionActive(MobEffects.BLINDNESS)
+                || mc.world.getBlockState(new BlockPos(point.x, point.y, point.z)).getMaterial().isLiquid()) return;
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0625, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0125, point.z, false));

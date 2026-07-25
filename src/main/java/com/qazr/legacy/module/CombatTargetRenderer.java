@@ -131,7 +131,6 @@ public final class CombatTargetRenderer {
     }
 
     static float facingYaw(SkeletonType type, float bodyYaw, float headYaw) {
-        if (type == SkeletonType.QUADRUPED || type == SkeletonType.HORSE) return headYaw;
         return bodyYaw;
     }
 
@@ -172,8 +171,11 @@ public final class CombatTargetRenderer {
         double front = horse ? 0.66 : 0.58;
         double bodyY = horse ? 0.58 : 0.60;
         localLine(b, 0, bodyY, back, 0, bodyY, front);
-        localHeadLine(b, 0, bodyY, front, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70);
-        headLine(b, 0, horse ? 0.88 : 0.78, horse ? 0.78 : 0.70, 0, horse ? 0.91 : 0.80, horse ? 1.00 : 0.88);
+        double neckLength = horse ? 0.28 : 0.20;
+        double headLength = horse ? 0.30 : 0.24;
+        pivotHeadLine(b, front, bodyY, 0.0, 0.0, horse ? 0.88 : 0.78, neckLength);
+        pivotHeadLine(b, front, horse ? 0.88 : 0.78, neckLength, 0.0,
+            horse ? 0.91 : 0.80, neckLength + headLength);
         double[] ends = {back + 0.10, front - 0.10};
         for (double longitudinal : ends) {
             for (double side : new double[] {-0.32, 0.32}) {
@@ -240,16 +242,12 @@ public final class CombatTargetRenderer {
             b.x(side2, forward2), b.y(height2), b.z(side2, forward2), b.red, b.green, b.blue);
     }
 
-    private void localHeadLine(SkeletonBasis b, double side1, double height1, double forward1,
+    private void pivotHeadLine(SkeletonBasis b, double pivotForward, double height1, double forward1,
             double side2, double height2, double forward2) {
-        drawLine(b.x(side1, forward1), b.y(height1), b.z(side1, forward1),
-            b.headX(side2, forward2), b.y(height2), b.headZ(side2, forward2), b.red, b.green, b.blue);
-    }
-
-    private void headLine(SkeletonBasis b, double side1, double height1, double forward1,
-            double side2, double height2, double forward2) {
-        drawLine(b.headX(side1, forward1), b.y(height1), b.headZ(side1, forward1),
-            b.headX(side2, forward2), b.y(height2), b.headZ(side2, forward2), b.red, b.green, b.blue);
+        drawLine(b.pivotHeadX(pivotForward, 0.0, forward1), b.y(height1),
+            b.pivotHeadZ(pivotForward, 0.0, forward1),
+            b.pivotHeadX(pivotForward, side2, forward2), b.y(height2),
+            b.pivotHeadZ(pivotForward, side2, forward2), b.red, b.green, b.blue);
     }
 
     static float interpolateAngle(float previous, float current, float partialTicks) {
@@ -322,12 +320,12 @@ public final class CombatTargetRenderer {
             return baseZ + sideZ * side * width + forwardZ * forward * width;
         }
 
-        private double headX(double side, double forward) {
-            return baseX + headSideX * side * width + headForwardX * forward * width;
+        private double pivotHeadX(double pivotForward, double side, double forward) {
+            return x(0.0, pivotForward) + headSideX * side * width + headForwardX * forward * width;
         }
 
-        private double headZ(double side, double forward) {
-            return baseZ + headSideZ * side * width + headForwardZ * forward * width;
+        private double pivotHeadZ(double pivotForward, double side, double forward) {
+            return z(0.0, pivotForward) + headSideZ * side * width + headForwardZ * forward * width;
         }
     }
 }

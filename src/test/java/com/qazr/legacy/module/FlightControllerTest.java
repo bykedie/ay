@@ -5,6 +5,20 @@ import static org.junit.Assert.assertEquals;
 
 public class FlightControllerTest {
     @Test
+    public void mapsConfiguredSpeedToVanillaFlySpeed() {
+        assertEquals(0.032F, FlightController.flySpeedFor(0.32), 0.0001F);
+        assertEquals(0.12F, FlightController.flySpeedFor(1.20), 0.0001F);
+    }
+
+    @Test
+    public void resolvesVerticalKeysWithoutDrift() {
+        assertEquals(0.20, FlightController.verticalMotion(true, false, 0.20), 0.0001);
+        assertEquals(-0.20, FlightController.verticalMotion(false, true, 0.20), 0.0001);
+        assertEquals(0.0, FlightController.verticalMotion(false, false, 0.20), 0.0001);
+        assertEquals(0.0, FlightController.verticalMotion(true, true, 0.20), 0.0001);
+    }
+
+    @Test
     public void mapsForwardMovementToYawDirection() {
         assertOffset(0.0, 0.32, FlightController.movementFor(0.0F, 1.0, 0.0, 0.32));
         assertOffset(-0.32, 0.0, FlightController.movementFor(90.0F, 1.0, 0.0, 0.32));

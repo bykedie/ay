@@ -2,18 +2,20 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.play.client.CPacketHeldItemChange;
-import net.minecraft.network.play.client.CPacketPlayerTryUseItemOnBlock;
+import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -23,6 +25,7 @@ public final class AutoBridge {
     private final ModuleManager modules;
     private int delay;
     private double lastMotionY;
+    private BlockPos lastPlaced;
 
     public AutoBridge(ModuleManager modules) {
         this.modules = modules;
@@ -34,16 +37,18 @@ public final class AutoBridge {
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
         double motionY = mc.player.motionY;
-        boolean atApex = lastMotionY > 0.0D && motionY <= 0.0D && !mc.player.onGround;
+        boolean atApex = isJumpApex(lastMotionY, motionY, mc.player.onGround);
         lastMotionY = motionY;
-        if (delay > 0) {
-            delay--;
-            if (!atApex) return;
-        }
         if (mc.player.capabilities.isFlying) return;
-        BlockPos placePos = supportPosition();
-        if (placePos == null && atApex) placePos = apexSupportPosition();
-        if (placePos == null) return;
+        BlockPos placePos = supportPosition(atApex);
+        if (placePos == null) {
+            if (delay > 0) delay--;
+            return;
+        }
+        if (delay > 0 && !atApex && placePos.equals(lastPlaced)) {
+            delay--;
+            return;
+        }
         Placement placement = placementFor(placePos);
         if (placement == null) return;
         int slot = findHotbarBlock(placePos);
@@ -54,23 +59,35 @@ public final class AutoBridge {
             slot = findInventoryBlock(placePos);
             if (slot < 0) return;
             inventorySlot = slot;
-            mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot, original, ClickType.SWAP, mc.player);
+            mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot, original,
+                ClickType.SWAP, mc.player);
             swapped = true;
             slot = original;
         }
+        boolean placed = false;
         try {
-            mc.player.connection.sendPacket(new CPacketHeldItemChange(slot));
-            mc.player.connection.sendPacket(new CPacketPlayerTryUseItemOnBlock(placement.neighbor,
-                placement.side, EnumHand.MAIN_HAND, 0.5F, 0.5F, 0.5F));
-            mc.player.swingArm(EnumHand.MAIN_HAND);
-            mc.player.connection.sendPacket(new CPacketHeldItemChange(original));
+            mc.player.inventory.currentItem = slot;
+            mc.playerController.updateController();
+            Vec3d hit = new Vec3d(placement.neighbor.getX() + 0.5, placement.neighbor.getY() + 0.5,
+                placement.neighbor.getZ() + 0.5);
+            EnumActionResult result = mc.playerController.processRightClickBlock(mc.player, mc.world,
+                placement.neighbor, placement.side, hit, EnumHand.MAIN_HAND);
+            placed = result == EnumActionResult.SUCCESS;
+            if (placed) mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
+            mc.player.inventory.currentItem = original;
+            mc.playerController.updateController();
             if (swapped) {
                 mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot, original,
                     ClickType.SWAP, mc.player);
             }
         }
-        delay = ModConfig.bridgeDelayTicks;
+        if (placed) {
+            lastPlaced = placePos;
+            delay = ModConfig.bridgeDelayTicks;
+        } else {
+            delay = 0;
+        }
     }
 
     @SubscribeEvent
@@ -78,33 +95,41 @@ public final class AutoBridge {
         if (event.getWorld().isRemote) {
             delay = 0;
             lastMotionY = 0.0;
+            lastPlaced = null;
         }
     }
 
-    private BlockPos supportPosition() {
+    private BlockPos supportPosition(boolean atApex) {
         double[] offset = movementOffset(mc.player.rotationYaw,
             mc.player.movementInput.moveForward, mc.player.movementInput.moveStrafe);
-        if (offset[0] == 0.0 && offset[1] == 0.0) return null;
-        int x = MathHelper.floor(mc.player.posX + offset[0] * ModConfig.bridgeLookahead);
-        int z = MathHelper.floor(mc.player.posZ + offset[1] * ModConfig.bridgeLookahead);
+        double[] lookaheads = candidateLookaheads(ModConfig.bridgeLookahead, atApex || mc.player.motionY < 0.0);
         int firstY = MathHelper.floor(mc.player.getEntityBoundingBox().minY) - 1;
-        for (int dy = 0; dy < ModConfig.bridgeDownScan; dy++) {
-            BlockPos candidate = new BlockPos(x, firstY - dy, z);
+        Set<BlockPos> candidates = new LinkedHashSet<>();
+        for (double lookahead : lookaheads) {
+            int x = MathHelper.floor(mc.player.posX + offset[0] * lookahead);
+            int z = MathHelper.floor(mc.player.posZ + offset[1] * lookahead);
+            for (int dy = 0; dy < ModConfig.bridgeDownScan; dy++) {
+                candidates.add(new BlockPos(x, firstY - dy, z));
+            }
+        }
+        for (BlockPos candidate : candidates) {
             if (!isReplaceable(candidate)) continue;
-            if (ModConfig.bridgeAvoidFeet && collidesWithPlayer(candidate)) continue;
+            if (ModConfig.bridgeAvoidFeet && collidesWithBody(candidate)) continue;
             if (placementFor(candidate) != null) return candidate;
         }
         return null;
     }
 
-    private BlockPos apexSupportPosition() {
-        int x = MathHelper.floor(mc.player.posX);
-        int z = MathHelper.floor(mc.player.posZ);
-        int y = MathHelper.floor(mc.player.getEntityBoundingBox().minY) - 1;
-        BlockPos candidate = new BlockPos(x, y, z);
-        if (!isReplaceable(candidate)) return null;
-        if (ModConfig.bridgeAvoidFeet && collidesWithPlayer(candidate)) return null;
-        return placementFor(candidate) != null ? candidate : null;
+    static double[] candidateLookaheads(double configured, boolean feetFirst) {
+        double near = Math.min(0.35, configured);
+        double middle = Math.min(0.70, configured);
+        return feetFirst
+            ? new double[] {0.0, near, middle, configured}
+            : new double[] {near, middle, configured, 0.0};
+    }
+
+    static boolean isJumpApex(double previousMotionY, double motionY, boolean onGround) {
+        return previousMotionY > 0.0 && motionY <= 0.0 && !onGround;
     }
 
     static double[] movementOffset(float yaw, float forward, float strafe) {
@@ -128,9 +153,10 @@ public final class AutoBridge {
         return mc.world.getBlockState(pos).getBlock().isReplaceable(mc.world, pos);
     }
 
-    private boolean collidesWithPlayer(BlockPos pos) {
+    private boolean collidesWithBody(BlockPos pos) {
         AxisAlignedBB block = new AxisAlignedBB(pos);
-        return block.intersects(mc.player.getEntityBoundingBox().grow(0.02, 0.0, 0.02));
+        AxisAlignedBB body = mc.player.getEntityBoundingBox().grow(-0.02, -0.01, -0.02);
+        return block.maxY > body.minY + 0.05 && block.intersects(body);
     }
 
     private Placement placementFor(BlockPos pos) {

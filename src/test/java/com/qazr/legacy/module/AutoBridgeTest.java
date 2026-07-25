@@ -5,6 +5,19 @@ import static org.junit.Assert.assertEquals;
 
 public class AutoBridgeTest {
     @Test
+    public void prioritizesFeetWhileFallingAndLookaheadWhileWalking() {
+        assertEquals(0.0, AutoBridge.candidateLookaheads(1.2, true)[0], 0.0);
+        assertEquals(1.2, AutoBridge.candidateLookaheads(1.2, false)[2], 0.0);
+    }
+
+    @Test
+    public void detectsTheJumpApexOnlyWhileAirborne() {
+        assertEquals(true, AutoBridge.isJumpApex(0.12, -0.01, false));
+        assertEquals(false, AutoBridge.isJumpApex(0.12, -0.01, true));
+        assertEquals(false, AutoBridge.isJumpApex(-0.02, -0.08, false));
+    }
+
+    @Test
     public void mapsForwardMovementToYawDirection() {
         assertOffset(0.0, 1.0, AutoBridge.movementOffset(0.0F, 1.0F, 0.0F));
         assertOffset(-1.0, 0.0, AutoBridge.movementOffset(90.0F, 1.0F, 0.0F));

@@ -34,7 +34,7 @@ final class CombatSupport {
         boolean melee = module == ModuleId.MELEE_AURA;
         if (!melee && module != ModuleId.BLINK_STRIKE) throw new IllegalArgumentException("Unsupported combat module: " + module);
         double range = melee ? ModConfig.meleeRange : ModConfig.blinkRange;
-        return findTargets(mc, module, range, true, melee, limit);
+        return findTargets(mc, module, range, melee, melee, limit);
     }
 
     static List<EntityLivingBase> findTargets(Minecraft mc, ModuleId module, double range,
