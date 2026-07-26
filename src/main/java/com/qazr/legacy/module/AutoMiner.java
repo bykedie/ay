@@ -127,6 +127,16 @@ public final class AutoMiner {
         }
         if (pathRetryDelay > 0) {
             pathRetryDelay--;
+            if (nearbyRouteCheckDelay-- <= 0) {
+                nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
+                List<OreVisualizer.CachedOre> nearby = oreVisualizer.cachedMineOres(
+                    NEARBY_ROUTE_RANGE, MAX_VISIBLE_TARGETS);
+                MineTarget visible = findNearestReachable(nearby);
+                if (visible != null) {
+                    mine(visible);
+                    return;
+                }
+            }
             return;
         }
         List<OreVisualizer.CachedOre> candidates = oreVisualizer.cachedMineOres(
@@ -680,6 +690,7 @@ public final class AutoMiner {
         clearPath();
         pathRetryDelay = 0;
         pathCandidateOffset = 0;
+        nearbyRouteCheckDelay = 0;
         delay = 2;
     }
 
