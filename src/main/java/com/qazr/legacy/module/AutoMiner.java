@@ -34,8 +34,10 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
 
 public final class AutoMiner {
-    private static final int MAX_PATH_NODES = 3000;
-    private static final int MAX_PATH_TARGETS = 24;
+    private static final int MAX_PATH_NODES = 1600;
+    private static final int MAX_PATH_TARGETS = 6;
+    private static final int MAX_CACHED_TARGETS = 96;
+    private static final int PATH_RETRY_TICKS = 20;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -53,6 +55,8 @@ public final class AutoMiner {
     private int pathIndex;
     private int delay;
     private int manualPause;
+    private int pathRetryDelay;
+    private int pathCandidateOffset;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -62,6 +66,8 @@ public final class AutoMiner {
 
     public void reloadTargets() {
         minedCounts.clear();
+        pathRetryDelay = 0;
+        pathCandidateOffset = 0;
         clearPath();
     }
 
@@ -87,12 +93,18 @@ public final class AutoMiner {
             followPathToOre();
             return;
         }
-        MineTarget visible = findNearestReachable();
+        if (pathRetryDelay > 0) {
+            pathRetryDelay--;
+            return;
+        }
+        List<OreVisualizer.CachedOre> candidates = oreVisualizer.cachedMineOres(
+            ModConfig.minePathRange, MAX_CACHED_TARGETS);
+        MineTarget visible = findNearestReachable(candidates);
         if (visible != null) {
             mine(visible);
             return;
         }
-        followPathToOre();
+        followPathToOre(candidates);
     }
 
     @SubscribeEvent
@@ -138,6 +150,8 @@ public final class AutoMiner {
         if (event.getWorld().isRemote) {
             delay = 0;
             manualPause = 0;
+            pathRetryDelay = 0;
+            pathCandidateOffset = 0;
             minedCounts.clear();
             lastMinedOre = null;
             lastMinedType = null;
@@ -238,12 +252,20 @@ public final class AutoMiner {
     }
 
     private void followPathToOre() {
+        followPathToOre(null);
+    }
+
+    private void followPathToOre(List<OreVisualizer.CachedOre> candidates) {
         if (currentOre == null || targetType(currentOre) == null || pathIndex >= path.size()) {
-            PathTarget target = findNearestPathTarget();
+            List<OreVisualizer.CachedOre> available = candidates == null
+                ? oreVisualizer.cachedMineOres(ModConfig.minePathRange, MAX_CACHED_TARGETS)
+                : candidates;
+            PathTarget target = findNearestPathTarget(available);
             if (target == null) {
-                delay = 8;
+                pathRetryDelay = PATH_RETRY_TICKS;
                 return;
             }
+            pathRetryDelay = 0;
             currentOre = target.ore;
             currentOreType = target.type;
             path = target.path;
@@ -303,9 +325,9 @@ public final class AutoMiner {
         return horizontalDistanceSq < 0.20 && Math.abs(verticalDistance) < 0.35;
     }
 
-    private PathTarget findNearestPathTarget() {
-        List<OreVisualizer.CachedOre> candidates = oreVisualizer.cachedMineOres(ModConfig.minePathRange);
+    private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
         int attempts = 0;
+        int eligible = 0;
         PathTarget best = null;
         int bestScore = Integer.MAX_VALUE;
         for (OreVisualizer.CachedOre candidate : candidates) {
@@ -315,10 +337,12 @@ public final class AutoMiner {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
+            if (eligible++ < pathCandidateOffset) continue;
             PathRoute route = pathToOre(candidate.pos());
             attempts++;
             if (route != null) {
-                int score = route.cost - (sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type()) ? 8 : 0);
+                int score = pathTargetScore(route.cost, candidate.distanceSq(),
+                    sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type()));
                 if (score < bestScore) {
                     bestScore = score;
                     best = new PathTarget(candidate.pos(), candidate.type(), route.points);
@@ -326,7 +350,19 @@ public final class AutoMiner {
             }
             if (attempts >= MAX_PATH_TARGETS) break;
         }
+        pathCandidateOffset = nextPathCandidateOffset(pathCandidateOffset, attempts,
+            MAX_PATH_TARGETS, best != null);
         return best;
+    }
+
+    static int nextPathCandidateOffset(int currentOffset, int attempts, int batchSize, boolean found) {
+        if (found || attempts < batchSize) return 0;
+        return currentOffset + attempts;
+    }
+
+    static int pathTargetScore(int routeCost, double distanceSq, boolean sameVein) {
+        int blockDistance = (int) Math.ceil(Math.sqrt(Math.max(0.0, distanceSq)));
+        return routeCost + blockDistance * 8 - (sameVein ? 2 : 0);
     }
 
     private PathRoute pathToOre(BlockPos ore) {
@@ -583,8 +619,7 @@ public final class AutoMiner {
         return stack.getDestroySpeed(state);
     }
 
-    private MineTarget findNearestReachable() {
-        List<OreVisualizer.CachedOre> candidates = oreVisualizer.cachedMineOres(ModConfig.minePathRange);
+    private MineTarget findNearestReachable(List<OreVisualizer.CachedOre> candidates) {
         MineTarget veinTarget = findVisibleVeinTarget(candidates);
         if (veinTarget != null) return veinTarget;
         for (OreVisualizer.CachedOre candidate : candidates) {

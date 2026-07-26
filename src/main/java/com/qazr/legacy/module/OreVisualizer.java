@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -36,7 +37,8 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
 
 public final class OreVisualizer {
-    private static final int SECTIONS_PER_TICK = 12;
+    private static final int VISUALIZER_SECTIONS_PER_TICK = 12;
+    private static final int AUTO_MINE_SECTIONS_PER_TICK = 2;
     private static final int VALIDATION_CHUNKS_PER_TICK = 2;
     private static final double BOX_INSET = 0.002;
 
@@ -109,7 +111,7 @@ public final class OreVisualizer {
             seededWorld = null;
         }
         seedLoadedChunks();
-        int remaining = SECTIONS_PER_TICK;
+        int remaining = scanBudget(modules.isEnabled(ModuleId.AUTO_MINE));
         while (remaining-- > 0 && !scanQueue.isEmpty()) {
             ScanTask task = scanQueue.removeFirst();
             if (task.world != mc.world || !task.chunk.isLoaded()) {
@@ -185,18 +187,32 @@ public final class OreVisualizer {
     }
 
     public List<CachedOre> cachedMineOres(double range) {
+        return cachedMineOres(range, Integer.MAX_VALUE);
+    }
+
+    public List<CachedOre> cachedMineOres(double range, int limit) {
         if (mc.player == null || mc.world == null) return Collections.emptyList();
+        if (limit <= 0) return Collections.emptyList();
         double rangeSq = range * range;
-        List<CachedOre> result = new ArrayList<>();
+        PriorityQueue<CachedOre> nearest = new PriorityQueue<>(
+            Comparator.comparingDouble(CachedOre::distanceSq).reversed());
         for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
             if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, range)) continue;
             List<OreMarker> markers = entry.getValue();
             for (OreMarker marker : markers) {
                 if (!ModConfig.isMineOreEnabled(marker.type)) continue;
                 double distanceSq = distanceSq(marker.pos);
-                if (distanceSq <= rangeSq) result.add(new CachedOre(marker.pos, marker.type, distanceSq));
+                if (distanceSq > rangeSq) continue;
+                CachedOre candidate = new CachedOre(marker.pos, marker.type, distanceSq);
+                if (nearest.size() < limit) {
+                    nearest.add(candidate);
+                } else if (distanceSq < nearest.peek().distanceSq()) {
+                    nearest.remove();
+                    nearest.add(candidate);
+                }
             }
         }
+        List<CachedOre> result = new ArrayList<>(nearest);
         result.sort(Comparator.comparingDouble(CachedOre::distanceSq));
         return result;
     }
@@ -253,6 +269,10 @@ public final class OreVisualizer {
 
     static double effectiveCacheRange(boolean oreEnabled, double oreRange, boolean mineEnabled, double mineRange) {
         return Math.max(oreEnabled ? oreRange : 0.0, mineEnabled ? mineRange : 0.0);
+    }
+
+    static int scanBudget(boolean autoMineEnabled) {
+        return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
     }
 
     static int[] sectionOrder(int sectionCount, int centerSection) {

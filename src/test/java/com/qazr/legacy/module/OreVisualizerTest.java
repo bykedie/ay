@@ -25,6 +25,12 @@ public class OreVisualizerTest {
     }
 
     @Test
+    public void autoMineUsesASmallerPerTickScanBudget() {
+        assertEquals(12, OreVisualizer.scanBudget(false));
+        assertEquals(2, OreVisualizer.scanBudget(true));
+    }
+
+    @Test
     public void drawsEveryEdgeForSingleOreBlock() {
         Set<BlockPos> positions = new HashSet<>();
         BlockPos block = new BlockPos(0, 0, 0);

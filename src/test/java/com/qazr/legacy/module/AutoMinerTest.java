@@ -89,4 +89,20 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.withinMiningReach(eyes, target, 4.49));
         assertEquals(new Vec3d(5.5, 64.5, 0.5), AutoMiner.blockCenter(target));
     }
+
+    @Test
+    public void nearbyReachableOreWinsOverAClearerDistantRoute() {
+        int nearby = AutoMiner.pathTargetScore(8, 2.0, false);
+        int distant = AutoMiner.pathTargetScore(1, 36.0, true);
+
+        assertTrue(nearby < distant);
+    }
+
+    @Test
+    public void unreachableCandidateBatchesAdvanceBeforeWrapping() {
+        assertEquals(6, AutoMiner.nextPathCandidateOffset(0, 6, 6, false));
+        assertEquals(12, AutoMiner.nextPathCandidateOffset(6, 6, 6, false));
+        assertEquals(0, AutoMiner.nextPathCandidateOffset(12, 3, 6, false));
+        assertEquals(0, AutoMiner.nextPathCandidateOffset(6, 2, 6, true));
+    }
 }
