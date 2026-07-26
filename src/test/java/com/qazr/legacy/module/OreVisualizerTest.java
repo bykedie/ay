@@ -31,6 +31,21 @@ public class OreVisualizerTest {
     }
 
     @Test
+    public void nearbyChunkSectionsStayAheadOfFartherScanTasks() {
+        assertTrue(OreVisualizer.scanTaskPrecedesResumed(1, 2));
+        assertTrue(OreVisualizer.scanTaskPrecedesResumed(2, 2));
+        assertTrue(!OreVisualizer.scanTaskPrecedesResumed(3, 2));
+    }
+
+    @Test
+    public void cacheIncludesDiagonalAndEdgeChunksThatCanEnterMiningRange() {
+        assertEquals(3, OreVisualizer.chunkSearchRadius(32.0));
+        assertTrue(OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(2, 2), 0, 0, 32.0));
+        assertTrue(OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(3, 0), 0, 0, 32.0));
+        assertTrue(!OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(3, 2), 0, 0, 32.0));
+    }
+
+    @Test
     public void drawsEveryEdgeForSingleOreBlock() {
         Set<BlockPos> positions = new HashSet<>();
         BlockPos block = new BlockPos(0, 0, 0);

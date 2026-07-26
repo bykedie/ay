@@ -75,7 +75,13 @@ public final class OreVisualizer {
         if (!cacheNeeded()) return;
         int centerSection = mc.player == null ? 4
             : MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
-        scanQueue.addFirst(new ScanTask(event.getWorld(), chunk, centerSection));
+        ScanTask task = new ScanTask(event.getWorld(), chunk, centerSection);
+        if (mc.player == null) {
+            scanQueue.addFirst(task);
+        } else {
+            requeueScanTask(task, MathHelper.floor(mc.player.posX) >> 4,
+                MathHelper.floor(mc.player.posZ) >> 4);
+        }
     }
 
     @SubscribeEvent
@@ -125,7 +131,7 @@ public final class OreVisualizer {
             if (task.isComplete()) {
                 scannedChunks.add(task.key);
             } else {
-                scanQueue.addLast(task);
+                requeueScanTask(task, seededCenterChunkX, seededCenterChunkZ);
             }
         }
         if (validationDelay-- <= 0) {
@@ -243,18 +249,19 @@ public final class OreVisualizer {
         if (!(mc.world.getChunkProvider() instanceof ChunkProviderClient)) return;
         double cacheRange = effectiveCacheRange(modules.isEnabled(ModuleId.ORE_VISUALIZER),
             ModConfig.oreVisualizerRange, modules.isEnabled(ModuleId.AUTO_MINE), ModConfig.minePathRange);
-        int radiusChunks = Math.max(1, (int) Math.ceil(cacheRange / 16.0D));
+        int radiusChunks = chunkSearchRadius(cacheRange);
         ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
         int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
-        pruneQueue(centerChunkX, centerChunkZ, radiusChunks);
+        pruneQueue(centerChunkX, centerChunkZ, cacheRange);
         if (seededWorld == mc.world && radiusChunks == seededRadiusChunks
                 && centerChunkX == seededCenterChunkX && centerChunkZ == seededCenterChunkZ) return;
         List<SeededChunk> chunks = new ArrayList<>();
         for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
             for (int dz = -radiusChunks; dz <= radiusChunks; dz++) {
                 int distanceSq = dx * dx + dz * dz;
-                if (distanceSq > radiusChunks * radiusChunks) continue;
+                long key = ChunkPos.asLong(centerChunkX + dx, centerChunkZ + dz);
+                if (!chunkCouldEnterRange(key, centerChunkX, centerChunkZ, cacheRange)) continue;
                 Chunk chunk = provider.getLoadedChunk(centerChunkX + dx, centerChunkZ + dz);
                 if (chunk != null) chunks.add(new SeededChunk(chunk, distanceSq));
             }
@@ -276,6 +283,19 @@ public final class OreVisualizer {
 
     static int scanBudget(boolean autoMineEnabled) {
         return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
+    }
+
+    static int chunkSearchRadius(double range) {
+        return Math.max(1, (int) Math.ceil(Math.max(0.0, range) / 16.0D) + 1);
+    }
+
+    static boolean chunkCouldEnterRange(long key, int centerChunkX, int centerChunkZ, double range) {
+        int chunkX = (int) key;
+        int chunkZ = (int) (key >> 32);
+        double dx = Math.max(0, Math.abs(chunkX - centerChunkX) - 1) * 16.0D;
+        double dz = Math.max(0, Math.abs(chunkZ - centerChunkZ) - 1) * 16.0D;
+        double padded = Math.max(0.0, range) + 1.5D;
+        return dx * dx + dz * dz <= padded * padded;
     }
 
     private void clearCache() {
@@ -317,12 +337,31 @@ public final class OreVisualizer {
         scanQueue.addAll(tasks);
     }
 
-    private void pruneQueue(int centerChunkX, int centerChunkZ, int radiusChunks) {
-        int maxDistanceSq = radiusChunks * radiusChunks;
+    private void requeueScanTask(ScanTask task, int centerChunkX, int centerChunkZ) {
+        int taskDistanceSq = task.distanceSq(centerChunkX, centerChunkZ);
+        int queued = scanQueue.size();
+        boolean inserted = false;
+        for (int i = 0; i < queued; i++) {
+            ScanTask next = scanQueue.removeFirst();
+            if (!inserted && !scanTaskPrecedesResumed(
+                    next.distanceSq(centerChunkX, centerChunkZ), taskDistanceSq)) {
+                scanQueue.addLast(task);
+                inserted = true;
+            }
+            scanQueue.addLast(next);
+        }
+        if (!inserted) scanQueue.addLast(task);
+    }
+
+    static boolean scanTaskPrecedesResumed(int queuedDistanceSq, int resumedDistanceSq) {
+        return queuedDistanceSq <= resumedDistanceSq;
+    }
+
+    private void pruneQueue(int centerChunkX, int centerChunkZ, double range) {
         Iterator<ScanTask> iterator = scanQueue.iterator();
         while (iterator.hasNext()) {
             ScanTask task = iterator.next();
-            if (task.distanceSq(centerChunkX, centerChunkZ) <= maxDistanceSq) continue;
+            if (chunkCouldEnterRange(task.key, centerChunkX, centerChunkZ, range)) continue;
             removeChunkMarkers(task.key);
             scannedChunks.remove(task.key);
             iterator.remove();
