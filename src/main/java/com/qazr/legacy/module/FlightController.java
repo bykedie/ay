@@ -17,6 +17,7 @@ public final class FlightController {
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private EntityPlayerSP controlledPlayer;
+    private Entity controlledBoat;
     private boolean originalAllowFlying;
     private boolean originalFlying;
     private float originalFlySpeed;
@@ -43,6 +44,7 @@ public final class FlightController {
     }
 
     private void normalFlight() {
+        clearControlledBoat();
         if (mc.player.isRiding()) {
             restoreCapabilities();
             return;
@@ -63,7 +65,11 @@ public final class FlightController {
     private void boatFlight() {
         restoreCapabilities();
         Entity riding = mc.player.getRidingEntity();
-        if (!(riding instanceof EntityBoat)) return;
+        if (!(riding instanceof EntityBoat)) {
+            clearControlledBoat();
+            return;
+        }
+        controlledBoat = riding;
         double[] motion = requestedMotion();
         riding.prevRotationYaw = riding.rotationYaw;
         riding.rotationYaw = mc.player.rotationYaw;
@@ -85,12 +91,35 @@ public final class FlightController {
     }
 
     private void restoreCapabilities() {
+        clearControlledBoat();
         if (controlledPlayer == null) return;
         controlledPlayer.fallDistance = 0.0F;
+        clearMotion(controlledPlayer);
         controlledPlayer.capabilities.isFlying = restoredFlying(originalFlying, originalAllowFlying,
             controlledPlayer.capabilities.allowFlying, controlledPlayer.capabilities.isFlying);
         controlledPlayer.capabilities.setFlySpeed(originalFlySpeed);
         controlledPlayer = null;
+    }
+
+    private void clearControlledBoat() {
+        if (controlledBoat == null) return;
+        clearMotion(controlledBoat);
+        controlledBoat.fallDistance = 0.0F;
+        controlledBoat = null;
+    }
+
+    private static void clearMotion(Entity entity) {
+        entity.motionX = 0.0;
+        entity.motionY = 0.0;
+        entity.motionZ = 0.0;
+    }
+
+    static double[] clearedMotion() {
+        return new double[] {0.0, 0.0, 0.0};
+    }
+
+    static boolean shouldClearBoatForNormalFlight(boolean boatWasControlled, boolean normalFlightEnabled) {
+        return boatWasControlled && normalFlightEnabled;
     }
 
     private double[] requestedMotion() {

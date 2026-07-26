@@ -19,6 +19,20 @@ public class FlightControllerTest {
     }
 
     @Test
+    public void clearsInjectedMotionWhenFlightControlEnds() {
+        assertEquals(0.0, FlightController.clearedMotion()[0], 0.0);
+        assertEquals(0.0, FlightController.clearedMotion()[1], 0.0);
+        assertEquals(0.0, FlightController.clearedMotion()[2], 0.0);
+    }
+
+    @Test
+    public void clearsBoatControlWhenSwitchingToNormalFlight() {
+        assertEquals(true, FlightController.shouldClearBoatForNormalFlight(true, true));
+        assertEquals(false, FlightController.shouldClearBoatForNormalFlight(false, true));
+        assertEquals(false, FlightController.shouldClearBoatForNormalFlight(true, false));
+    }
+
+    @Test
     public void resolvesVerticalKeysWithoutDrift() {
         assertEquals(0.20, FlightController.verticalMotion(true, false, 0.20), 0.0001);
         assertEquals(-0.20, FlightController.verticalMotion(false, true, 0.20), 0.0001);
