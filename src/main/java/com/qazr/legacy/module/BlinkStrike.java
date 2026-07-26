@@ -23,15 +23,23 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class BlinkStrike {
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
-    private static final int RECOVERY_TICKS = 12;
+    private static final int RECOVERY_TICKS = 40;
+    private static final double RECOVERY_ORIGIN_RADIUS = 3.0;
+    private static final double RECOVERY_JUMP_DISTANCE = 2.0;
+    private static final double RECOVERY_PATH_RADIUS = 4.0;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
     private final Map<Integer, Integer> reachableUntil = new HashMap<>();
-    private final List<BlinkPath.Point> recoveryDestinations = new ArrayList<>();
+    private final List<List<BlinkPath.Point>> recoveryRoutes = new ArrayList<>();
     private BlinkPath.Point recoveryOrigin;
     private BlinkPath.Point lastRecoveryPosition;
     private boolean recoveryOnGround;
+    private boolean recoveryTransportOnGround;
+    private boolean recoveryPlayerOnGround;
+    private double recoveryMotionX;
+    private double recoveryMotionY;
+    private double recoveryMotionZ;
     private int recoveryUntilTick;
     private int delay;
 
@@ -71,7 +79,7 @@ public final class BlinkStrike {
         for (PlannedStrike strike : strikes) {
             StrikePlan currentPlan = refreshStrikePlan(strike.target, origin, strike.plan);
             if (currentPlan == null) continue;
-            recoveryDestinations.add(currentPlan.destination);
+            if (!currentPlan.path.isEmpty()) recoveryRoutes.add(new ArrayList<>(currentPlan.path));
             if (strike(strike.target, origin, currentPlan, originOnGround)) attacked = true;
         }
         if (attacked) {
@@ -90,6 +98,7 @@ public final class BlinkStrike {
         double originalMotionX = mc.player.motionX;
         double originalMotionY = mc.player.motionY;
         double originalMotionZ = mc.player.motionZ;
+        boolean originalOnGround = mc.player.onGround;
         int sent = 0;
         try {
             for (BlinkPath.Point point : path) {
@@ -113,7 +122,7 @@ public final class BlinkStrike {
             mc.player.motionX = originalMotionX;
             mc.player.motionY = originalMotionY;
             mc.player.motionZ = originalMotionZ;
-            mc.player.onGround = originOnGround;
+            mc.player.onGround = originalOnGround;
             mc.player.setPosition(origin.x, origin.y, origin.z);
         }
         return true;
@@ -133,7 +142,12 @@ public final class BlinkStrike {
         recoveryOrigin = origin;
         lastRecoveryPosition = origin;
         recoveryOnGround = onGround;
-        recoveryDestinations.clear();
+        recoveryTransportOnGround = transportOnGround(onGround, modules.isEnabled(ModuleId.FLIGHT));
+        recoveryPlayerOnGround = mc.player.onGround;
+        recoveryMotionX = mc.player.motionX;
+        recoveryMotionY = mc.player.motionY;
+        recoveryMotionZ = mc.player.motionZ;
+        recoveryRoutes.clear();
         recoveryUntilTick = mc.player.ticksExisted + RECOVERY_TICKS;
     }
 
@@ -144,13 +158,26 @@ public final class BlinkStrike {
             return;
         }
         BlinkPath.Point current = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
-        if (!shouldRecoverPosition(recoveryOrigin, lastRecoveryPosition, current, recoveryDestinations)) {
+        List<BlinkPath.Point> returnPath = recoveryReturnPath(recoveryOrigin, lastRecoveryPosition, current,
+            recoveryRoutes, ModConfig.blinkStep);
+        if (returnPath.isEmpty()) {
             lastRecoveryPosition = current;
+            recoveryPlayerOnGround = mc.player.onGround;
+            recoveryMotionX = mc.player.motionX;
+            recoveryMotionY = mc.player.motionY;
+            recoveryMotionZ = mc.player.motionZ;
             return;
+        }
+        for (int i = 0; i < returnPath.size(); i++) {
+            sendPosition(returnPath.get(i), i + 1 == returnPath.size()
+                ? recoveryOnGround : recoveryTransportOnGround);
         }
         mc.player.setPosition(recoveryOrigin.x, recoveryOrigin.y, recoveryOrigin.z);
         mc.player.fallDistance = 0.0F;
-        sendPosition(recoveryOrigin, recoveryOnGround);
+        mc.player.motionX = recoveryMotionX;
+        mc.player.motionY = recoveryMotionY;
+        mc.player.motionZ = recoveryMotionZ;
+        mc.player.onGround = recoveryPlayerOnGround;
         lastRecoveryPosition = recoveryOrigin;
     }
 
@@ -158,18 +185,39 @@ public final class BlinkStrike {
         recoveryOrigin = null;
         lastRecoveryPosition = null;
         recoveryOnGround = false;
-        recoveryDestinations.clear();
+        recoveryTransportOnGround = false;
+        recoveryPlayerOnGround = false;
+        recoveryMotionX = 0.0;
+        recoveryMotionY = 0.0;
+        recoveryMotionZ = 0.0;
+        recoveryRoutes.clear();
         recoveryUntilTick = 0;
     }
 
-    static boolean shouldRecoverPosition(BlinkPath.Point origin, BlinkPath.Point previous,
-            BlinkPath.Point current, List<BlinkPath.Point> destinations) {
-        if (origin.distanceTo(current) <= 3.0) return false;
-        if (previous == null || previous.distanceTo(current) <= 4.0) return false;
-        for (BlinkPath.Point destination : destinations) {
-            if (destination.distanceTo(current) <= 4.0) return true;
+    static List<BlinkPath.Point> recoveryReturnPath(BlinkPath.Point origin, BlinkPath.Point previous,
+            BlinkPath.Point current, List<List<BlinkPath.Point>> routes, double maxStep) {
+        if (origin.distanceTo(current) <= RECOVERY_ORIGIN_RADIUS
+                || previous == null || previous.distanceTo(current) <= RECOVERY_JUMP_DISTANCE) {
+            return java.util.Collections.emptyList();
         }
-        return false;
+        List<BlinkPath.Point> nearestRoute = null;
+        int nearestIndex = -1;
+        double nearestDistance = RECOVERY_PATH_RADIUS;
+        for (List<BlinkPath.Point> route : routes) {
+            for (int i = 0; i < route.size(); i++) {
+                double distance = route.get(i).distanceTo(current);
+                if (distance <= nearestDistance) {
+                    nearestDistance = distance;
+                    nearestRoute = route;
+                    nearestIndex = i;
+                }
+            }
+        }
+        if (nearestRoute == null) return java.util.Collections.emptyList();
+        List<BlinkPath.Point> result = new ArrayList<>();
+        result.addAll(BlinkPath.interpolate(current, nearestRoute.get(nearestIndex), maxStep));
+        result.addAll(BlinkPath.returnPath(origin, nearestRoute, nearestIndex + 1));
+        return result;
     }
 
     private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,

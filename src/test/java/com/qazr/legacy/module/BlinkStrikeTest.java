@@ -96,19 +96,61 @@ public class BlinkStrikeTest {
     }
 
     @Test
-    public void recoversOnlyWhenCorrectedNearTheRemoteStrikePosition() {
+    public void retracesTheAcceptedRouteAfterARemoteCorrection() {
         BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
-        List<BlinkPath.Point> destinations = java.util.Collections.singletonList(
-            new BlinkPath.Point(20.0, 64.0, 0.0));
+        List<BlinkPath.Point> outward = BlinkPath.interpolate(origin,
+            new BlinkPath.Point(20.0, 64.0, 0.0), 4.0);
+        List<BlinkPath.Point> returning = BlinkStrike.recoveryReturnPath(origin, origin,
+            new BlinkPath.Point(20.5, 64.0, 0.0),
+            java.util.Collections.singletonList(outward), 4.0);
 
-        assertEquals(true, BlinkStrike.shouldRecoverPosition(origin, origin,
-            new BlinkPath.Point(20.5, 64.0, 0.0), destinations));
-        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin, origin,
-            new BlinkPath.Point(2.5, 64.0, 0.0), destinations));
-        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin, origin,
-            new BlinkPath.Point(8.0, 64.0, 8.0), destinations));
-        assertEquals(false, BlinkStrike.shouldRecoverPosition(origin,
-            new BlinkPath.Point(16.5, 64.0, 0.0), new BlinkPath.Point(20.5, 64.0, 0.0), destinations));
+        assertTrue(!returning.isEmpty());
+        assertEquals(origin.x, returning.get(returning.size() - 1).x, 0.0);
+        BlinkPath.Point previous = new BlinkPath.Point(20.5, 64.0, 0.0);
+        for (BlinkPath.Point point : returning) {
+            assertTrue(previous.distanceTo(point) <= 4.0);
+            previous = point;
+        }
+    }
+
+    @Test
+    public void recoversFromAnIntermediateOutboundPacket() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        List<BlinkPath.Point> outward = BlinkPath.interpolate(origin,
+            new BlinkPath.Point(20.0, 64.0, 0.0), 4.0);
+        List<BlinkPath.Point> returning = BlinkStrike.recoveryReturnPath(origin, origin,
+            new BlinkPath.Point(12.5, 64.0, 0.0),
+            java.util.Collections.singletonList(outward), 4.0);
+
+        assertTrue(!returning.isEmpty());
+        assertEquals(origin.x, returning.get(returning.size() - 1).x, 0.0);
+    }
+
+    @Test
+    public void recoversWhenTheServerAcceptsOnlyTheFirstDefaultStep() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        List<BlinkPath.Point> outward = BlinkPath.interpolate(origin,
+            new BlinkPath.Point(12.0, 64.0, 0.0), 4.0);
+        List<BlinkPath.Point> returning = BlinkStrike.recoveryReturnPath(origin, origin,
+            outward.get(0), java.util.Collections.singletonList(outward), 4.0);
+
+        assertTrue(!returning.isEmpty());
+        assertEquals(origin.x, returning.get(returning.size() - 1).x, 0.0);
+    }
+
+    @Test
+    public void ignoresOrdinaryMovementAndUnrelatedTeleports() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        List<List<BlinkPath.Point>> routes = java.util.Collections.singletonList(
+            BlinkPath.interpolate(origin, new BlinkPath.Point(20.0, 64.0, 0.0), 4.0));
+
+        assertTrue(BlinkStrike.recoveryReturnPath(origin, origin,
+            new BlinkPath.Point(2.5, 64.0, 0.0), routes, 4.0).isEmpty());
+        assertTrue(BlinkStrike.recoveryReturnPath(origin, origin,
+            new BlinkPath.Point(8.0, 64.0, 8.0), routes, 4.0).isEmpty());
+        assertTrue(BlinkStrike.recoveryReturnPath(origin,
+            new BlinkPath.Point(19.0, 64.0, 0.0),
+            new BlinkPath.Point(20.5, 64.0, 0.0), routes, 4.0).isEmpty());
     }
 
     @Test
