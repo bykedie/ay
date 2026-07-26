@@ -161,6 +161,8 @@ public class BlinkStrikeTest {
             new BlinkPath.Point(2.5, 64.0, 0.0), routes, 4.0).isEmpty());
         assertTrue(BlinkStrike.recoveryReturnPath(origin, origin,
             new BlinkPath.Point(8.0, 64.0, 8.0), routes, 4.0).isEmpty());
+        assertTrue(BlinkStrike.recoveryReturnPath(origin, origin,
+            new BlinkPath.Point(12.0, 64.0, 3.0), routes, 4.0).isEmpty());
         assertTrue(BlinkStrike.recoveryReturnPath(origin,
             new BlinkPath.Point(19.0, 64.0, 0.0),
             new BlinkPath.Point(20.5, 64.0, 0.0), routes, 4.0).isEmpty());

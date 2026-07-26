@@ -26,7 +26,7 @@ public final class BlinkStrike {
     private static final int RECOVERY_TICKS = 40;
     private static final double RECOVERY_ORIGIN_RADIUS = 3.0;
     private static final double RECOVERY_JUMP_DISTANCE = 2.0;
-    private static final double RECOVERY_PATH_RADIUS = 4.0;
+    private static final double RECOVERY_PATH_RADIUS = 1.5;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
