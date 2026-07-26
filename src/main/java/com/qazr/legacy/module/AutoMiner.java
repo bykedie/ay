@@ -45,6 +45,7 @@ public final class AutoMiner {
     private static final double ROUTE_SPEED = 0.18;
     private static final int NEARBY_ROUTE_CHECK_TICKS = 5;
     private static final double NEARBY_ROUTE_RANGE = 6.0;
+    private static final double NEARBY_PREEMPT_MARGIN = 0.5;
     private static final int MAX_VISIBLE_TARGETS = 16;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
@@ -499,7 +500,7 @@ public final class AutoMiner {
     }
 
     static boolean closerTargetWarrantsPreemption(double nearbyDistanceSq, double currentDistanceSq) {
-        return Math.sqrt(Math.max(0.0, nearbyDistanceSq)) + 2.0
+        return Math.sqrt(Math.max(0.0, nearbyDistanceSq)) + NEARBY_PREEMPT_MARGIN
             < Math.sqrt(Math.max(0.0, currentDistanceSq));
     }
 

@@ -217,10 +217,11 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void nearbyOrePreemptsOnlyWhenMeaningfullyCloser() {
+    public void nearbyOrePreemptsAnExistingDetourWithoutTargetThrashing() {
         assertTrue(AutoMiner.closerTargetWarrantsPreemption(4.0, 36.0));
-        assertFalse(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
-        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 25.0));
+        assertTrue(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
+        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 12.25));
+        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 9.0));
     }
 
     @Test
