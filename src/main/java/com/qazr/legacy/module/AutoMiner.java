@@ -70,6 +70,9 @@ public final class AutoMiner {
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
     private boolean observedEnabled;
+    private BlockPos miningPlayerFeet;
+    private Vec3d miningEyes;
+    private double miningReachDistance;
     private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
     private int stalledRouteTicks;
 
@@ -101,6 +104,9 @@ public final class AutoMiner {
             observedEnabled = true;
         }
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
+        miningPlayerFeet = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        miningEyes = mc.player.getPositionEyes(1.0F);
+        miningReachDistance = mc.playerController.getBlockReachDistance();
         updateFailedRouteCooldown();
         updateMinedCount();
         if (allFiniteQuotasReached()) {
@@ -215,6 +221,9 @@ public final class AutoMiner {
             lastMinedOre = null;
             lastMinedType = null;
             clearPath();
+            miningPlayerFeet = null;
+            miningEyes = null;
+            miningReachDistance = 0.0;
         }
     }
 
@@ -796,15 +805,17 @@ public final class AutoMiner {
 
     private MineTarget visibleTarget(BlockPos pos) {
         OreType type = targetType(pos);
-        if (type == null) return null;
-        BlockPos playerFeet = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
-        if (!stableMiningPosition(playerFeet, pos)) return null;
-        Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        if (!withinMiningReach(eyes, pos, miningReach())) return null;
+        if (type == null || !visibilityContextReady(miningPlayerFeet, miningEyes, miningReachDistance)) return null;
+        if (!stableMiningPosition(miningPlayerFeet, pos)) return null;
+        if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         Vec3d center = blockCenter(pos);
-        RayTraceResult hit = mc.world.rayTraceBlocks(eyes, center, false, true, false);
+        RayTraceResult hit = mc.world.rayTraceBlocks(miningEyes, center, false, true, false);
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK || !pos.equals(hit.getBlockPos())) return null;
         return new MineTarget(pos.toImmutable(), type, hit.sideHit);
+    }
+
+    static boolean visibilityContextReady(BlockPos playerFeet, Vec3d eyes, double reach) {
+        return playerFeet != null && eyes != null && reach > 0.0;
     }
 
     private double miningReach() {

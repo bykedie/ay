@@ -160,6 +160,17 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void visibilityContextRequiresAValidPlayerSnapshot() {
+        BlockPos feet = new BlockPos(0, 64, 0);
+        Vec3d eyes = new Vec3d(0.5, 65.6, 0.5);
+
+        assertTrue(AutoMiner.visibilityContextReady(feet, eyes, 4.5));
+        assertFalse(AutoMiner.visibilityContextReady(null, eyes, 4.5));
+        assertFalse(AutoMiner.visibilityContextReady(feet, null, 4.5));
+        assertFalse(AutoMiner.visibilityContextReady(feet, eyes, 0.0));
+    }
+
+    @Test
     public void renderedRouteSplitsDiagonalJumpNodesIntoOrthogonalCenters() {
         List<BlockPos> route = AutoMiner.orthogonalRoutePoints(Arrays.asList(
             new BlockPos(0, 64, 0), new BlockPos(1, 65, 0), new BlockPos(1, 65, 2)));
