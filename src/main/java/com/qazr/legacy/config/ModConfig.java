@@ -21,6 +21,7 @@ public final class ModConfig {
     public static boolean flight;
     public static boolean criticals;
     public static boolean targetVisualizer;
+    public static boolean panelGraveKeyMigrated;
     public static String[] ggMessages;
     public static int ggMinDelayTicks;
     public static int ggMaxDelayTicks;
@@ -113,6 +114,8 @@ public final class ModConfig {
         flight = configuration.getBoolean("flight", "modules", false, "Packet-assisted survival movement modes.");
         criticals = configuration.getBoolean("criticals", "modules", false, "Send a critical movement sequence before melee attacks.");
         targetVisualizer = configuration.getBoolean("targetVisualizer", "modules", false, "Draw configurable target overlays.");
+        panelGraveKeyMigrated = configuration.getBoolean("panelGraveKeyMigrated", "ui", false,
+            "One-time migration from the old Right Shift panel key to the grave key.");
         ggMessages = fiveMessages(configuration.getStringList("messages", "autoGg", DEFAULT_GG_MESSAGES, "Messages sent after a detected kill."), DEFAULT_GG_MESSAGES);
         ggMinDelayTicks = configuration.getInt("minDelayTicks", "autoGg", 4, 0, 200, "Minimum delay before sending.");
         ggMaxDelayTicks = configuration.getInt("maxDelayTicks", "autoGg", 24, 0, 200, "Maximum delay before sending.");
@@ -218,6 +221,12 @@ public final class ModConfig {
 
     public static void saveModule(ModuleId id, boolean enabled) {
         configuration.get("modules", id.key(), enabled).set(enabled);
+        configuration.save();
+    }
+
+    public static void markPanelGraveKeyMigrated() {
+        panelGraveKeyMigrated = true;
+        saveBoolean("ui", "panelGraveKeyMigrated", true);
         configuration.save();
     }
 

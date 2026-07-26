@@ -1,5 +1,6 @@
 package com.qazr.legacy.control;
 
+import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.gui.ModuleControlScreen;
 import com.qazr.legacy.module.ModuleManager;
@@ -11,12 +12,14 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
 
 public final class ClientControls {
     private static final String CATEGORY = "Voris Hub 功能设置";
+    static final int DEFAULT_MENU_KEY = Keyboard.KEY_GRAVE;
     private final ModuleManager modules;
-    private final KeyBinding menu = new KeyBinding("打开控制面板", Keyboard.KEY_RSHIFT, CATEGORY);
+    private final KeyBinding menu = new KeyBinding("打开控制面板", DEFAULT_MENU_KEY, CATEGORY);
     private final Map<ModuleId, KeyBinding> moduleKeys = new EnumMap<>(ModuleId.class);
 
     public ClientControls(ModuleManager modules) {
@@ -29,6 +32,11 @@ public final class ClientControls {
     public void register() {
         ClientRegistry.registerKeyBinding(menu);
         for (KeyBinding binding : moduleKeys.values()) ClientRegistry.registerKeyBinding(binding);
+    }
+
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END) migrateOldMenuKey();
     }
 
     @SubscribeEvent
@@ -51,6 +59,20 @@ public final class ClientControls {
         binding.setKeyCode(keyCode);
         KeyBinding.resetKeyBindingArrayAndHash();
         Minecraft.getMinecraft().gameSettings.saveOptions();
+    }
+
+    private void migrateOldMenuKey() {
+        if (ModConfig.panelGraveKeyMigrated) return;
+        if (shouldMigrateMenuKey(menu.getKeyCode())) {
+            menu.setKeyCode(DEFAULT_MENU_KEY);
+            KeyBinding.resetKeyBindingArrayAndHash();
+            Minecraft.getMinecraft().gameSettings.saveOptions();
+        }
+        ModConfig.markPanelGraveKeyMigrated();
+    }
+
+    static boolean shouldMigrateMenuKey(int keyCode) {
+        return keyCode == Keyboard.KEY_RSHIFT;
     }
 
     private void toggle(ModuleId id) {

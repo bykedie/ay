@@ -36,7 +36,7 @@ All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. T
 
 ## Controls And Commands
 
-- `Right Shift`: open the module control screen.
+- `·` (grave key below Esc): open the module control screen.
 - Module toggle key bindings are unassigned by default and can be set in Minecraft's Controls screen.
 - Left-click a module to toggle it; right-click it to expand persistent sliders, switches, color editors, and choices below the module.
 - Hover the small question-mark icon beside any parameter for its purpose and usage.

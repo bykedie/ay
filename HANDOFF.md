@@ -53,7 +53,7 @@ Windows 构建命令：
 - `src/main/java/com/qazr/legacy/config/ModuleSetting.java`: GUI 参数定义、范围、类型、中文标签、问号提示说明。
 - `src/main/java/com/qazr/legacy/config/ModConfig.java`: 配置加载、保存、默认值、兼容键。
 - `src/main/java/com/qazr/legacy/config/AttackPoint.java`: 战斗模块攻击部位选项和目标点计算。
-- `src/main/java/com/qazr/legacy/control/ClientControls.java`: 右 Shift 面板入口和模块快捷键绑定。
+- `src/main/java/com/qazr/legacy/control/ClientControls.java`: `·` 键面板入口和模块快捷键绑定。
 - `src/main/java/com/qazr/legacy/gui/ModuleControlScreen.java`: 主控制面板、右键展开参数、问号提示、模块实体选择器。
 - `src/main/java/com/qazr/legacy/gui/MessageEditorScreen.java`: 自动 GG 和自动回复的 5 条消息编辑页。
 - `src/main/java/com/qazr/legacy/gui/ColorEditorScreen.java`: 矿物颜色 `#RRGGBB` 编辑页。
@@ -77,7 +77,7 @@ Windows 构建命令：
 
 ### 控制和界面
 
-- 默认按 `Right Shift` 打开 `Voris Hub 控制面板`。
+- 默认按 `·`（Esc 下方的反引号键）打开 `Voris Hub 控制面板`。
 - 模块自身快捷键默认不绑定，用户可以在 Minecraft Controls 里自行绑定。
 - 左键点击模块：开启/关闭。
 - 右键点击模块：展开该模块参数。
@@ -198,7 +198,7 @@ Select-String -Path run\logs\latest.log -Pattern "Voris Hub|Forge Mod Loader has
 优先维护顺序建议如下：
 
 1. 先保证 `verifyRelease` 继续通过。
-2. 再做开发客户端烟雾测试，尤其是右 Shift 面板、右键展开参数、颜色编辑页和问号提示。
+2. 再做开发客户端烟雾测试，尤其是 `·` 键面板、右键展开参数、颜色编辑页和问号提示。
 3. 战斗相关变更要同时测试 `CombatSupportTest`、`CombatMathTest`、`BlinkPathTest`。
 4. 配置或 GUI 参数变更要同步更新 `ModuleSetting.description()`，不能留下没有问号说明的参数。
 5. 新增模块要加入 `ModuleId`、`ModConfig`、`ModuleManager.reloadStates()`、GUI 分类、语言资源和测试。
@@ -232,7 +232,7 @@ git ls-remote origin refs/heads/main
 截至本文档编写时，项目主功能状态为 `Voris Hub 1.9.0`：
 
 - 构建产物名：`voris-hub-1.9.0.jar`
-- 面板入口：`Right Shift`
+- 面板入口：`·`（Esc 下方的反引号键）
 - 模块快捷键：默认未绑定，由用户自行绑定
 - 目标可视化：默认 `150`，最大 `500`
 - 矿物可视化：默认 `150`，最大 `500`，相邻同类矿石只绘制外边界

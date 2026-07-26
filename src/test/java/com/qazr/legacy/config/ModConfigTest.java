@@ -33,6 +33,7 @@ public class ModConfigTest {
         assertFalse(ModConfig.meleeAura);
         assertFalse(ModConfig.blinkStrike);
         assertFalse(ModConfig.flight);
+        assertFalse(ModConfig.panelGraveKeyMigrated);
         assertEquals(3.0, ModConfig.meleeRange, 0.0);
         assertEquals(12.0, ModConfig.blinkRange, 0.0);
         assertEquals(4.0, ModConfig.blinkStep, 0.0);
