@@ -113,8 +113,9 @@ public class BlinkStrikeTest {
 
     @Test
     public void skipsExpiredStrikePlansInsteadOfCountingThemAsHits() {
-        assertEquals(false, BlinkStrike.strikePlanStillUsable(false, false));
-        assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false));
-        assertEquals(true, BlinkStrike.strikePlanStillUsable(true, true));
+        assertEquals(false, BlinkStrike.strikePlanStillUsable(false, true, true));
+        assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false, true));
+        assertEquals(false, BlinkStrike.strikePlanStillUsable(true, true, false));
+        assertEquals(true, BlinkStrike.strikePlanStillUsable(true, true, true));
     }
 }

@@ -235,7 +235,8 @@ public final class BlinkStrike {
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) {
             Vec3d originEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
             if (hasAttackLine(originEyes, attackPoint)) {
-                return new StrikePlan(origin, java.util.Collections.emptyList());
+                return new StrikePlan(origin, java.util.Collections.emptyList(),
+                    java.util.Collections.emptyList());
             }
         }
         for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
@@ -247,7 +248,8 @@ public final class BlinkStrike {
             if (!hasAttackLine(eyes, attackPoint)) continue;
             for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
                 if (!isRouteClear(origin, waypoints)) continue;
-                return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep));
+                return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep),
+                    new ArrayList<>(waypoints));
             }
         }
         return null;
@@ -271,13 +273,17 @@ public final class BlinkStrike {
         Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
             targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
             targetPoint.z + predictedZ - target.posZ);
-        return CombatSupport.distanceSqToHitbox(eyes, predictedBox)
+        boolean lineAndRangeValid = CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance
             && hasAttackLine(eyes, attackPoint);
+        return strikePlanStillUsable(true, lineAndRangeValid,
+            plan.waypoints.isEmpty() || isRouteClear(new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
+                plan.waypoints));
     }
 
-    static boolean strikePlanStillUsable(boolean targetAlive, boolean lineAndRangeValid) {
-        return targetAlive && lineAndRangeValid;
+    static boolean strikePlanStillUsable(boolean targetAlive, boolean lineAndRangeValid,
+            boolean routeClear) {
+        return targetAlive && lineAndRangeValid && routeClear;
     }
 
     private boolean hasAttackLine(Vec3d eyes, Vec3d attackPoint) {
@@ -406,10 +412,13 @@ public final class BlinkStrike {
     private static final class StrikePlan {
         private final BlinkPath.Point destination;
         private final List<BlinkPath.Point> path;
+        private final List<BlinkPath.Point> waypoints;
 
-        private StrikePlan(BlinkPath.Point destination, List<BlinkPath.Point> path) {
+        private StrikePlan(BlinkPath.Point destination, List<BlinkPath.Point> path,
+                List<BlinkPath.Point> waypoints) {
             this.destination = destination;
             this.path = path;
+            this.waypoints = waypoints;
         }
     }
 
