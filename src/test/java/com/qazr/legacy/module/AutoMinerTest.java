@@ -137,4 +137,12 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
         assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 25.0));
     }
+
+    @Test
+    public void routeProgressRequiresMeaningfulDistanceReduction() {
+        assertTrue(AutoMiner.routeProgressed(Double.POSITIVE_INFINITY, 1.0));
+        assertTrue(AutoMiner.routeProgressed(1.0, 0.99));
+        assertFalse(AutoMiner.routeProgressed(1.0, 0.999));
+        assertFalse(AutoMiner.routeProgressed(1.0, 1.01));
+    }
 }

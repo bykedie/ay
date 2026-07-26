@@ -43,6 +43,8 @@ public final class AutoMiner {
     private static final int NEARBY_ROUTE_CHECK_TICKS = 5;
     private static final double NEARBY_ROUTE_RANGE = 6.0;
     private static final int MAX_NEARBY_PATH_TARGETS = 2;
+    private static final int MAX_STALLED_ROUTE_TICKS = 30;
+    private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -65,6 +67,8 @@ public final class AutoMiner {
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
+    private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
+    private int stalledRouteTicks;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -112,7 +116,10 @@ public final class AutoMiner {
                     return;
                 }
                 PathTarget closer = findNearbyPathTarget(nearby);
-                if (closer != null) activatePathTarget(closer);
+                if (closer != null) {
+                    activatePathTarget(closer);
+                    if (path.isEmpty()) return;
+                }
             }
             followPathToOre();
             return;
@@ -332,6 +339,14 @@ public final class AutoMiner {
         double verticalDistance = next.getY() - mc.player.getEntityBoundingBox().minY;
         if (reachedPathNode(distanceSq, verticalDistance)) {
             pathIndex++;
+            resetRouteProgress();
+            return;
+        }
+        if (routeProgressed(lastRouteDistanceSq, distanceSq)) {
+            lastRouteDistanceSq = distanceSq;
+            stalledRouteTicks = 0;
+        } else if (++stalledRouteTicks >= MAX_STALLED_ROUTE_TICKS) {
+            abandonCurrentRoute();
             return;
         }
         if (distanceSq > 0.0001) {
@@ -348,6 +363,10 @@ public final class AutoMiner {
     static double routeMotion(double current, double unitDirection) {
         return MathHelper.clamp(current * 0.5 + unitDirection * ROUTE_SPEED,
             -ROUTE_SPEED, ROUTE_SPEED);
+    }
+
+    static boolean routeProgressed(double previousDistanceSq, double currentDistanceSq) {
+        return currentDistanceSq + ROUTE_PROGRESS_EPSILON < previousDistanceSq;
     }
 
     static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {
@@ -669,6 +688,12 @@ public final class AutoMiner {
         path = target.path;
         pathIndex = 0;
         nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
+        resetRouteProgress();
+    }
+
+    private void resetRouteProgress() {
+        lastRouteDistanceSq = Double.POSITIVE_INFINITY;
+        stalledRouteTicks = 0;
     }
 
     private void updateFailedRouteCooldown() {
@@ -685,6 +710,7 @@ public final class AutoMiner {
         miningType = null;
         clearingPos = null;
         pathIndex = 0;
+        resetRouteProgress();
     }
 
     private void selectBestPickaxe(IBlockState state) {
