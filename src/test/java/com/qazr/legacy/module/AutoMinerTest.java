@@ -115,6 +115,21 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void pathGoalsIncludeEveryStableOrthogonalMiningPosition() {
+        BlockPos ore = new BlockPos(0, 64, 0);
+        List<BlockPos> candidates = AutoMiner.miningStandCandidates(ore);
+
+        assertEquals(17, candidates.size());
+        assertTrue(candidates.contains(ore.up()));
+        assertTrue(candidates.contains(new BlockPos(1, 62, 0)));
+        assertTrue(candidates.contains(new BlockPos(1, 65, 0)));
+        assertFalse(candidates.contains(new BlockPos(1, 64, 1)));
+        for (BlockPos candidate : candidates) {
+            assertTrue(AutoMiner.stableMiningPosition(candidate, ore));
+        }
+    }
+
+    @Test
     public void miningReachUsesTheNearestPointOnTheBlock() {
         BlockPos target = new BlockPos(5, 64, 0);
         Vec3d eyes = new Vec3d(0.5, 64.5, 0.5);

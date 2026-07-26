@@ -619,14 +619,21 @@ public final class AutoMiner {
 
     private List<BlockPos> standPositionsAround(BlockPos ore) {
         List<BlockPos> result = new ArrayList<>();
-        for (EnumFacing facing : EnumFacing.HORIZONTALS) {
-            BlockPos base = ore.offset(facing);
-            for (int dy = -1; dy <= 1; dy++) {
-                BlockPos stand = standPos(base.add(0, dy, 0));
-                if (canTraverse(stand)) result.add(stand);
-            }
+        for (BlockPos candidate : miningStandCandidates(ore)) {
+            BlockPos stand = standPos(candidate);
+            if (canTraverse(stand)) result.add(stand);
         }
         result.sort(java.util.Comparator.comparingDouble(pos -> mc.player.getDistanceSqToCenter(pos)));
+        return result;
+    }
+
+    static List<BlockPos> miningStandCandidates(BlockPos ore) {
+        List<BlockPos> result = new ArrayList<>();
+        result.add(ore.up());
+        for (EnumFacing facing : EnumFacing.HORIZONTALS) {
+            BlockPos side = ore.offset(facing);
+            for (int dy = -2; dy <= 1; dy++) result.add(side.add(0, dy, 0));
+        }
         return result;
     }
 
