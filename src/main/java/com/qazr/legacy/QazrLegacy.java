@@ -43,6 +43,7 @@ public final class QazrLegacy {
         MinecraftForge.EVENT_BUS.register(modules);
         MinecraftForge.EVENT_BUS.register(new ChatAutomation(modules));
         OreVisualizer oreVisualizer = new OreVisualizer(modules);
+        modules.addReloadListener(oreVisualizer::reloadCache);
         MinecraftForge.EVENT_BUS.register(oreVisualizer);
         AutoMiner autoMiner = new AutoMiner(modules, oreVisualizer);
         modules.addReloadListener(autoMiner::reloadTargets);

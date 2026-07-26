@@ -60,6 +60,10 @@ public final class OreVisualizer {
         this.modules = modules;
     }
 
+    public void reloadCache() {
+        if (hasCacheState()) clearCache();
+    }
+
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
         if (!event.getWorld().isRemote) return;
