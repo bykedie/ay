@@ -31,6 +31,14 @@ public class OreVisualizerTest {
     }
 
     @Test
+    public void unchangedSeedStateSkipsRepeatedQueueTraversal() {
+        assertTrue(OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
+        assertTrue(!OreVisualizer.sameSeedState(false, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
+        assertTrue(!OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 33.0, 10, -4));
+        assertTrue(!OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 32.0, 11, -4));
+    }
+
+    @Test
     public void nearbyChunkSectionsStayAheadOfFartherScanTasks() {
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(1, 2));
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(2, 2));

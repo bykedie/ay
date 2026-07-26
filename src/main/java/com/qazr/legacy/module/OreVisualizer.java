@@ -53,6 +53,7 @@ public final class OreVisualizer {
     private int validationDelay;
     private World seededWorld;
     private int seededRadiusChunks;
+    private double seededRange = -1.0;
     private int seededCenterChunkX = Integer.MIN_VALUE;
     private int seededCenterChunkZ = Integer.MIN_VALUE;
     private boolean cacheActive;
@@ -106,6 +107,7 @@ public final class OreVisualizer {
         validationDelay = 0;
         seededWorld = null;
         seededRadiusChunks = 0;
+        seededRange = -1.0;
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
         cacheActive = false;
@@ -258,9 +260,10 @@ public final class OreVisualizer {
         ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
         int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
+        if (sameSeedState(seededWorld == mc.world, seededRadiusChunks, seededRange,
+                seededCenterChunkX, seededCenterChunkZ, radiusChunks, cacheRange,
+                centerChunkX, centerChunkZ)) return;
         pruneQueue(centerChunkX, centerChunkZ, cacheRange);
-        if (seededWorld == mc.world && radiusChunks == seededRadiusChunks
-                && centerChunkX == seededCenterChunkX && centerChunkZ == seededCenterChunkZ) return;
         List<SeededChunk> chunks = new ArrayList<>();
         for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
             for (int dz = -radiusChunks; dz <= radiusChunks; dz++) {
@@ -277,6 +280,7 @@ public final class OreVisualizer {
         prioritizeQueue(centerChunkX, centerChunkZ);
         seededWorld = mc.world;
         seededRadiusChunks = radiusChunks;
+        seededRange = cacheRange;
         seededCenterChunkX = centerChunkX;
         seededCenterChunkZ = centerChunkZ;
         validationDelay = 0;
@@ -288,6 +292,13 @@ public final class OreVisualizer {
 
     static int scanBudget(boolean autoMineEnabled) {
         return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
+    }
+
+    static boolean sameSeedState(boolean sameWorld, int previousRadius, double previousRange,
+            int previousChunkX, int previousChunkZ, int radius, double range,
+            int chunkX, int chunkZ) {
+        return sameWorld && previousRadius == radius && Double.compare(previousRange, range) == 0
+            && previousChunkX == chunkX && previousChunkZ == chunkZ;
     }
 
     static int chunkSearchRadius(double range) {
@@ -313,6 +324,7 @@ public final class OreVisualizer {
         validationDelay = 0;
         seededWorld = null;
         seededRadiusChunks = 0;
+        seededRange = -1.0;
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
         cacheActive = false;
