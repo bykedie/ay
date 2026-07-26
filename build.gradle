@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.10.3'
+version = '1.10.4'
 group = 'com.qazr.legacy'
 archivesBaseName = 'voris-hub'
 
@@ -160,12 +160,14 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
             if (!metadata.contains('\"version\": \"' + project.version + '\"') || !metadata.contains('\"mcversion\": \"1.12.2\"')) {
                 throw new GradleException('Expanded release metadata is invalid')
             }
-            def stream = zip.getInputStream(zip.getEntry('com/qazr/legacy/QazrLegacy.class'))
-            byte[] header = new byte[8]
-            if (stream.read(header) != 8) throw new GradleException('Cannot read class header')
-            stream.close()
+            byte[] mainClass = zip.getInputStream(zip.getEntry('com/qazr/legacy/QazrLegacy.class')).bytes
+            if (mainClass.length < 8) throw new GradleException('Cannot read class header')
+            byte[] header = java.util.Arrays.copyOf(mainClass, 8)
             int major = ((header[6] & 0xff) << 8) | (header[7] & 0xff)
             if (major != 52) throw new GradleException("Expected Java 8 bytecode (52), found ${major}")
+            if (!new String(mainClass, 'ISO-8859-1').contains(project.version.toString())) {
+                throw new GradleException('Forge @Mod version does not match the release version')
+            }
         } finally {
             zip.close()
         }
