@@ -28,6 +28,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
+import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -273,7 +274,7 @@ public final class AutoMiner {
     }
 
     private void mine(MineTarget target) {
-        selectBestPickaxe(mc.world.getBlockState(target.pos));
+        selectBestPickaxe(target.pos);
         face(target.pos);
         mc.playerController.onPlayerDamageBlock(target.pos, target.side);
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
@@ -629,7 +630,12 @@ public final class AutoMiner {
         if (state.getMaterial().isReplaceable()) return false;
         if (OreType.fromBlock(state.getBlock()) != null) return false;
         if (state.getBlock().getBlockHardness(state, mc.world, pos) < 0.0F) return false;
-        return state.getBlock().canHarvestBlock(mc.world, pos, mc.player);
+        if (state.getBlock().canHarvestBlock(mc.world, pos, mc.player)) return true;
+        for (int slot = 0; slot < 9; slot++) {
+            ItemStack stack = mc.player.inventory.getStackInSlot(slot);
+            if (toolHarvests(stack, pos)) return true;
+        }
+        return false;
     }
 
     private boolean clearBlockingObstacle(BlockPos next) {
@@ -663,7 +669,7 @@ public final class AutoMiner {
         RayTraceResult hit = mc.world.rayTraceBlocks(eyes, point, false, true, false);
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
                 || !obstacle.equals(hit.getBlockPos())) return false;
-        selectBestPickaxe(mc.world.getBlockState(obstacle));
+        selectBestPickaxe(obstacle);
         face(obstacle);
         mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
@@ -758,12 +764,17 @@ public final class AutoMiner {
         resetRouteProgress();
     }
 
-    private void selectBestPickaxe(IBlockState state) {
+    private void selectBestPickaxe(BlockPos pos) {
+        IBlockState state = mc.world.getBlockState(pos);
         int bestSlot = mc.player.inventory.currentItem;
+        boolean bestHarvests = toolHarvests(mc.player.inventory.getStackInSlot(bestSlot), pos);
         float bestSpeed = toolSpeed(mc.player.inventory.getStackInSlot(bestSlot), state);
         for (int slot = 0; slot < 9; slot++) {
-            float speed = toolSpeed(mc.player.inventory.getStackInSlot(slot), state);
-            if (speed > bestSpeed) {
+            ItemStack stack = mc.player.inventory.getStackInSlot(slot);
+            boolean harvests = toolHarvests(stack, pos);
+            float speed = toolSpeed(stack, state);
+            if (betterMiningTool(harvests, speed, bestHarvests, bestSpeed)) {
+                bestHarvests = harvests;
                 bestSpeed = speed;
                 bestSlot = slot;
             }
@@ -777,6 +788,16 @@ public final class AutoMiner {
     private float toolSpeed(ItemStack stack, IBlockState state) {
         if (stack.isEmpty() || !(stack.getItem() instanceof ItemPickaxe)) return -1.0F;
         return stack.getDestroySpeed(state);
+    }
+
+    private boolean toolHarvests(ItemStack stack, BlockPos pos) {
+        return !stack.isEmpty() && stack.getItem() instanceof ItemPickaxe
+            && ForgeHooks.canToolHarvestBlock(mc.world, pos, stack);
+    }
+
+    static boolean betterMiningTool(boolean harvests, float speed, boolean bestHarvests, float bestSpeed) {
+        if (harvests != bestHarvests) return harvests;
+        return speed > bestSpeed;
     }
 
     private MineTarget findNearestReachable(List<OreVisualizer.CachedOre> candidates) {

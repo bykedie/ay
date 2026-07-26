@@ -99,6 +99,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void harvestCapablePickaxeWinsOverAFasterWrongTool() {
+        assertTrue(AutoMiner.betterMiningTool(true, 6.0F, false, 12.0F));
+        assertFalse(AutoMiner.betterMiningTool(false, 12.0F, true, 6.0F));
+        assertTrue(AutoMiner.betterMiningTool(true, 8.0F, true, 6.0F));
+        assertFalse(AutoMiner.betterMiningTool(true, 6.0F, true, 8.0F));
+    }
+
+    @Test
     public void nearbyReachableOreWinsOverAClearerDistantRoute() {
         int nearby = AutoMiner.pathTargetScore(8, 2.0, false);
         int distant = AutoMiner.pathTargetScore(1, 36.0, true);
