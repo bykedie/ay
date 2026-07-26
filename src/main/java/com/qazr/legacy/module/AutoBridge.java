@@ -45,7 +45,8 @@ public final class AutoBridge {
             if (delay > 0) delay--;
             return;
         }
-        if (delay > 0 && !atApex && placePos.equals(lastPlaced)) {
+        boolean retryUnconfirmed = placePos.equals(lastPlaced) && isReplaceable(lastPlaced);
+        if (shouldWaitForPlacementDelay(delay, atApex, retryUnconfirmed)) {
             delay--;
             return;
         }
@@ -152,6 +153,10 @@ public final class AutoBridge {
 
     static int scanDepth(int configuredDepth, boolean airborne) {
         return airborne ? Math.max(1, configuredDepth) : 1;
+    }
+
+    static boolean shouldWaitForPlacementDelay(int delay, boolean atApex, boolean retryUnconfirmed) {
+        return delay > 0 && !atApex && (!retryUnconfirmed || delay > 1);
     }
 
     static double[] movementOffset(float yaw, float forward, float strafe) {

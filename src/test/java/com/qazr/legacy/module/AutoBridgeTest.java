@@ -14,6 +14,15 @@ public class AutoBridgeTest {
     }
 
     @Test
+    public void retriesAnUnconfirmedPlacementDuringCooldown() {
+        assertEquals(false, AutoBridge.shouldWaitForPlacementDelay(1, false, true));
+        assertEquals(true, AutoBridge.shouldWaitForPlacementDelay(2, false, true));
+        assertEquals(true, AutoBridge.shouldWaitForPlacementDelay(1, false, false));
+        assertEquals(false, AutoBridge.shouldWaitForPlacementDelay(1, true, false));
+        assertEquals(false, AutoBridge.shouldWaitForPlacementDelay(0, false, false));
+    }
+
+    @Test
     public void prioritizesFeetWhileFallingAndLookaheadWhileWalking() {
         assertEquals(0.0, AutoBridge.candidateLookaheads(1.2, true)[0], 0.0);
         assertEquals(1.2, AutoBridge.candidateLookaheads(1.2, false)[2], 0.0);
