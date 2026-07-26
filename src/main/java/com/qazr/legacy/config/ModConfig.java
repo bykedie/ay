@@ -245,7 +245,7 @@ public final class ModConfig {
             blinkRange = value;
             configuration.get("blinkStrike", "range", value).set(value);
         } else {
-            throw new IllegalArgumentException("Module has no attack range: " + id.key());
+            throw new IllegalArgumentException(id.displayName() + "没有可调整的攻击距离。");
         }
         configuration.save();
         return value;
@@ -254,7 +254,7 @@ public final class ModConfig {
     public static double getRange(ModuleId id) {
         if (id == ModuleId.MELEE_AURA) return meleeRange;
         if (id == ModuleId.BLINK_STRIKE) return blinkRange;
-        throw new IllegalArgumentException("Module has no attack range: " + id.key());
+        throw new IllegalArgumentException(id.displayName() + "没有可调整的攻击距离。");
     }
 
     public static double getNumber(ModuleSetting setting) {
@@ -523,7 +523,7 @@ public final class ModConfig {
     private static Set<String> excludedModEntities(ModuleId module) {
         if (module == ModuleId.MELEE_AURA) return meleeExcludedModEntities;
         if (module == ModuleId.BLINK_STRIKE) return blinkExcludedModEntities;
-        throw new IllegalArgumentException("Module has no entity targets: " + module);
+        throw new IllegalArgumentException(module.displayName() + "没有实体目标列表。");
     }
 
     private static void saveInt(String category, String key, int value) {

@@ -26,7 +26,7 @@ public final class QazrCommand extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/qazr [status|toggle <module>|range <meleeAura|blinkStrike> [blocks]|give <id> [count] [meta]|potion <effect> <level> <seconds> [splash]]";
+        return "/qazr [status(状态)|reload(重载)|toggle <功能>|range <自动近战|闪现攻击> [距离]|give <物品ID> [数量] [数据值]|potion <效果ID> <等级> <秒数> [喷溅]]";
     }
 
     @Override
@@ -62,7 +62,7 @@ public final class QazrCommand extends CommandBase {
                 double min = id == ModuleId.MELEE_AURA ? 1.0 : 3.0;
                 double max = id == ModuleId.MELEE_AURA ? 6.0 : 200.0;
                 if (id != ModuleId.MELEE_AURA && id != ModuleId.BLINK_STRIKE) {
-                    throw new IllegalArgumentException("Module has no attack range: " + id.key());
+                    throw new IllegalArgumentException(id.displayName() + "没有可调整的攻击距离。");
                 }
                 double value = args.length == 2 ? ModConfig.getRange(id) : parseDouble(args[2], min, max);
                 if (args.length == 3) ModConfig.saveRange(id, value);

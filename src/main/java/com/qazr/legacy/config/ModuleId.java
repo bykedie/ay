@@ -38,6 +38,6 @@ public enum ModuleId {
         for (ModuleId id : values()) {
             if (id.name().equals(normalized) || id.key.toUpperCase().equals(normalized)) return id;
         }
-        throw new IllegalArgumentException("Unknown module: " + raw);
+        throw new IllegalArgumentException("未知功能：" + raw);
     }
 }

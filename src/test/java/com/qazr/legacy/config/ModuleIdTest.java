@@ -15,6 +15,17 @@ public class ModuleIdTest {
     }
 
     @Test
+    public void unknownModuleErrorsAreChinese() {
+        try {
+            ModuleId.parse("missing");
+        } catch (IllegalArgumentException ex) {
+            assertEquals("未知功能：missing", ex.getMessage());
+            return;
+        }
+        throw new AssertionError("Expected an unknown module error");
+    }
+
+    @Test
     public void exposesStableTranslationKeysWithoutChangingConfigKeys() {
         assertEquals("meleeAura", ModuleId.MELEE_AURA.key());
         assertEquals("module.qazr.meleeAura", ModuleId.MELEE_AURA.translationKey());
