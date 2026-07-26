@@ -200,41 +200,41 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void unreachableCandidateBatchesAdvanceBeforeWrapping() {
-        assertEquals(6, AutoMiner.nextPathCandidateOffset(0, 6, 6, false));
-        assertEquals(12, AutoMiner.nextPathCandidateOffset(6, 6, 6, false));
-        assertEquals(0, AutoMiner.nextPathCandidateOffset(12, 3, 6, false));
-        assertEquals(0, AutoMiner.nextPathCandidateOffset(6, 2, 6, true));
-    }
-
-    @Test
     public void pathPlanningSpreadsUnreachableCandidatesAcrossTicks() {
-        assertEquals(1, AutoMiner.pathTargetsPerTick());
         assertEquals(128, AutoMiner.pathSearchSliceBudget(0));
         assertEquals(128, AutoMiner.pathSearchSliceBudget(256));
         assertEquals(64, AutoMiner.pathSearchSliceBudget(1536));
         assertEquals(0, AutoMiner.pathSearchSliceBudget(1600));
-        assertEquals(1, AutoMiner.nextPathCandidateOffset(0, 1, 1, false));
         assertEquals(0, AutoMiner.pathSearchRetryDelay(0, true));
         assertEquals(1, AutoMiner.pathSearchRetryDelay(1, false));
         assertEquals(20, AutoMiner.pathSearchRetryDelay(0, false));
     }
 
     @Test
-    public void initialRouteSelectionComparesANearbyCandidateBatchAcrossTicks() {
-        assertFalse(AutoMiner.shouldFinalizePathCandidateBatch(1, 4, true));
-        assertFalse(AutoMiner.shouldFinalizePathCandidateBatch(3, 4, true));
-        assertTrue(AutoMiner.shouldFinalizePathCandidateBatch(4, 4, true));
-        assertTrue(AutoMiner.shouldFinalizePathCandidateBatch(2, 4, false));
+    public void pathCandidateSnapshotDoesNotReorderWhilePlanning() {
+        OreVisualizer.CachedOre front = new OreVisualizer.CachedOre(
+            new BlockPos(5, 20, 0), OreType.IRON, 25.0);
+        OreVisualizer.CachedOre behind = new OreVisualizer.CachedOre(
+            new BlockPos(-2, 19, 0), OreType.IRON, 36.0);
+        List<OreVisualizer.CachedOre> live = new java.util.ArrayList<>(Arrays.asList(front, behind));
+        List<OreVisualizer.CachedOre> snapshot = AutoMiner.snapshotPathCandidates(live, 96);
+
+        java.util.Collections.reverse(live);
+
+        assertEquals(front.pos(), snapshot.get(0).pos());
+        assertEquals(behind.pos(), snapshot.get(1).pos());
+        assertEquals(2, snapshot.size());
     }
 
     @Test
-    public void newlyDiscoveredNearestOreRestartsTheCandidateBatch() {
-        BlockPos originalNearest = new BlockPos(5, 20, 0);
-        assertFalse(AutoMiner.candidateBatchChanged(1, originalNearest, originalNearest));
-        assertTrue(AutoMiner.candidateBatchChanged(1, originalNearest, new BlockPos(2, 20, 0)));
-        assertTrue(AutoMiner.candidateBatchChanged(1, null, originalNearest));
-        assertFalse(AutoMiner.candidateBatchChanged(0, originalNearest, new BlockPos(2, 20, 0)));
+    public void pathCandidateSnapshotHonorsItsWorkLimit() {
+        List<OreVisualizer.CachedOre> candidates = Arrays.asList(
+            new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0),
+            new OreVisualizer.CachedOre(new BlockPos(2, 20, 0), OreType.IRON, 4.0),
+            new OreVisualizer.CachedOre(new BlockPos(3, 20, 0), OreType.IRON, 9.0));
+
+        assertEquals(2, AutoMiner.snapshotPathCandidates(candidates, 2).size());
+        assertTrue(AutoMiner.snapshotPathCandidates(candidates, 0).isEmpty());
     }
 
     @Test
@@ -263,18 +263,20 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void nearbyOrePreemptsAnExistingDetourWithoutTargetThrashing() {
-        assertTrue(AutoMiner.closerTargetWarrantsPreemption(4.0, 36.0));
-        assertTrue(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
-        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 12.25));
-        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 9.0));
+    public void pathPlanningStopsResidualHorizontalDrift() {
+        assertEquals(0.04, AutoMiner.planningMotion(0.20), 0.0001);
+        assertEquals(-0.04, AutoMiner.planningMotion(-0.20), 0.0001);
+        assertEquals(0.0, AutoMiner.planningMotion(0.02), 0.0001);
     }
 
     @Test
-    public void routeTargetLocksAfterTheFirstNodeIsReached() {
-        assertTrue(AutoMiner.routeTargetMayBePreempted(0));
-        assertFalse(AutoMiner.routeTargetMayBePreempted(1));
-        assertFalse(AutoMiner.routeTargetMayBePreempted(8));
+    public void routeOwnsItsTargetFromTheFirstNodeUntilArrival() {
+        BlockPos ore = new BlockPos(5, 20, 0);
+
+        assertTrue(AutoMiner.routeOwnsTarget(ore, 0, 4));
+        assertTrue(AutoMiner.routeOwnsTarget(ore, 3, 4));
+        assertFalse(AutoMiner.routeOwnsTarget(ore, 4, 4));
+        assertFalse(AutoMiner.routeOwnsTarget(null, 0, 4));
     }
 
     @Test
