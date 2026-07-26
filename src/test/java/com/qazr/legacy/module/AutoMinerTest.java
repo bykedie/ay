@@ -130,4 +130,11 @@ public class AutoMinerTest {
         assertEquals(-0.18, AutoMiner.routeMotion(-0.40, -1.0), 0.0001);
         assertEquals(0.10, AutoMiner.routeMotion(0.20, 0.0), 0.0001);
     }
+
+    @Test
+    public void nearbyOrePreemptsOnlyWhenMeaningfullyCloser() {
+        assertTrue(AutoMiner.closerTargetWarrantsPreemption(4.0, 36.0));
+        assertFalse(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
+        assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 25.0));
+    }
 }

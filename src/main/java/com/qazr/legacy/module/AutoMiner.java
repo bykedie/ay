@@ -40,6 +40,9 @@ public final class AutoMiner {
     private static final int PATH_RETRY_TICKS = 20;
     private static final int FAILED_ROUTE_RETRY_TICKS = 100;
     private static final double ROUTE_SPEED = 0.18;
+    private static final int NEARBY_ROUTE_CHECK_TICKS = 5;
+    private static final double NEARBY_ROUTE_RANGE = 6.0;
+    private static final int MAX_NEARBY_PATH_TARGETS = 2;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -61,6 +64,7 @@ public final class AutoMiner {
     private int pathCandidateOffset;
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
+    private int nearbyRouteCheckDelay;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -74,6 +78,7 @@ public final class AutoMiner {
         pathCandidateOffset = 0;
         failedRouteOre = null;
         failedRouteRetryDelay = 0;
+        nearbyRouteCheckDelay = 0;
         clearPath();
     }
 
@@ -97,6 +102,18 @@ public final class AutoMiner {
         if (continueClearingObstacle()) return;
         if (continueMiningTarget()) return;
         if (hasActiveRoute()) {
+            if (nearbyRouteCheckDelay-- <= 0) {
+                nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
+                List<OreVisualizer.CachedOre> nearby = oreVisualizer.cachedMineOres(
+                    NEARBY_ROUTE_RANGE, MAX_CACHED_TARGETS);
+                MineTarget visible = findNearestReachable(nearby);
+                if (visible != null && !visible.pos.equals(currentOre)) {
+                    mine(visible);
+                    return;
+                }
+                PathTarget closer = findNearbyPathTarget(nearby);
+                if (closer != null) activatePathTarget(closer);
+            }
             followPathToOre();
             return;
         }
@@ -165,6 +182,7 @@ public final class AutoMiner {
             pathCandidateOffset = 0;
             failedRouteOre = null;
             failedRouteRetryDelay = 0;
+            nearbyRouteCheckDelay = 0;
             minedCounts.clear();
             lastMinedOre = null;
             lastMinedType = null;
@@ -278,10 +296,7 @@ public final class AutoMiner {
                 return;
             }
             pathRetryDelay = 0;
-            currentOre = target.ore;
-            currentOreType = target.type;
-            path = target.path;
-            pathIndex = 0;
+            activatePathTarget(target);
             if (path.isEmpty()) {
                 delay = 3;
                 return;
@@ -368,6 +383,32 @@ public final class AutoMiner {
         pathCandidateOffset = nextPathCandidateOffset(pathCandidateOffset, attempts,
             MAX_PATH_TARGETS, best != null);
         return best;
+    }
+
+    private PathTarget findNearbyPathTarget(List<OreVisualizer.CachedOre> candidates) {
+        if (currentOre == null) return null;
+        double currentDistanceSq = mc.player.getDistanceSqToCenter(currentOre);
+        int attempts = 0;
+        for (OreVisualizer.CachedOre candidate : candidates) {
+            if (candidate.pos().equals(currentOre) || quotaReached(candidate.type())) continue;
+            if (!closerTargetWarrantsPreemption(candidate.distanceSq(), currentDistanceSq)) break;
+            if (temporarilyBlocked(candidate.pos(), failedRouteOre, failedRouteRetryDelay)) continue;
+            OreType currentType = targetType(candidate.pos());
+            if (currentType != candidate.type()) {
+                oreVisualizer.removeMarker(candidate.pos());
+                continue;
+            }
+            PathRoute route = pathToOre(candidate.pos());
+            attempts++;
+            if (route != null) return new PathTarget(candidate.pos(), candidate.type(), route.points);
+            if (attempts >= MAX_NEARBY_PATH_TARGETS) break;
+        }
+        return null;
+    }
+
+    static boolean closerTargetWarrantsPreemption(double nearbyDistanceSq, double currentDistanceSq) {
+        return Math.sqrt(Math.max(0.0, nearbyDistanceSq)) + 2.0
+            < Math.sqrt(Math.max(0.0, currentDistanceSq));
     }
 
     static int nextPathCandidateOffset(int currentOffset, int attempts, int batchSize, boolean found) {
@@ -620,6 +661,14 @@ public final class AutoMiner {
         pathRetryDelay = 0;
         pathCandidateOffset = 0;
         delay = 2;
+    }
+
+    private void activatePathTarget(PathTarget target) {
+        currentOre = target.ore;
+        currentOreType = target.type;
+        path = target.path;
+        pathIndex = 0;
+        nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
     }
 
     private void updateFailedRouteCooldown() {
