@@ -827,10 +827,17 @@ public final class AutoMiner {
 
     private void drawRoute(BufferBuilder buffer, double viewerX, double viewerY, double viewerZ) {
         BlockPos playerCell = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
-        double lastX = playerCell.getX() + 0.5 - viewerX;
-        double lastY = playerCell.getY() + 0.5 - viewerY;
-        double lastZ = playerCell.getZ() + 0.5 - viewerZ;
-        for (BlockPos point : plannedRoutePoints()) {
+        List<BlockPos> rawPoints = new ArrayList<>();
+        rawPoints.add(playerCell);
+        rawPoints.addAll(plannedRoutePoints());
+        List<BlockPos> routePoints = orthogonalRoutePoints(rawPoints);
+        if (routePoints.isEmpty()) return;
+        BlockPos first = routePoints.get(0);
+        double lastX = first.getX() + 0.5 - viewerX;
+        double lastY = first.getY() + 0.5 - viewerY;
+        double lastZ = first.getZ() + 0.5 - viewerZ;
+        for (int i = 1; i < routePoints.size(); i++) {
+            BlockPos point = routePoints.get(i);
             double x = point.getX() + 0.5 - viewerX;
             double y = point.getY() + 0.5 - viewerY;
             double z = point.getZ() + 0.5 - viewerZ;
@@ -839,6 +846,37 @@ public final class AutoMiner {
             lastY = y;
             lastZ = z;
         }
+    }
+
+    static List<BlockPos> orthogonalRoutePoints(List<BlockPos> points) {
+        if (points == null || points.isEmpty()) return java.util.Collections.emptyList();
+        List<BlockPos> result = new ArrayList<>();
+        BlockPos previous = null;
+        for (BlockPos point : points) {
+            if (point == null) continue;
+            if (previous == null) {
+                result.add(point);
+                previous = point;
+                continue;
+            }
+            int x = previous.getX();
+            int y = previous.getY();
+            int z = previous.getZ();
+            while (x != point.getX()) {
+                x += Integer.signum(point.getX() - x);
+                result.add(new BlockPos(x, y, z));
+            }
+            while (z != point.getZ()) {
+                z += Integer.signum(point.getZ() - z);
+                result.add(new BlockPos(x, y, z));
+            }
+            while (y != point.getY()) {
+                y += Integer.signum(point.getY() - y);
+                result.add(new BlockPos(x, y, z));
+            }
+            previous = point;
+        }
+        return result;
     }
 
     private List<BlockPos> plannedRoutePoints() {

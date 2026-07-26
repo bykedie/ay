@@ -150,4 +150,15 @@ public class AutoMinerTest {
     public void directMiningChecksStayBoundedInDenseVeins() {
         assertEquals(16, AutoMiner.visibleTargetInspectionLimit());
     }
+
+    @Test
+    public void renderedRouteSplitsDiagonalJumpNodesIntoOrthogonalCenters() {
+        List<BlockPos> route = AutoMiner.orthogonalRoutePoints(Arrays.asList(
+            new BlockPos(0, 64, 0), new BlockPos(1, 65, 0), new BlockPos(1, 65, 2)));
+
+        assertEquals(Arrays.asList(
+            new BlockPos(0, 64, 0), new BlockPos(1, 64, 0),
+            new BlockPos(1, 65, 0), new BlockPos(1, 65, 1),
+            new BlockPos(1, 65, 2)), route);
+    }
 }
