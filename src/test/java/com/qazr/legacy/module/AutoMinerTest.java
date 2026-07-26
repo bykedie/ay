@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.junit.Test;
@@ -33,11 +34,33 @@ public class AutoMinerTest {
 
     @Test
     public void verticalPathNodesRequireThePlayersFeetToEnterTheCell() {
-        assertFalse(AutoMiner.reachedPathNode(0.0, -1.0));
-        assertTrue(AutoMiner.reachedPathNode(0.0, -0.20));
-        assertTrue(AutoMiner.reachedPathNode(0.0, 0.0));
-        assertTrue(AutoMiner.reachedPathNode(0.0, 0.04));
-        assertFalse(AutoMiner.reachedPathNode(0.0, 0.20));
+        BlockPos expected = new BlockPos(1, 64, 0);
+
+        assertFalse(AutoMiner.reachedPathNode(new BlockPos(0, 64, 0), expected, 0.01, 0.0));
+        assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.0, -1.0));
+        assertTrue(AutoMiner.reachedPathNode(expected, expected, 0.0, -0.20));
+        assertTrue(AutoMiner.reachedPathNode(expected, expected, 0.0, 0.0));
+        assertTrue(AutoMiner.reachedPathNode(expected, expected, 0.0, 0.04));
+        assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.05, 0.0));
+        assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.0, 0.20));
+    }
+
+    @Test
+    public void playerFeetCellToleratesTinyVerticalRoundingErrors() {
+        assertEquals(new BlockPos(3, 64, -3), AutoMiner.playerFeetCell(3.9, 63.999, -2.1));
+        assertEquals(new BlockPos(4, 65, -2), AutoMiner.playerFeetCell(4.0, 65.0, -2.0));
+    }
+
+    @Test
+    public void routeTransitionRejectsAPlayerOutsideTheCurrentPathStep() {
+        BlockPos from = new BlockPos(0, 64, 0);
+        BlockPos next = new BlockPos(1, 65, 0);
+
+        assertTrue(AutoMiner.routeTransitionContains(from, from, next));
+        assertTrue(AutoMiner.routeTransitionContains(new BlockPos(1, 64, 0), from, next));
+        assertTrue(AutoMiner.routeTransitionContains(next, from, next));
+        assertFalse(AutoMiner.routeTransitionContains(new BlockPos(0, 63, 0), from, next));
+        assertFalse(AutoMiner.routeTransitionContains(new BlockPos(1, 65, 1), from, next));
     }
 
     @Test
@@ -256,10 +279,23 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void routeMotionIsDampedAndLimitedEveryTick() {
-        assertEquals(0.18, AutoMiner.routeMotion(0.40, 1.0), 0.0001);
-        assertEquals(-0.18, AutoMiner.routeMotion(-0.40, -1.0), 0.0001);
-        assertEquals(0.10, AutoMiner.routeMotion(0.20, 0.0), 0.0001);
+    public void routeMotionFacesOnlyTheCurrentNodeAndSlowsBeforeItsCenter() {
+        assertEquals(0.18, AutoMiner.routeMotionTowardNode(1.0, 1.0), 0.0001);
+        assertEquals(-0.18, AutoMiner.routeMotionTowardNode(-1.0, 1.0), 0.0001);
+        assertEquals(0.04, AutoMiner.routeMotionTowardNode(1.0, 0.04), 0.0001);
+        assertEquals(0.0, AutoMiner.routeMotionTowardNode(0.0, 1.0), 0.0001);
+    }
+
+    @Test
+    public void routeCollisionCellsCoverThePlayersHeadAndBothSidesAtABoundary() {
+        AxisAlignedBB current = new AxisAlignedBB(0.85, 64.0, 0.2, 1.45, 65.8, 0.8);
+        AxisAlignedBB swept = AutoMiner.routeStepBounds(current, 0.18, 0.0);
+        List<BlockPos> cells = AutoMiner.routeOccupiedCells(swept);
+
+        assertEquals(Arrays.asList(new BlockPos(0, 65, 0), new BlockPos(1, 65, 0),
+            new BlockPos(0, 64, 0), new BlockPos(1, 64, 0)), cells);
+        assertEquals(0.85, swept.minX, 0.0);
+        assertEquals(1.63, swept.maxX, 0.0);
     }
 
     @Test

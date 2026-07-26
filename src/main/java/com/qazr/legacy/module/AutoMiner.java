@@ -46,6 +46,7 @@ public final class AutoMiner {
     private static final int MAX_VISIBLE_TARGETS = 16;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
+    private static final double ROUTE_NODE_REACH_DISTANCE_SQ = 0.04;
     private static final int ROUTE_RENDER_LIMIT = 220;
     private static final int[] PATH_VERTICAL_OFFSETS = {0, 1, -1};
 
@@ -106,7 +107,8 @@ public final class AutoMiner {
             observedEnabled = true;
         }
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
-        miningPlayerFeet = new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        miningPlayerFeet = playerFeetCell(mc.player.posX,
+            mc.player.getEntityBoundingBox().minY, mc.player.posZ);
         miningEyes = mc.player.getPositionEyes(1.0F);
         miningReachDistance = mc.playerController.getBlockReachDistance();
         updateFailedRouteCooldown();
@@ -352,11 +354,20 @@ public final class AutoMiner {
             }
         }
         BlockPos next = path.get(pathIndex);
+        BlockPos actualFeet = playerFeetCell(mc.player.posX,
+            mc.player.getEntityBoundingBox().minY, mc.player.posZ);
         BlockPos from = pathIndex == 0
-            ? standPos(new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ))
+            ? standPos(actualFeet)
             : path.get(pathIndex - 1);
-        if (next.getY() > from.getY() && !isPassable(from.up(2))) {
-            if (!clearCorridorCell(from.up(2), from.up(2))) {
+        if (!routeTransitionContains(actualFeet, from, next)) {
+            stopRouteMotion();
+            abandonCurrentRoute();
+            return;
+        }
+        BlockPos jumpStart = actualFeet.equals(next) ? from : actualFeet;
+        if (next.getY() > jumpStart.getY() && !isPassable(jumpStart.up(2))) {
+            stopRouteMotion();
+            if (!clearCorridorCell(jumpStart.up(2), jumpStart.up(2))) {
                 abandonCurrentRoute();
                 return;
             }
@@ -379,9 +390,14 @@ public final class AutoMiner {
             return;
         }
         double verticalDistance = next.getY() - mc.player.getEntityBoundingBox().minY;
-        if (reachedPathNode(distanceSq, verticalDistance)) {
+        if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance)) {
             pathIndex++;
             resetRouteProgress();
+            if (pathIndex < path.size()) {
+                followPathToOre(candidates);
+            } else {
+                stopRouteMotion();
+            }
             return;
         }
         double nodeDistanceSq = routeNodeDistanceSq(distanceSq, verticalDistance);
@@ -394,8 +410,15 @@ public final class AutoMiner {
         }
         if (distanceSq > 0.0001) {
             double length = Math.sqrt(distanceSq);
-            mc.player.motionX = routeMotion(mc.player.motionX, dx / length);
-            mc.player.motionZ = routeMotion(mc.player.motionZ, dz / length);
+            double motionX = routeMotionTowardNode(dx / length, length);
+            double motionZ = routeMotionTowardNode(dz / length, length);
+            if (!routeStepClear(motionX, motionZ)) {
+                stopRouteMotion();
+                if (!clearRouteStepObstacle(motionX, motionZ)) abandonCurrentRoute();
+                return;
+            }
+            mc.player.motionX = motionX;
+            mc.player.motionZ = motionZ;
         }
         if (next.getY() > MathHelper.floor(mc.player.getEntityBoundingBox().minY) && mc.player.onGround) {
             mc.player.jump();
@@ -403,9 +426,9 @@ public final class AutoMiner {
         delay = 0;
     }
 
-    static double routeMotion(double current, double unitDirection) {
-        return MathHelper.clamp(current * 0.5 + unitDirection * ROUTE_SPEED,
-            -ROUTE_SPEED, ROUTE_SPEED);
+    static double routeMotionTowardNode(double unitDirection, double remainingDistance) {
+        double speed = Math.min(ROUTE_SPEED, Math.max(0.0, remainingDistance));
+        return MathHelper.clamp(unitDirection * speed, -ROUTE_SPEED, ROUTE_SPEED);
     }
 
     static double planningMotion(double current) {
@@ -421,9 +444,72 @@ public final class AutoMiner {
         return Math.max(0.0, horizontalDistanceSq) + verticalDistance * verticalDistance;
     }
 
-    static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {
-        return horizontalDistanceSq < 0.20
+    static BlockPos playerFeetCell(double x, double feetY, double z) {
+        return new BlockPos(MathHelper.floor(x), MathHelper.floor(feetY + 0.01), MathHelper.floor(z));
+    }
+
+    static boolean reachedPathNode(BlockPos actualFeet, BlockPos expectedFeet,
+            double horizontalDistanceSq, double verticalDistance) {
+        return actualFeet != null && actualFeet.equals(expectedFeet)
+            && horizontalDistanceSq < ROUTE_NODE_REACH_DISTANCE_SQ
             && verticalDistance <= 0.05 && verticalDistance > -0.35;
+    }
+
+    static boolean routeTransitionContains(BlockPos actualFeet, BlockPos from, BlockPos next) {
+        if (actualFeet == null || from == null || next == null) return false;
+        return actualFeet.getX() >= Math.min(from.getX(), next.getX())
+            && actualFeet.getX() <= Math.max(from.getX(), next.getX())
+            && actualFeet.getY() >= Math.min(from.getY(), next.getY())
+            && actualFeet.getY() <= Math.max(from.getY(), next.getY())
+            && actualFeet.getZ() >= Math.min(from.getZ(), next.getZ())
+            && actualFeet.getZ() <= Math.max(from.getZ(), next.getZ());
+    }
+
+    private void stopRouteMotion() {
+        mc.player.motionX = 0.0;
+        mc.player.motionZ = 0.0;
+    }
+
+    private boolean routeStepClear(double motionX, double motionZ) {
+        AxisAlignedBB box = routeStepBounds(mc.player.getEntityBoundingBox(), motionX, motionZ);
+        AxisAlignedBB playerSpace = new AxisAlignedBB(box.minX + 0.001, box.minY + 0.01,
+            box.minZ + 0.001, box.maxX - 0.001, box.maxY - 0.001, box.maxZ - 0.001);
+        return mc.world.getCollisionBoxes(mc.player, playerSpace).isEmpty();
+    }
+
+    private boolean clearRouteStepObstacle(double motionX, double motionZ) {
+        AxisAlignedBB routeStep = routeStepBounds(mc.player.getEntityBoundingBox(), motionX, motionZ);
+        for (BlockPos cell : routeOccupiedCells(routeStep)) {
+            if (!isPassable(cell) && clearCorridorCell(cell, cell)) {
+                delay = ModConfig.mineDelayTicks;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static AxisAlignedBB routeStepBounds(AxisAlignedBB current, double motionX, double motionZ) {
+        AxisAlignedBB destination = current.offset(motionX, 0.0, motionZ);
+        return new AxisAlignedBB(Math.min(current.minX, destination.minX), current.minY,
+            Math.min(current.minZ, destination.minZ), Math.max(current.maxX, destination.maxX),
+            current.maxY, Math.max(current.maxZ, destination.maxZ));
+    }
+
+    static List<BlockPos> routeOccupiedCells(AxisAlignedBB box) {
+        if (box == null) return java.util.Collections.emptyList();
+        int minX = MathHelper.floor(box.minX + 0.001);
+        int maxX = MathHelper.floor(box.maxX - 0.001);
+        int minY = MathHelper.floor(box.minY + 0.01);
+        int maxY = MathHelper.floor(box.maxY - 0.001);
+        int minZ = MathHelper.floor(box.minZ + 0.001);
+        int maxZ = MathHelper.floor(box.maxZ - 0.001);
+        List<BlockPos> cells = new ArrayList<>();
+        for (int y = maxY; y >= minY; y--) {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) cells.add(new BlockPos(x, y, z));
+            }
+        }
+        return cells;
     }
 
     private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
@@ -507,7 +593,8 @@ public final class AutoMiner {
     }
 
     private PathSearchResult incrementalPathToOre(BlockPos ore) {
-        BlockPos start = standPos(mc.player.getPosition());
+        BlockPos start = standPos(playerFeetCell(mc.player.posX,
+            mc.player.getEntityBoundingBox().minY, mc.player.posZ));
         double maxDistanceSq = ModConfig.minePathRange * ModConfig.minePathRange;
         if (pendingPathSearch == null || !pendingPathSearch.matches(ore, start, maxDistanceSq)) {
             List<BlockPos> goals = standPositionsAround(ore);
