@@ -110,4 +110,11 @@ public class BlinkStrikeTest {
         assertEquals(false, BlinkStrike.shouldRecoverPosition(origin,
             new BlinkPath.Point(16.5, 64.0, 0.0), new BlinkPath.Point(20.5, 64.0, 0.0), destinations));
     }
+
+    @Test
+    public void skipsExpiredStrikePlansInsteadOfCountingThemAsHits() {
+        assertEquals(false, BlinkStrike.strikePlanStillUsable(false, false));
+        assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false));
+        assertEquals(true, BlinkStrike.strikePlanStillUsable(true, true));
+    }
 }

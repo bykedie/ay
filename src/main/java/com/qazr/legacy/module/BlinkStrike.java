@@ -69,8 +69,10 @@ public final class BlinkStrike {
         boolean attacked = false;
         beginRecovery(origin, originOnGround);
         for (PlannedStrike strike : strikes) {
-            recoveryDestinations.add(strike.plan.destination);
-            if (strike(strike.target, origin, strike.plan, originOnGround)) attacked = true;
+            StrikePlan currentPlan = refreshStrikePlan(strike.target, origin, strike.plan);
+            if (currentPlan == null) continue;
+            recoveryDestinations.add(currentPlan.destination);
+            if (strike(strike.target, origin, currentPlan, originOnGround)) attacked = true;
         }
         if (attacked) {
             mc.player.resetCooldown();
@@ -249,6 +251,33 @@ public final class BlinkStrike {
             }
         }
         return null;
+    }
+
+    private StrikePlan refreshStrikePlan(EntityLivingBase target, BlinkPath.Point origin, StrikePlan planned) {
+        if (target == null || target.isDead || target.getHealth() <= 0.0F) return null;
+        if (planStillValid(target, planned)) return planned;
+        return findStrikePlan(target, origin);
+    }
+
+    private boolean planStillValid(EntityLivingBase target, StrikePlan plan) {
+        if (plan == null || plan.destination == null) return false;
+        double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
+        double predictedY = target.getEntityBoundingBox().minY + target.motionY * ModConfig.blinkPredictTicks;
+        double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
+        AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
+            predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
+        Vec3d eyes = new Vec3d(plan.destination.x, plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
+        Vec3d targetPoint = ModConfig.blinkAttackPoint.point(target);
+        Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
+            targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
+            targetPoint.z + predictedZ - target.posZ);
+        return CombatSupport.distanceSqToHitbox(eyes, predictedBox)
+                <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance
+            && hasAttackLine(eyes, attackPoint);
+    }
+
+    static boolean strikePlanStillUsable(boolean targetAlive, boolean lineAndRangeValid) {
+        return targetAlive && lineAndRangeValid;
     }
 
     private boolean hasAttackLine(Vec3d eyes, Vec3d attackPoint) {
