@@ -33,6 +33,14 @@ public class FlightControllerTest {
     }
 
     @Test
+    public void restoresNormalFlightWheneverControlCannotContinue() {
+        assertEquals(false, FlightController.shouldRestoreNormalFlight(true, true));
+        assertEquals(true, FlightController.shouldRestoreNormalFlight(true, false));
+        assertEquals(true, FlightController.shouldRestoreNormalFlight(false, true));
+        assertEquals(true, FlightController.shouldRestoreNormalFlight(false, false));
+    }
+
+    @Test
     public void resolvesVerticalKeysWithoutDrift() {
         assertEquals(0.20, FlightController.verticalMotion(true, false, 0.20), 0.0001);
         assertEquals(-0.20, FlightController.verticalMotion(false, true, 0.20), 0.0001);

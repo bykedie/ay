@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.item.EntityBoat;
-import net.minecraft.network.play.client.CPacketPlayer;
+import net.minecraft.network.play.client.CPacketEntityAction;
 import net.minecraft.network.play.client.CPacketVehicleMove;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -29,10 +29,12 @@ public final class FlightController {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        boolean normalFlight = modules.isEnabled(ModuleId.FLIGHT) && ModConfig.flightElytra && !ModConfig.flightBoat;
-        if (!normalFlight || mc.player == null || mc.world == null) restoreCapabilities();
-        if (!modules.isEnabled(ModuleId.FLIGHT)) return;
-        if (mc.player == null || mc.world == null || mc.player.connection == null || mc.currentScreen != null) return;
+        boolean flightEnabled = modules.isEnabled(ModuleId.FLIGHT);
+        boolean controlReady = mc.player != null && mc.world != null
+            && mc.player.connection != null && mc.currentScreen == null;
+        boolean normalFlight = flightEnabled && ModConfig.flightElytra && !ModConfig.flightBoat;
+        if (shouldRestoreNormalFlight(normalFlight, controlReady)) restoreCapabilities();
+        if (!flightEnabled || !controlReady) return;
         if (ModConfig.flightBoat) boatFlight();
         else if (ModConfig.flightElytra) normalFlight();
     }
@@ -59,7 +61,8 @@ public final class FlightController {
             mc.gameSettings.keyBindSneak.isKeyDown(), ModConfig.flightVerticalSpeed);
         mc.player.motionZ = horizontal[1];
         mc.player.fallDistance = 0.0F;
-        mc.player.connection.sendPacket(new CPacketPlayer(true));
+        mc.player.connection.sendPacket(new CPacketEntityAction(mc.player,
+            CPacketEntityAction.Action.START_FALL_FLYING));
     }
 
     private void boatFlight() {
@@ -120,6 +123,10 @@ public final class FlightController {
 
     static boolean shouldClearBoatForNormalFlight(boolean boatWasControlled, boolean normalFlightEnabled) {
         return boatWasControlled && normalFlightEnabled;
+    }
+
+    static boolean shouldRestoreNormalFlight(boolean normalFlightEnabled, boolean controlReady) {
+        return !normalFlightEnabled || !controlReady;
     }
 
     private double[] requestedMotion() {
