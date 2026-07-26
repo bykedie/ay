@@ -68,6 +68,7 @@ public final class AutoMiner {
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
+    private boolean observedEnabled;
     private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
     private int stalledRouteTicks;
 
@@ -89,7 +90,15 @@ public final class AutoMiner {
 
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.AUTO_MINE)) return;
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!modules.isEnabled(ModuleId.AUTO_MINE)) {
+            observedEnabled = false;
+            return;
+        }
+        if (!observedEnabled) {
+            reloadTargets();
+            observedEnabled = true;
+        }
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
         updateFailedRouteCooldown();
         updateMinedCount();
