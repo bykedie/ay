@@ -172,6 +172,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void initialRouteSelectionComparesANearbyCandidateBatchAcrossTicks() {
+        assertFalse(AutoMiner.shouldFinalizePathCandidateBatch(1, 4, true));
+        assertFalse(AutoMiner.shouldFinalizePathCandidateBatch(3, 4, true));
+        assertTrue(AutoMiner.shouldFinalizePathCandidateBatch(4, 4, true));
+        assertTrue(AutoMiner.shouldFinalizePathCandidateBatch(2, 4, false));
+    }
+
+    @Test
     public void newlyDiscoveredNearestOreRestartsTheCandidateBatch() {
         BlockPos originalNearest = new BlockPos(5, 20, 0);
         assertFalse(AutoMiner.candidateBatchChanged(1, originalNearest, originalNearest));

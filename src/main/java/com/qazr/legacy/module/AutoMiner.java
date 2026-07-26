@@ -38,6 +38,7 @@ import org.lwjgl.opengl.GL11;
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 1600;
     private static final int PATH_TARGETS_PER_TICK = 1;
+    private static final int PATH_CANDIDATE_BATCH_SIZE = 4;
     private static final int MAX_CACHED_TARGETS = 96;
     private static final int PATH_RETRY_TICKS = 20;
     private static final int FAILED_ROUTE_RETRY_TICKS = 100;
@@ -70,6 +71,8 @@ public final class AutoMiner {
     private int nearbyPathCandidateOffset;
     private BlockPos pathCandidateAnchor;
     private BlockPos nearbyPathCandidateAnchor;
+    private PathTarget pendingPathTarget;
+    private int pendingPathTargetScore = Integer.MAX_VALUE;
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
@@ -89,9 +92,7 @@ public final class AutoMiner {
     public void reloadTargets() {
         minedCounts.clear();
         pathRetryDelay = 0;
-        pathCandidateOffset = 0;
         nearbyPathCandidateOffset = 0;
-        pathCandidateAnchor = null;
         nearbyPathCandidateAnchor = null;
         failedRouteOre = null;
         failedRouteRetryDelay = 0;
@@ -220,9 +221,7 @@ public final class AutoMiner {
             delay = 0;
             manualPause = 0;
             pathRetryDelay = 0;
-            pathCandidateOffset = 0;
             nearbyPathCandidateOffset = 0;
-            pathCandidateAnchor = null;
             nearbyPathCandidateAnchor = null;
             failedRouteOre = null;
             failedRouteRetryDelay = 0;
@@ -421,8 +420,7 @@ public final class AutoMiner {
     private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
         int attempts = 0;
         int eligible = 0;
-        PathTarget best = null;
-        int bestScore = Integer.MAX_VALUE;
+        boolean hasMoreCandidates = false;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (quotaReached(candidate.type())) continue;
             if (temporarilyBlocked(candidate.pos(), failedRouteOre, failedRouteRetryDelay)) continue;
@@ -433,26 +431,33 @@ public final class AutoMiner {
             }
             if (eligible == 0) {
                 if (candidateBatchChanged(pathCandidateOffset, pathCandidateAnchor, candidate.pos())) {
-                    pathCandidateOffset = 0;
+                    resetPathCandidateBatch();
                 }
                 pathCandidateAnchor = candidate.pos();
             }
             if (eligible++ < pathCandidateOffset) continue;
+            if (attempts >= pathTargetsPerTick()) {
+                hasMoreCandidates = true;
+                break;
+            }
             PathRoute route = pathToOre(candidate.pos());
             attempts++;
             if (route != null) {
                 int score = pathTargetScore(route.cost, candidate.distanceSq(),
                     sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type()));
-                if (score < bestScore) {
-                    bestScore = score;
-                    best = new PathTarget(candidate.pos(), candidate.type(), route.points);
+                if (score < pendingPathTargetScore) {
+                    pendingPathTargetScore = score;
+                    pendingPathTarget = new PathTarget(candidate.pos(), candidate.type(), route.points);
                 }
             }
-            if (attempts >= pathTargetsPerTick()) break;
         }
-        pathCandidateOffset = nextPathCandidateOffset(pathCandidateOffset, attempts,
-            pathTargetsPerTick(), best != null);
-        if (pathCandidateOffset == 0) pathCandidateAnchor = null;
+        int nextOffset = pathCandidateOffset + attempts;
+        if (!shouldFinalizePathCandidateBatch(nextOffset, PATH_CANDIDATE_BATCH_SIZE, hasMoreCandidates)) {
+            pathCandidateOffset = nextOffset;
+            return null;
+        }
+        PathTarget best = pendingPathTarget;
+        resetPathCandidateBatch();
         return best;
     }
 
@@ -504,6 +509,11 @@ public final class AutoMiner {
 
     static int pathTargetsPerTick() {
         return PATH_TARGETS_PER_TICK;
+    }
+
+    static boolean shouldFinalizePathCandidateBatch(int evaluated, int batchSize,
+            boolean hasMoreCandidates) {
+        return evaluated >= batchSize || !hasMoreCandidates;
     }
 
     static int pathSearchRetryDelay(int nextCandidateOffset) {
@@ -797,15 +807,14 @@ public final class AutoMiner {
         }
         clearPath();
         pathRetryDelay = 0;
-        pathCandidateOffset = 0;
         nearbyPathCandidateOffset = 0;
-        pathCandidateAnchor = null;
         nearbyPathCandidateAnchor = null;
         nearbyRouteCheckDelay = 0;
         delay = 2;
     }
 
     private void activatePathTarget(PathTarget target) {
+        resetPathCandidateBatch();
         currentOre = target.ore;
         currentOreType = target.type;
         path = target.path;
@@ -828,6 +837,7 @@ public final class AutoMiner {
     }
 
     private void clearPath() {
+        resetPathCandidateBatch();
         path = java.util.Collections.emptyList();
         currentOre = null;
         currentOreType = null;
@@ -836,6 +846,13 @@ public final class AutoMiner {
         clearingPos = null;
         pathIndex = 0;
         resetRouteProgress();
+    }
+
+    private void resetPathCandidateBatch() {
+        pathCandidateOffset = 0;
+        pathCandidateAnchor = null;
+        pendingPathTarget = null;
+        pendingPathTargetScore = Integer.MAX_VALUE;
     }
 
     private void selectBestPickaxe(BlockPos pos) {
