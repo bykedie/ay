@@ -103,7 +103,7 @@ public final class OreVisualizer {
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || mc.world == null) return;
         if (!cacheNeeded()) {
-            clearCache();
+            if (hasCacheState()) clearCache();
             return;
         }
         if (!cacheActive) {
@@ -287,6 +287,11 @@ public final class OreVisualizer {
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
         cacheActive = false;
+    }
+
+    private boolean hasCacheState() {
+        return cacheActive || !markersByChunk.isEmpty() || !markerSetsByType.isEmpty()
+            || !scannedChunks.isEmpty() || !scanQueue.isEmpty();
     }
 
     static int[] sectionOrder(int sectionCount, int centerSection) {
