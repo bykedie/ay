@@ -47,6 +47,7 @@ public final class AutoMiner {
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final int ROUTE_RENDER_LIMIT = 220;
+    private static final int[] PATH_VERTICAL_OFFSETS = {0, 1, -1};
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
@@ -483,40 +484,49 @@ public final class AutoMiner {
         queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
         previous.put(start, null);
         costs.put(start, 0);
+        double maxDistanceSq = ModConfig.minePathRange * ModConfig.minePathRange;
         int visited = 0;
-        while (!queue.isEmpty() && visited++ < MAX_PATH_NODES) {
+        while (!queue.isEmpty() && visited < MAX_PATH_NODES) {
             PathNode node = queue.remove();
             BlockPos pos = node.pos;
-            if (node.cost != costs.get(pos)) continue;
+            Integer knownCost = costs.get(pos);
+            if (knownCost == null || node.cost != knownCost) continue;
+            visited++;
             if (goalSet.contains(pos)) return new PathRoute(reconstruct(previous, pos), node.cost);
             for (EnumFacing facing : EnumFacing.HORIZONTALS) {
-                for (int dy : new int[] {0, 1, -1}) {
+                for (int dy : PATH_VERTICAL_OFFSETS) {
                     BlockPos next = standPos(pos.offset(facing).add(0, dy, 0));
-                    addPathNeighbor(queue, previous, costs, start, goals, pos, node.cost, next,
-                        Math.abs(dy) * 2);
+                    addPathNeighbor(queue, previous, costs, start, goals, maxDistanceSq, pos,
+                        node.cost, next, Math.abs(dy) * 2);
                 }
             }
-            addPathNeighbor(queue, previous, costs, start, goals, pos, node.cost, pos.down(), 2);
+            addPathNeighbor(queue, previous, costs, start, goals, maxDistanceSq, pos, node.cost,
+                pos.down(), 2);
         }
         return null;
     }
 
     private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
-            Map<BlockPos, Integer> costs, BlockPos start, List<BlockPos> goals, BlockPos from,
-            int currentCost, BlockPos next, int verticalPenalty) {
+            Map<BlockPos, Integer> costs, BlockPos start, List<BlockPos> goals, double maxDistanceSq,
+            BlockPos from, int currentCost, BlockPos next, int verticalPenalty) {
+        if (start.distanceSq(next) > maxDistanceSq) return;
+        Integer known = costs.get(next);
+        if (knownPathCostCannotImprove(known, currentCost, verticalPenalty)) return;
         int stepCost = traversalCost(next);
         if (stepCost < 0) return;
         int jumpExcavation = next.getY() > from.getY()
             ? jumpClearanceCost(isPassable(from.up(2)), canClearForCorridor(from.up(2)))
             : 0;
         if (jumpExcavation < 0) return;
-        if (start.distanceSq(next) > ModConfig.minePathRange * ModConfig.minePathRange) return;
         int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
-        Integer known = costs.get(next);
         if (known != null && known <= nextCost) return;
         previous.put(next, from);
         costs.put(next, nextCost);
         queue.add(new PathNode(next, nextCost, pathPriority(nextCost, next, goals)));
+    }
+
+    static boolean knownPathCostCannotImprove(Integer knownCost, int currentCost, int verticalPenalty) {
+        return knownCost != null && knownCost <= currentCost + 1 + verticalPenalty;
     }
 
     static int pathPriority(int cost, BlockPos pos, List<BlockPos> goals) {

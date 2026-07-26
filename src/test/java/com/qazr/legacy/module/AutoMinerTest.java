@@ -42,6 +42,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void knownCheaperNeighborSkipsWorldTraversalChecks() {
+        assertTrue(AutoMiner.knownPathCostCannotImprove(5, 4, 0));
+        assertTrue(AutoMiner.knownPathCostCannotImprove(7, 4, 2));
+        assertFalse(AutoMiner.knownPathCostCannotImprove(6, 4, 0));
+        assertFalse(AutoMiner.knownPathCostCannotImprove(null, 4, 0));
+    }
+
+    @Test
     public void corridorCellsKeepHeadAndFeetObstaclesInRouteOrder() {
         List<BlockPos> cells = AutoMiner.corridorCells(Arrays.asList(
             new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), 0, 10);
