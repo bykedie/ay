@@ -96,6 +96,18 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void predictsHorizontalMotionWithoutOvershootingFloatingTargetsVertically() {
+        BlinkPath.Point predicted = BlinkStrike.predictedTargetPosition(10.0, 61.0, 4.0,
+            0.25, -0.5, 3);
+
+        assertEquals(10.75, predicted.x, 0.0);
+        assertEquals(61.0, predicted.y, 0.0);
+        assertEquals(2.5, predicted.z, 0.0);
+        assertEquals(61.0, BlinkStrike.predictedTargetPosition(10.0, 61.0, 4.0,
+            0.25, -0.5, -2).y, 0.0);
+    }
+
+    @Test
     public void boundsExpensivePathPlanningPerTick() {
         assertEquals(4, BlinkStrike.planningBudget(1));
         assertEquals(6, BlinkStrike.planningBudget(3));

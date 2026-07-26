@@ -276,9 +276,12 @@ public final class BlinkStrike {
     }
 
     private StrikePlan findStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
-        double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
-        double predictedY = target.getEntityBoundingBox().minY + target.motionY * ModConfig.blinkPredictTicks;
-        double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
+        BlinkPath.Point predicted = predictedTargetPosition(target.posX,
+            target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
+            ModConfig.blinkPredictTicks);
+        double predictedX = predicted.x;
+        double predictedY = predicted.y;
+        double predictedZ = predicted.z;
         AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
             predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
         Vec3d targetPoint = ModConfig.blinkAttackPoint.point(target);
@@ -317,9 +320,12 @@ public final class BlinkStrike {
 
     private boolean planStillValid(EntityLivingBase target, StrikePlan plan) {
         if (plan == null || plan.destination == null) return false;
-        double predictedX = target.posX + target.motionX * ModConfig.blinkPredictTicks;
-        double predictedY = target.getEntityBoundingBox().minY + target.motionY * ModConfig.blinkPredictTicks;
-        double predictedZ = target.posZ + target.motionZ * ModConfig.blinkPredictTicks;
+        BlinkPath.Point predicted = predictedTargetPosition(target.posX,
+            target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
+            ModConfig.blinkPredictTicks);
+        double predictedX = predicted.x;
+        double predictedY = predicted.y;
+        double predictedZ = predicted.z;
         AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
             predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
         Vec3d eyes = new Vec3d(plan.destination.x, plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
@@ -338,6 +344,12 @@ public final class BlinkStrike {
     static boolean strikePlanStillUsable(boolean targetAlive, boolean lineAndRangeValid,
             boolean routeClear) {
         return targetAlive && lineAndRangeValid && routeClear;
+    }
+
+    static BlinkPath.Point predictedTargetPosition(double x, double minY, double z,
+            double motionX, double motionZ, int predictTicks) {
+        int ticks = Math.max(0, predictTicks);
+        return new BlinkPath.Point(x + motionX * ticks, minY, z + motionZ * ticks);
     }
 
     private boolean hasAttackLine(Vec3d eyes, Vec3d attackPoint) {
