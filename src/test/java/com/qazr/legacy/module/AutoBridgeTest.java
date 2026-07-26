@@ -23,6 +23,43 @@ public class AutoBridgeTest {
     }
 
     @Test
+    public void backsOffRepeatedPlacementRetriesWithoutLongGaps() {
+        assertEquals(1, AutoBridge.placementRetryDelay(1));
+        assertEquals(2, AutoBridge.placementRetryDelay(2));
+        assertEquals(4, AutoBridge.placementRetryDelay(3));
+        assertEquals(4, AutoBridge.placementRetryDelay(4));
+        assertEquals(4, AutoBridge.placementRetryDelay(8));
+        assertEquals(false, AutoBridge.placementRetryDue(19, 20));
+        assertEquals(true, AutoBridge.placementRetryDue(20, 20));
+        assertEquals(true, AutoBridge.placementRetryDue(21, 20));
+    }
+
+    @Test
+    public void keepsMissingPlacementsAndRecentConfirmations() {
+        assertEquals(80, AutoBridge.placementConfirmationExpiry(20));
+        assertEquals(true, AutoBridge.retainPendingPlacement(true, 80, 60));
+        assertEquals(true, AutoBridge.retainPendingPlacement(false, 20, 60));
+        assertEquals(false, AutoBridge.retainPendingPlacement(false, 61, 60));
+        assertEquals(false, AutoBridge.playerTickResetNeeded(-1, 0));
+        assertEquals(false, AutoBridge.playerTickResetNeeded(20, 21));
+        assertEquals(true, AutoBridge.playerTickResetNeeded(20, 0));
+    }
+
+    @Test
+    public void retriesOnlyGapsThatRemainWithinRepairDistance() {
+        assertEquals(true, AutoBridge.repairablePendingPlacement(24.9, 5.0));
+        assertEquals(true, AutoBridge.repairablePendingPlacement(25.0, 5.0));
+        assertEquals(false, AutoBridge.repairablePendingPlacement(25.1, 5.0));
+    }
+
+    @Test
+    public void rejectsFallingBlocksAsPermanentBridgeSupports() {
+        assertEquals(true, AutoBridge.stableBridgeBlock(true, false));
+        assertEquals(false, AutoBridge.stableBridgeBlock(true, true));
+        assertEquals(false, AutoBridge.stableBridgeBlock(false, false));
+    }
+
+    @Test
     public void prioritizesFeetWhileFallingAndLookaheadWhileWalking() {
         assertEquals(0.0, AutoBridge.candidateLookaheads(1.2, true)[0], 0.0);
         assertEquals(1.2, AutoBridge.candidateLookaheads(1.2, false)[2], 0.0);

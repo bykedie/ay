@@ -2,9 +2,13 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockFalling;
 import net.minecraft.client.Minecraft;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.item.ItemBlock;
@@ -21,11 +25,15 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class AutoBridge {
+    private static final int PENDING_CONFIRM_TICKS = 60;
+    private static final int MAX_PENDING_PLACEMENTS = 64;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
+    private final Deque<PendingPlacement> pendingPlacements = new ArrayDeque<>();
     private int delay;
+    private int lastPlayerTick = -1;
     private double lastMotionY;
-    private BlockPos lastPlaced;
+    private boolean observedEnabled;
 
     public AutoBridge(ModuleManager modules) {
         this.modules = modules;
@@ -33,32 +41,65 @@ public final class AutoBridge {
 
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.AUTO_BRIDGE)) return;
+        if (event.phase != TickEvent.Phase.END) return;
+        if (!modules.isEnabled(ModuleId.AUTO_BRIDGE)) {
+            if (observedEnabled) resetState();
+            observedEnabled = false;
+            return;
+        }
+        if (!observedEnabled) {
+            resetState();
+            observedEnabled = true;
+        }
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
+        int tick = mc.player.ticksExisted;
+        if (playerTickResetNeeded(lastPlayerTick, tick)) resetState();
+        lastPlayerTick = tick;
         double motionY = mc.player.motionY;
         boolean atApex = isJumpApex(lastMotionY, motionY, mc.player.onGround);
         lastMotionY = motionY;
-        if (mc.player.capabilities.isFlying) return;
-        BlockPos placePos = supportPosition(atApex);
+        if (mc.player.capabilities.isFlying) {
+            resetState();
+            return;
+        }
+        prunePendingPlacements(tick);
+        PendingPlacement oldestPending = oldestMissingPlacement();
+        BlockPos placePos;
+        if (oldestPending != null && placementRetryDue(tick, oldestPending.nextRetryTick)) {
+            placePos = oldestPending.pos;
+        } else {
+            placePos = supportPosition(atApex);
+        }
         if (placePos == null) {
             if (delay > 0) delay--;
             return;
         }
-        boolean retryUnconfirmed = placePos.equals(lastPlaced) && isReplaceable(lastPlaced);
+        PendingPlacement pending = findPendingPlacement(placePos);
+        boolean retryUnconfirmed = pending != null;
+        if (retryUnconfirmed && ModConfig.bridgeAvoidFeet && collidesWithBody(placePos)) {
+            schedulePlacementRetry(pending, tick);
+            return;
+        }
         if (shouldWaitForPlacementDelay(delay, atApex, retryUnconfirmed)) {
             delay--;
             return;
         }
         Placement placement = placementFor(placePos);
-        if (placement == null) return;
+        if (placement == null || !withinPlacementReach(placement)) {
+            if (retryUnconfirmed) schedulePlacementRetry(pending, tick);
+            return;
+        }
         int slot = findHotbarBlock(placePos);
         boolean swapped = false;
         int original = mc.player.inventory.currentItem;
         int inventorySlot = -1;
         if (slot < 0) {
             slot = findInventoryBlock(placePos);
-            if (slot < 0) return;
+            if (slot < 0) {
+                if (retryUnconfirmed) schedulePlacementRetry(pending, tick);
+                return;
+            }
             inventorySlot = slot;
             mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot, original,
                 ClickType.SWAP, mc.player);
@@ -83,8 +124,8 @@ public final class AutoBridge {
                     ClickType.SWAP, mc.player);
             }
         }
+        if (placed || retryUnconfirmed) recordPlacementAttempt(placePos, tick);
         if (placed) {
-            lastPlaced = placePos;
             delay = ModConfig.bridgeDelayTicks;
         } else {
             delay = 0;
@@ -94,10 +135,60 @@ public final class AutoBridge {
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
         if (event.getWorld().isRemote) {
-            delay = 0;
-            lastMotionY = 0.0;
-            lastPlaced = null;
+            resetState();
+            observedEnabled = false;
         }
+    }
+
+    private void resetState() {
+        delay = 0;
+        lastPlayerTick = -1;
+        lastMotionY = 0.0;
+        pendingPlacements.clear();
+    }
+
+    private void prunePendingPlacements(int tick) {
+        Iterator<PendingPlacement> iterator = pendingPlacements.iterator();
+        while (iterator.hasNext()) {
+            PendingPlacement pending = iterator.next();
+            if (!retainPendingPlacement(isReplaceable(pending.pos), tick, pending.expiresAt)) iterator.remove();
+        }
+    }
+
+    private PendingPlacement oldestMissingPlacement() {
+        Iterator<PendingPlacement> iterator = pendingPlacements.iterator();
+        while (iterator.hasNext()) {
+            PendingPlacement pending = iterator.next();
+            if (!isReplaceable(pending.pos)) continue;
+            double reach = mc.playerController.getBlockReachDistance() + 1.5;
+            if (repairablePendingPlacement(mc.player.getDistanceSqToCenter(pending.pos), reach)) return pending;
+            iterator.remove();
+        }
+        return null;
+    }
+
+    private void recordPlacementAttempt(BlockPos pos, int tick) {
+        PendingPlacement pending = findPendingPlacement(pos);
+        if (pending == null) {
+            if (pendingPlacements.size() >= MAX_PENDING_PLACEMENTS) pendingPlacements.removeFirst();
+            pending = new PendingPlacement(pos.toImmutable());
+            pendingPlacements.addLast(pending);
+        }
+        pending.expiresAt = placementConfirmationExpiry(tick);
+        schedulePlacementRetry(pending, tick);
+    }
+
+    private PendingPlacement findPendingPlacement(BlockPos pos) {
+        for (PendingPlacement pending : pendingPlacements) {
+            if (pending.pos.equals(pos)) return pending;
+        }
+        return null;
+    }
+
+    private void schedulePlacementRetry(PendingPlacement pending, int tick) {
+        if (pending == null) return;
+        pending.attempts++;
+        pending.nextRetryTick = tick + placementRetryDelay(pending.attempts);
     }
 
     private BlockPos supportPosition(boolean atApex) {
@@ -118,6 +209,7 @@ public final class AutoBridge {
         }
         for (BlockPos candidate : candidates) {
             if (!isReplaceable(candidate)) continue;
+            if (findPendingPlacement(candidate) != null) continue;
             if (ModConfig.bridgeAvoidFeet && collidesWithBody(candidate)) continue;
             if (placementFor(candidate) != null) return candidate;
         }
@@ -157,6 +249,31 @@ public final class AutoBridge {
 
     static boolean shouldWaitForPlacementDelay(int delay, boolean atApex, boolean retryUnconfirmed) {
         return delay > 0 && !atApex && (!retryUnconfirmed || delay > 1);
+    }
+
+    static int placementRetryDelay(int attempts) {
+        int shift = Math.max(0, Math.min(2, attempts - 1));
+        return 1 << shift;
+    }
+
+    static boolean placementRetryDue(int tick, int nextRetryTick) {
+        return tick >= nextRetryTick;
+    }
+
+    static boolean playerTickResetNeeded(int previousTick, int currentTick) {
+        return previousTick >= 0 && currentTick < previousTick;
+    }
+
+    static int placementConfirmationExpiry(int tick) {
+        return tick + PENDING_CONFIRM_TICKS;
+    }
+
+    static boolean retainPendingPlacement(boolean replaceable, int tick, int expiresAt) {
+        return replaceable || tick <= expiresAt;
+    }
+
+    static boolean repairablePendingPlacement(double distanceSq, double reach) {
+        return distanceSq <= reach * reach;
     }
 
     static double[] movementOffset(float yaw, float forward, float strafe) {
@@ -214,7 +331,20 @@ public final class AutoBridge {
     private boolean canPlace(ItemStack stack, BlockPos pos) {
         if (stack.isEmpty() || !(stack.getItem() instanceof ItemBlock)) return false;
         Block block = ((ItemBlock) stack.getItem()).getBlock();
-        return block != null && block.getDefaultState().getMaterial().isSolid() && block.canPlaceBlockAt(mc.world, pos);
+        return block != null && stableBridgeBlock(block.getDefaultState().getMaterial().isSolid(),
+            block instanceof BlockFalling) && block.canPlaceBlockAt(mc.world, pos);
+    }
+
+    static boolean stableBridgeBlock(boolean solid, boolean falling) {
+        return solid && !falling;
+    }
+
+    private boolean withinPlacementReach(Placement placement) {
+        Vec3d eyes = mc.player.getPositionEyes(1.0F);
+        Vec3d hit = new Vec3d(placement.neighbor.getX() + 0.5, placement.neighbor.getY() + 0.5,
+            placement.neighbor.getZ() + 0.5);
+        double reach = mc.playerController.getBlockReachDistance() + 0.5;
+        return eyes.squareDistanceTo(hit) <= reach * reach;
     }
 
     private static final class Placement {
@@ -224,6 +354,17 @@ public final class AutoBridge {
         private Placement(BlockPos neighbor, EnumFacing side) {
             this.neighbor = neighbor;
             this.side = side;
+        }
+    }
+
+    private static final class PendingPlacement {
+        private final BlockPos pos;
+        private int expiresAt;
+        private int attempts;
+        private int nextRetryTick;
+
+        private PendingPlacement(BlockPos pos) {
+            this.pos = pos;
         }
     }
 }
