@@ -2,7 +2,9 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.OreType;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.junit.Test;
@@ -54,6 +56,23 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.knownPathCostCannotImprove(7, 4, 2));
         assertFalse(AutoMiner.knownPathCostCannotImprove(6, 4, 0));
         assertFalse(AutoMiner.knownPathCostCannotImprove(null, 4, 0));
+    }
+
+    @Test
+    public void pathSearchReusesExpensiveWorldCostsWithinOnePlan() {
+        Map<BlockPos, Integer> costs = new HashMap<>();
+        BlockPos cell = new BlockPos(3, 20, 7);
+        int[] resolutions = {0};
+
+        assertEquals(-1, AutoMiner.cachedPathCost(costs, cell, pos -> {
+            resolutions[0]++;
+            return -1;
+        }));
+        assertEquals(-1, AutoMiner.cachedPathCost(costs, cell, pos -> {
+            resolutions[0]++;
+            return 5;
+        }));
+        assertEquals(1, resolutions[0]);
     }
 
     @Test

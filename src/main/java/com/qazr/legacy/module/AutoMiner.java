@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -535,6 +536,8 @@ public final class AutoMiner {
         PriorityQueue<PathNode> queue = new PriorityQueue<>(AutoMiner::comparePathNodes);
         Map<BlockPos, BlockPos> previous = new HashMap<>();
         Map<BlockPos, Integer> costs = new HashMap<>();
+        Map<BlockPos, Integer> traversalCosts = new HashMap<>();
+        Map<BlockPos, Integer> jumpClearanceCosts = new HashMap<>();
         queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
         previous.put(start, null);
         costs.put(start, 0);
@@ -550,26 +553,28 @@ public final class AutoMiner {
             for (EnumFacing facing : EnumFacing.HORIZONTALS) {
                 for (int dy : PATH_VERTICAL_OFFSETS) {
                     BlockPos next = standPos(pos.offset(facing).add(0, dy, 0));
-                    addPathNeighbor(queue, previous, costs, start, goals, maxDistanceSq, pos,
-                        node.cost, next, Math.abs(dy) * 2);
+                    addPathNeighbor(queue, previous, costs, traversalCosts, jumpClearanceCosts,
+                        start, goals, maxDistanceSq, pos, node.cost, next, Math.abs(dy) * 2);
                 }
             }
-            addPathNeighbor(queue, previous, costs, start, goals, maxDistanceSq, pos, node.cost,
-                pos.down(), 2);
+            addPathNeighbor(queue, previous, costs, traversalCosts, jumpClearanceCosts, start,
+                goals, maxDistanceSq, pos, node.cost, pos.down(), 2);
         }
         return null;
     }
 
     private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
-            Map<BlockPos, Integer> costs, BlockPos start, List<BlockPos> goals, double maxDistanceSq,
-            BlockPos from, int currentCost, BlockPos next, int verticalPenalty) {
+            Map<BlockPos, Integer> costs, Map<BlockPos, Integer> traversalCosts,
+            Map<BlockPos, Integer> jumpClearanceCosts, BlockPos start, List<BlockPos> goals,
+            double maxDistanceSq, BlockPos from, int currentCost, BlockPos next, int verticalPenalty) {
         if (start.distanceSq(next) > maxDistanceSq) return;
         Integer known = costs.get(next);
         if (knownPathCostCannotImprove(known, currentCost, verticalPenalty)) return;
-        int stepCost = traversalCost(next);
+        int stepCost = cachedPathCost(traversalCosts, next, this::traversalCost);
         if (stepCost < 0) return;
         int jumpExcavation = next.getY() > from.getY()
-            ? jumpClearanceCost(isPassable(from.up(2)), canClearForCorridor(from.up(2)))
+            ? cachedPathCost(jumpClearanceCosts, from.up(2),
+                pos -> jumpClearanceCost(isPassable(pos), canClearForCorridor(pos)))
             : 0;
         if (jumpExcavation < 0) return;
         int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
@@ -581,6 +586,15 @@ public final class AutoMiner {
 
     static boolean knownPathCostCannotImprove(Integer knownCost, int currentCost, int verticalPenalty) {
         return knownCost != null && knownCost <= currentCost + 1 + verticalPenalty;
+    }
+
+    static int cachedPathCost(Map<BlockPos, Integer> cache, BlockPos pos,
+            ToIntFunction<BlockPos> resolver) {
+        Integer cached = cache.get(pos);
+        if (cached != null) return cached;
+        int resolved = resolver.applyAsInt(pos);
+        cache.put(pos, resolved);
+        return resolved;
     }
 
     static int pathPriority(int cost, BlockPos pos, List<BlockPos> goals) {
