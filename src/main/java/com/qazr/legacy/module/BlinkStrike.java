@@ -113,11 +113,11 @@ public final class BlinkStrike {
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
-            List<BlinkPath.Point> returnPath = BlinkPath.returnPath(origin, path, sent);
+            List<BlinkPath.Point> returnPath = completeReturnPath(origin, path, sent);
             for (int i = 0; i < returnPath.size(); i++) {
-                sendPosition(returnPath.get(i), transportOnGround);
+                sendPosition(returnPath.get(i), i + 1 == returnPath.size()
+                    ? originOnGround : transportOnGround);
             }
-            sendPosition(origin, originOnGround);
             mc.player.fallDistance = 0.0F;
             mc.player.motionX = originalMotionX;
             mc.player.motionY = originalMotionY;
@@ -126,6 +126,12 @@ public final class BlinkStrike {
             mc.player.setPosition(origin.x, origin.y, origin.z);
         }
         return true;
+    }
+
+    static List<BlinkPath.Point> completeReturnPath(BlinkPath.Point origin,
+            List<BlinkPath.Point> outward, int sentPoints) {
+        List<BlinkPath.Point> result = BlinkPath.returnPath(origin, outward, sentPoints);
+        return result.isEmpty() ? java.util.Collections.singletonList(origin) : result;
     }
 
     @SubscribeEvent

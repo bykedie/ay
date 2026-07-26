@@ -53,6 +53,19 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void returnPacketsContainTheOriginExactlyOnce() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        List<BlinkPath.Point> outward = BlinkPath.interpolate(origin,
+            new BlinkPath.Point(12.0, 64.0, 0.0), 4.0);
+        List<BlinkPath.Point> returning = BlinkStrike.completeReturnPath(origin, outward, outward.size());
+
+        assertEquals(3, returning.size());
+        assertEquals(origin, returning.get(returning.size() - 1));
+        assertEquals(1, returning.stream().filter(point -> point == origin).count());
+        assertEquals(origin, BlinkStrike.completeReturnPath(origin, outward, 0).get(0));
+    }
+
+    @Test
     public void generatesNearSideCandidateFirst() {
         BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
         List<BlinkPath.Point> candidates = BlinkStrike.candidatePositions(origin, 10.0, 61.0, 0.0, 2.5);
