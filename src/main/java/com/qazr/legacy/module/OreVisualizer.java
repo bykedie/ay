@@ -207,12 +207,11 @@ public final class OreVisualizer {
                 if (!ModConfig.isMineOreEnabled(marker.type)) continue;
                 double distanceSq = distanceSq(marker.pos);
                 if (distanceSq > rangeSq) continue;
-                CachedOre candidate = new CachedOre(marker.pos, marker.type, distanceSq);
                 if (nearest.size() < limit) {
-                    nearest.add(candidate);
+                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
                 } else if (distanceSq < nearest.peek().distanceSq()) {
                     nearest.remove();
-                    nearest.add(candidate);
+                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
                 }
             }
         }
