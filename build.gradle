@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.10.35'
+version = '1.10.36'
 group = 'com.qazr.legacy'
 archivesBaseName = 'voris-hub'
 
@@ -145,6 +145,7 @@ task verifyRelease(dependsOn: ['test', 'reobfJar']) {
             'com/qazr/legacy/gui/MessageEditorScreen.class',
             'com/qazr/legacy/gui/ColorEditorScreen.class',
             'com/qazr/legacy/config/ModuleSetting.class',
+            'com/qazr/legacy/config/FlightMode.class',
             'com/qazr/legacy/config/AttackPoint.class',
             'com/qazr/legacy/config/HudPosition.class',
             'com/qazr/legacy/config/OreType.class',

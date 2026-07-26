@@ -75,10 +75,8 @@ public final class ModConfig {
     public static String blinkPriority;
     public static AttackPoint blinkAttackPoint;
     private static final Set<String> blinkExcludedModEntities = new LinkedHashSet<>();
-    public static boolean flightElytra;
-    public static boolean flightBoat;
+    public static FlightMode flightMode;
     public static double flightSpeed;
-    public static double flightVerticalSpeed;
     public static boolean targetSkeleton;
     public static boolean targetBox;
     public static boolean targetRays;
@@ -192,14 +190,16 @@ public final class ModConfig {
         blinkExcludedModEntities.clear();
         blinkExcludedModEntities.addAll(Arrays.asList(configuration.getStringList("excludedModEntities", "blinkStrike",
             new String[0], "Mod entity registry names excluded from blink strike.")));
-        flightElytra = configuration.getBoolean("elytraPackets", "flight", true, "Use elytra start-flying packets for flight movement.");
-        flightBoat = configuration.getBoolean("boatPackets", "flight", false, "Use vehicle movement packets while riding a boat.");
-        if (flightElytra && flightBoat) {
-            flightBoat = false;
-            configuration.get("flight", "boatPackets", false).set(false);
-        }
-        flightSpeed = configuration.getFloat("speed", "flight", 0.32F, 0.05F, 1.20F, "Horizontal flight speed in blocks per tick.");
-        flightVerticalSpeed = configuration.getFloat("verticalSpeed", "flight", 0.20F, 0.02F, 0.80F, "Vertical flight speed in blocks per tick.");
+        boolean legacyFlight = configuration.getCategory("flight").containsKey("elytraPackets")
+            || configuration.getCategory("flight").containsKey("boatPackets")
+            || configuration.getCategory("flight").containsKey("verticalSpeed");
+        configuration.getCategory("flight").remove("elytraPackets");
+        configuration.getCategory("flight").remove("boatPackets");
+        configuration.getCategory("flight").remove("verticalSpeed");
+        if (legacyFlight) configuration.getCategory("flight").remove("speed");
+        flightMode = FlightMode.fromKey(configuration.getString("mode", "flight", FlightMode.STATIC.key(),
+            "WWE Flight mode: static, vanilla or hypixel."));
+        flightSpeed = configuration.getFloat("speed", "flight", 1.0F, 0.0F, 10.0F, "WWE Flight speed.");
         targetSkeleton = configuration.getBoolean("skeleton", "targetVisualizer", true, "Draw stick-figure skeletons.");
         targetBox = configuration.getBoolean("box", "targetVisualizer", true, "Draw target bounding boxes.");
         targetRays = configuration.getBoolean("rays", "targetVisualizer", false, "Draw lines from the camera to targets.");
@@ -283,7 +283,6 @@ public final class ModConfig {
             case BLINK_DELAY: return blinkDelayTicks;
             case BLINK_MAX_TARGETS: return blinkMaxTargets;
             case FLIGHT_SPEED: return flightSpeed;
-            case FLIGHT_VERTICAL: return flightVerticalSpeed;
             case TARGET_RANGE: return targetVisualizerRange;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
@@ -335,7 +334,6 @@ public final class ModConfig {
             case BLINK_DELAY: blinkDelayTicks = (int) rounded; saveInt("blinkStrike", "delayTicks", blinkDelayTicks); break;
             case BLINK_MAX_TARGETS: blinkMaxTargets = (int) rounded; saveInt("blinkStrike", "maxTargets", blinkMaxTargets); break;
             case FLIGHT_SPEED: flightSpeed = rounded; saveDouble("flight", "speed", rounded); break;
-            case FLIGHT_VERTICAL: flightVerticalSpeed = rounded; saveDouble("flight", "verticalSpeed", rounded); break;
             case TARGET_RANGE: targetVisualizerRange = rounded; saveDouble("targetVisualizer", "range", rounded); break;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
@@ -366,8 +364,6 @@ public final class ModConfig {
             case BLINK_ROTATE: return blinkRotate;
             case BLINK_MULTI: return blinkMultiTarget;
             case BLINK_VISUALIZE: return blinkVisualize;
-            case FLIGHT_ELYTRA: return flightElytra;
-            case FLIGHT_BOAT: return flightBoat;
             case MINE_VISUALIZE_PATH: return mineVisualizePath;
             case BRIDGE_AVOID_FEET: return bridgeAvoidFeet;
             case TARGET_SKELETON: return targetSkeleton;
@@ -415,18 +411,6 @@ public final class ModConfig {
             case BLINK_VISUALIZE: blinkVisualize = value; saveBoolean("blinkStrike", "visualizeTargets", value); break;
             case MINE_VISUALIZE_PATH: mineVisualizePath = value; saveBoolean("autoMine", "visualizePath", value); break;
             case BRIDGE_AVOID_FEET: bridgeAvoidFeet = value; saveBoolean("autoBridge", "avoidFeetCollision", value); break;
-            case FLIGHT_ELYTRA:
-                flightElytra = value;
-                if (value) flightBoat = false;
-                saveBoolean("flight", "elytraPackets", flightElytra);
-                saveBoolean("flight", "boatPackets", flightBoat);
-                break;
-            case FLIGHT_BOAT:
-                flightBoat = value;
-                if (value) flightElytra = false;
-                saveBoolean("flight", "boatPackets", flightBoat);
-                saveBoolean("flight", "elytraPackets", flightElytra);
-                break;
             case TARGET_SKELETON: targetSkeleton = value; saveBoolean("targetVisualizer", "skeleton", value); break;
             case TARGET_BOX: targetBox = value; saveBoolean("targetVisualizer", "box", value); break;
             case TARGET_RAYS: targetRays = value; saveBoolean("targetVisualizer", "rays", value); break;
@@ -474,6 +458,7 @@ public final class ModConfig {
         if (setting == ModuleSetting.MELEE_ATTACK_POINT) return meleeAttackPoint.displayName();
         if (setting == ModuleSetting.BLINK_ATTACK_POINT) return blinkAttackPoint.displayName();
         if (setting == ModuleSetting.TARGET_COUNT_POSITION || setting == ModuleSetting.ORE_COUNT_POSITION) return countHudPosition.displayName();
+        if (setting == ModuleSetting.FLIGHT_MODE) return flightMode.displayName();
         throw new IllegalArgumentException("Setting is not a choice: " + setting);
     }
 
@@ -493,6 +478,9 @@ public final class ModConfig {
         } else if (setting == ModuleSetting.TARGET_COUNT_POSITION || setting == ModuleSetting.ORE_COUNT_POSITION) {
             countHudPosition = HudPosition.next(countHudPosition);
             configuration.get("hud", "countHudPosition", countHudPosition.key()).set(countHudPosition.key());
+        } else if (setting == ModuleSetting.FLIGHT_MODE) {
+            flightMode = FlightMode.next(flightMode);
+            configuration.get("flight", "mode", flightMode.key()).set(flightMode.key());
         } else {
             throw new IllegalArgumentException("Setting is not a choice: " + setting);
         }

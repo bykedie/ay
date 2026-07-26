@@ -85,10 +85,8 @@ public enum ModuleSetting {
     BLINK_VISUALIZE(ModuleId.BLINK_STRIKE, "目标可视化", Type.TOGGLE),
     BLINK_PRIORITY(ModuleId.BLINK_STRIKE, "目标优先级", Type.CHOICE),
     BLINK_ATTACK_POINT(ModuleId.BLINK_STRIKE, "攻击部位", Type.CHOICE),
-    FLIGHT_ELYTRA(ModuleId.FLIGHT, "普通飞行", Type.TOGGLE),
-    FLIGHT_BOAT(ModuleId.FLIGHT, "船发包", Type.TOGGLE),
-    FLIGHT_SPEED(ModuleId.FLIGHT, "飞行速度", Type.NUMBER, 0.05, 1.20, 0.05, " 格/tick"),
-    FLIGHT_VERTICAL(ModuleId.FLIGHT, "升降速度", Type.NUMBER, 0.02, 0.80, 0.02, " 格/tick"),
+    FLIGHT_MODE(ModuleId.FLIGHT, "飞行模式", Type.CHOICE),
+    FLIGHT_SPEED(ModuleId.FLIGHT, "飞行速度", Type.NUMBER, 0.0, 10.0, 0.1, " 格/tick"),
     TARGET_RANGE(ModuleId.TARGET_VISUALIZER, "显示距离", Type.NUMBER, 3.0, 500.0, 1.0, " 格"),
     TARGET_SKELETON(ModuleId.TARGET_VISUALIZER, "绘制骨骼", Type.TOGGLE),
     TARGET_BOX(ModuleId.TARGET_VISUALIZER, "绘制方框", Type.TOGGLE),
@@ -225,10 +223,8 @@ public enum ModuleSetting {
             case BLINK_VISUALIZE: return "用红色方框标出闪现攻击本次选中的目标。";
             case BLINK_PRIORITY: return "选择按距离最近或血量最低排列闪现攻击目标。点击切换。";
             case BLINK_ATTACK_POINT: return "选择闪现攻击发包时瞄准目标的部位，用于远端旋转和命中点。";
-            case FLIGHT_ELYTRA: return "参考 WWE Flight，仅接管当前飞行状态和移动速度，不修改游戏模式的飞行权限；开启后自动关闭船发包模式。";
-            case FLIGHT_BOAT: return "骑乘船时用载具移动数据包控制船的位置；开启后自动关闭普通飞行模式。";
-            case FLIGHT_SPEED: return "飞行水平移动速度。数值越高越容易被服务器移动检查回拉。";
-            case FLIGHT_VERTICAL: return "按跳跃或潜行时的上升/下降速度。";
+            case FLIGHT_MODE: return "切换 WWE Flight 的静态、原版和 Hypixel 三种模式。静态模式直接控制移动，原版模式使用游戏飞行能力，Hypixel 模式使用微小高度偏移。";
+            case FLIGHT_SPEED: return "WWE Flight 的移动速度。静态模式同时用于水平和升降，原版模式会按 WWE 的规则除以 10 后写入飞行速度。";
             case TARGET_RANGE: return "目标骨骼、方框和射线的最大绘制距离，范围为 3 到 500 格。";
             case TARGET_SKELETON: return "按目标实际渲染模型绘制人形、四足、马、蜘蛛等对应骨架。";
             case TARGET_BOX: return "在目标碰撞箱外绘制细线方框。可见目标为绿色，遮挡目标为红色。";

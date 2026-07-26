@@ -5,39 +5,9 @@ import static org.junit.Assert.assertEquals;
 
 public class FlightControllerTest {
     @Test
-    public void restoresFlyingOnlyWhenTheCurrentModeStillAllowsIt() {
-        assertEquals(true, FlightController.restoredFlying(true, true, true, true));
-        assertEquals(false, FlightController.restoredFlying(true, true, false, true));
-        assertEquals(false, FlightController.restoredFlying(false, true, true, true));
-        assertEquals(true, FlightController.restoredFlying(false, false, true, true));
-    }
-
-    @Test
-    public void mapsConfiguredSpeedToVanillaFlySpeed() {
-        assertEquals(0.032F, FlightController.flySpeedFor(0.32), 0.0001F);
-        assertEquals(0.12F, FlightController.flySpeedFor(1.20), 0.0001F);
-    }
-
-    @Test
-    public void clearsInjectedMotionWhenFlightControlEnds() {
-        assertEquals(0.0, FlightController.clearedMotion()[0], 0.0);
-        assertEquals(0.0, FlightController.clearedMotion()[1], 0.0);
-        assertEquals(0.0, FlightController.clearedMotion()[2], 0.0);
-    }
-
-    @Test
-    public void clearsBoatControlWhenSwitchingToNormalFlight() {
-        assertEquals(true, FlightController.shouldClearBoatForNormalFlight(true, true));
-        assertEquals(false, FlightController.shouldClearBoatForNormalFlight(false, true));
-        assertEquals(false, FlightController.shouldClearBoatForNormalFlight(true, false));
-    }
-
-    @Test
-    public void restoresNormalFlightWheneverControlCannotContinue() {
-        assertEquals(false, FlightController.shouldRestoreNormalFlight(true, true));
-        assertEquals(true, FlightController.shouldRestoreNormalFlight(true, false));
-        assertEquals(true, FlightController.shouldRestoreNormalFlight(false, true));
-        assertEquals(true, FlightController.shouldRestoreNormalFlight(false, false));
+    public void mapsWweSpeedToVanillaFlySpeed() {
+        assertEquals(0.10F, FlightController.flySpeedFor(1.0), 0.0001F);
+        assertEquals(1.0F, FlightController.flySpeedFor(10.0), 0.0001F);
     }
 
     @Test
@@ -61,6 +31,12 @@ public class FlightControllerTest {
 
         assertEquals(0.40, Math.sqrt(movement[0] * movement[0] + movement[1] * movement[1]), 0.0001);
         assertEquals(movement[0], movement[1], 0.0001);
+    }
+
+    @Test
+    public void reproducesHypixelThreeTickPositionPulse() {
+        assertEquals(3.0E-9, FlightController.hypixelOffsetForTick(2), 1.0E-20);
+        assertEquals(0.0, FlightController.hypixelOffsetForTick(3), 0.0);
     }
 
     private static void assertOffset(double x, double z, double[] movement) {

@@ -3,6 +3,9 @@ package com.qazr.legacy.config;
 import com.qazr.legacy.module.ModuleManager;
 import java.io.File;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.relauncher.FMLInjectionData;
 import org.junit.Before;
 import org.junit.Rule;
@@ -48,10 +51,8 @@ public class ModConfigTest {
         assertFalse(ModConfig.blinkPeaceful);
         assertEquals(AttackPoint.CHEST, ModConfig.meleeAttackPoint);
         assertEquals(AttackPoint.CHEST, ModConfig.blinkAttackPoint);
-        assertTrue(ModConfig.flightElytra);
-        assertFalse(ModConfig.flightBoat);
-        assertEquals(0.32, ModConfig.flightSpeed, 0.001);
-        assertEquals(0.20, ModConfig.flightVerticalSpeed, 0.001);
+        assertEquals(FlightMode.STATIC, ModConfig.flightMode);
+        assertEquals(1.0, ModConfig.flightSpeed, 0.001);
         assertFalse(ModConfig.targetVisualizer);
         assertFalse(ModConfig.oreVisualizer);
         assertFalse(ModConfig.autoBridge);
@@ -271,22 +272,38 @@ public class ModConfigTest {
     }
 
     @Test
-    public void persistsFlightModeSettingsMutuallyExclusively() throws Exception {
+    public void persistsWweFlightModeAndSpeed() throws Exception {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.FLIGHT, true);
-        ModConfig.toggle(ModuleSetting.FLIGHT_BOAT);
-        ModConfig.saveNumber(ModuleSetting.FLIGHT_SPEED, 0.48);
-        ModConfig.saveNumber(ModuleSetting.FLIGHT_VERTICAL, 0.27);
+        ModConfig.cycleChoice(ModuleSetting.FLIGHT_MODE);
+        ModConfig.cycleChoice(ModuleSetting.FLIGHT_MODE);
+        ModConfig.saveNumber(ModuleSetting.FLIGHT_SPEED, 4.46);
         ModConfig.reload();
 
         assertTrue(ModConfig.flight);
-        assertFalse(ModConfig.flightElytra);
-        assertTrue(ModConfig.flightBoat);
-        assertEquals(0.5, ModConfig.flightSpeed, 0.001);
-        assertEquals(0.28, ModConfig.flightVerticalSpeed, 0.001);
-        assertTrue(ModConfig.toggle(ModuleSetting.FLIGHT_ELYTRA));
-        assertTrue(ModConfig.flightElytra);
-        assertFalse(ModConfig.flightBoat);
+        assertEquals(FlightMode.HYPIXEL, ModConfig.flightMode);
+        assertEquals(4.5, ModConfig.flightSpeed, 0.001);
+        assertEquals("Hypixel", ModConfig.getChoice(ModuleSetting.FLIGHT_MODE));
+    }
+
+    @Test
+    public void removesLegacyFlightModesAndResetsTheirSpeed() throws Exception {
+        File file = configFile();
+        Configuration legacy = new Configuration(file);
+        legacy.get("flight", "elytraPackets", true).set(true);
+        legacy.get("flight", "boatPackets", false).set(false);
+        legacy.get("flight", "verticalSpeed", 0.2).set(0.2);
+        legacy.get("flight", "speed", 0.32).set(0.32);
+        legacy.save();
+
+        ModConfig.load(file);
+
+        assertEquals(FlightMode.STATIC, ModConfig.flightMode);
+        assertEquals(1.0, ModConfig.flightSpeed, 0.001);
+        String saved = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        assertFalse(saved.contains("elytraPackets"));
+        assertFalse(saved.contains("boatPackets"));
+        assertFalse(saved.contains("verticalSpeed"));
     }
 
     private File configFile() throws Exception {
