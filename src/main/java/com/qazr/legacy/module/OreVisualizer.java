@@ -103,7 +103,7 @@ public final class OreVisualizer {
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || mc.world == null) return;
         if (!cacheNeeded()) {
-            cacheActive = false;
+            clearCache();
             return;
         }
         if (!cacheActive) {
@@ -273,6 +273,20 @@ public final class OreVisualizer {
 
     static int scanBudget(boolean autoMineEnabled) {
         return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
+    }
+
+    private void clearCache() {
+        markersByChunk.clear();
+        markerSetsByType.clear();
+        scannedChunks.clear();
+        scanQueue.clear();
+        validationIndex = 0;
+        validationDelay = 0;
+        seededWorld = null;
+        seededRadiusChunks = 0;
+        seededCenterChunkX = Integer.MIN_VALUE;
+        seededCenterChunkZ = Integer.MIN_VALUE;
+        cacheActive = false;
     }
 
     static int[] sectionOrder(int sectionCount, int centerSection) {
