@@ -38,6 +38,8 @@ public final class AutoMiner {
     private static final int MAX_PATH_TARGETS = 6;
     private static final int MAX_CACHED_TARGETS = 96;
     private static final int PATH_RETRY_TICKS = 20;
+    private static final int FAILED_ROUTE_RETRY_TICKS = 100;
+    private static final double ROUTE_SPEED = 0.18;
     private static final int ROUTE_RENDER_LIMIT = 220;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -57,6 +59,8 @@ public final class AutoMiner {
     private int manualPause;
     private int pathRetryDelay;
     private int pathCandidateOffset;
+    private BlockPos failedRouteOre;
+    private int failedRouteRetryDelay;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -68,6 +72,8 @@ public final class AutoMiner {
         minedCounts.clear();
         pathRetryDelay = 0;
         pathCandidateOffset = 0;
+        failedRouteOre = null;
+        failedRouteRetryDelay = 0;
         clearPath();
     }
 
@@ -75,6 +81,7 @@ public final class AutoMiner {
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !modules.isEnabled(ModuleId.AUTO_MINE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null || mc.currentScreen != null) return;
+        updateFailedRouteCooldown();
         updateMinedCount();
         if (allFiniteQuotasReached()) {
             modules.setEnabled(ModuleId.AUTO_MINE, false);
@@ -102,6 +109,10 @@ public final class AutoMiner {
         MineTarget visible = findNearestReachable(candidates);
         if (visible != null) {
             mine(visible);
+            return;
+        }
+        if (routeEndedBeforeMining(currentOre, pathIndex, path.size())) {
+            abandonCurrentRoute();
             return;
         }
         followPathToOre(candidates);
@@ -152,6 +163,8 @@ public final class AutoMiner {
             manualPause = 0;
             pathRetryDelay = 0;
             pathCandidateOffset = 0;
+            failedRouteOre = null;
+            failedRouteRetryDelay = 0;
             minedCounts.clear();
             lastMinedOre = null;
             lastMinedType = null;
@@ -239,8 +252,7 @@ public final class AutoMiner {
         }
         if (!damageCorridorBlock(clearingPos)) {
             clearingPos = null;
-            clearPath();
-            delay = 2;
+            abandonCurrentRoute();
             return true;
         }
         delay = ModConfig.mineDelayTicks;
@@ -281,8 +293,7 @@ public final class AutoMiner {
             : path.get(pathIndex - 1);
         if (next.getY() > from.getY() && !isPassable(from.up(2))) {
             if (!clearCorridorCell(from.up(2), from.up(2))) {
-                clearPath();
-                delay = 2;
+                abandonCurrentRoute();
                 return;
             }
             delay = ModConfig.mineDelayTicks;
@@ -290,8 +301,7 @@ public final class AutoMiner {
         }
         if (!isStandable(next)) {
             if (!clearBlockingObstacle(next)) {
-                clearPath();
-                delay = 2;
+                abandonCurrentRoute();
                 return;
             }
             delay = ModConfig.mineDelayTicks;
@@ -301,8 +311,7 @@ public final class AutoMiner {
         double dz = next.getZ() + 0.5 - mc.player.posZ;
         double distanceSq = dx * dx + dz * dz;
         if (distanceSq > 16.0) {
-            clearPath();
-            delay = 2;
+            abandonCurrentRoute();
             return;
         }
         double verticalDistance = next.getY() - mc.player.getEntityBoundingBox().minY;
@@ -312,13 +321,18 @@ public final class AutoMiner {
         }
         if (distanceSq > 0.0001) {
             double length = Math.sqrt(distanceSq);
-            mc.player.motionX += MathHelper.clamp(dx / length * 0.18, -0.18, 0.18);
-            mc.player.motionZ += MathHelper.clamp(dz / length * 0.18, -0.18, 0.18);
+            mc.player.motionX = routeMotion(mc.player.motionX, dx / length);
+            mc.player.motionZ = routeMotion(mc.player.motionZ, dz / length);
         }
         if (next.getY() > MathHelper.floor(mc.player.getEntityBoundingBox().minY) && mc.player.onGround) {
             mc.player.jump();
         }
-        delay = 1;
+        delay = 0;
+    }
+
+    static double routeMotion(double current, double unitDirection) {
+        return MathHelper.clamp(current * 0.5 + unitDirection * ROUTE_SPEED,
+            -ROUTE_SPEED, ROUTE_SPEED);
     }
 
     static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {
@@ -332,6 +346,7 @@ public final class AutoMiner {
         int bestScore = Integer.MAX_VALUE;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (quotaReached(candidate.type())) continue;
+            if (temporarilyBlocked(candidate.pos(), failedRouteOre, failedRouteRetryDelay)) continue;
             OreType currentType = targetType(candidate.pos());
             if (currentType != candidate.type()) {
                 oreVisualizer.removeMarker(candidate.pos());
@@ -358,6 +373,14 @@ public final class AutoMiner {
     static int nextPathCandidateOffset(int currentOffset, int attempts, int batchSize, boolean found) {
         if (found || attempts < batchSize) return 0;
         return currentOffset + attempts;
+    }
+
+    static boolean temporarilyBlocked(BlockPos candidate, BlockPos failed, int retryDelay) {
+        return retryDelay > 0 && failed != null && failed.equals(candidate);
+    }
+
+    static boolean routeEndedBeforeMining(BlockPos currentOre, int pathIndex, int pathSize) {
+        return currentOre != null && pathIndex >= pathSize;
     }
 
     static int pathTargetScore(int routeCost, double distanceSq, boolean sameVein) {
@@ -586,6 +609,23 @@ public final class AutoMiner {
         OreType type = OreType.fromBlock(state.getBlock());
         if (type == null || !ModConfig.isMineOreEnabled(type) || quotaReached(type)) return null;
         return type;
+    }
+
+    private void abandonCurrentRoute() {
+        if (currentOre != null) {
+            failedRouteOre = currentOre.toImmutable();
+            failedRouteRetryDelay = FAILED_ROUTE_RETRY_TICKS;
+        }
+        clearPath();
+        pathRetryDelay = 0;
+        pathCandidateOffset = 0;
+        delay = 2;
+    }
+
+    private void updateFailedRouteCooldown() {
+        if (failedRouteRetryDelay <= 0) return;
+        failedRouteRetryDelay--;
+        if (failedRouteRetryDelay == 0) failedRouteOre = null;
     }
 
     private void clearPath() {

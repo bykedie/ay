@@ -105,4 +105,29 @@ public class AutoMinerTest {
         assertEquals(0, AutoMiner.nextPathCandidateOffset(12, 3, 6, false));
         assertEquals(0, AutoMiner.nextPathCandidateOffset(6, 2, 6, true));
     }
+
+    @Test
+    public void failedRouteIsSkippedOnlyDuringItsRetryWindow() {
+        BlockPos failed = new BlockPos(4, 20, 7);
+
+        assertTrue(AutoMiner.temporarilyBlocked(failed, failed, 1));
+        assertFalse(AutoMiner.temporarilyBlocked(failed, failed, 0));
+        assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), failed, 100));
+    }
+
+    @Test
+    public void routeThatEndsWithoutAVisibleOreIsAbandoned() {
+        BlockPos ore = new BlockPos(4, 20, 7);
+
+        assertTrue(AutoMiner.routeEndedBeforeMining(ore, 3, 3));
+        assertFalse(AutoMiner.routeEndedBeforeMining(ore, 2, 3));
+        assertFalse(AutoMiner.routeEndedBeforeMining(null, 0, 0));
+    }
+
+    @Test
+    public void routeMotionIsDampedAndLimitedEveryTick() {
+        assertEquals(0.18, AutoMiner.routeMotion(0.40, 1.0), 0.0001);
+        assertEquals(-0.18, AutoMiner.routeMotion(-0.40, -1.0), 0.0001);
+        assertEquals(0.10, AutoMiner.routeMotion(0.20, 0.0), 0.0001);
+    }
 }
