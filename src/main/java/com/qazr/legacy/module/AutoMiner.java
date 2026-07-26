@@ -372,8 +372,9 @@ public final class AutoMiner {
             resetRouteProgress();
             return;
         }
-        if (routeProgressed(lastRouteDistanceSq, distanceSq)) {
-            lastRouteDistanceSq = distanceSq;
+        double nodeDistanceSq = routeNodeDistanceSq(distanceSq, verticalDistance);
+        if (routeProgressed(lastRouteDistanceSq, nodeDistanceSq)) {
+            lastRouteDistanceSq = nodeDistanceSq;
             stalledRouteTicks = 0;
         } else if (++stalledRouteTicks >= MAX_STALLED_ROUTE_TICKS) {
             abandonCurrentRoute();
@@ -397,6 +398,10 @@ public final class AutoMiner {
 
     static boolean routeProgressed(double previousDistanceSq, double currentDistanceSq) {
         return currentDistanceSq + ROUTE_PROGRESS_EPSILON < previousDistanceSq;
+    }
+
+    static double routeNodeDistanceSq(double horizontalDistanceSq, double verticalDistance) {
+        return Math.max(0.0, horizontalDistanceSq) + verticalDistance * verticalDistance;
     }
 
     static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {

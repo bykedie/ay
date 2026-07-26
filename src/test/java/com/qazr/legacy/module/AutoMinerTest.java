@@ -155,6 +155,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void verticalDescentCountsAsRouteProgress() {
+        assertEquals(1.0, AutoMiner.routeNodeDistanceSq(0.0, -1.0), 0.0);
+        assertEquals(0.25, AutoMiner.routeNodeDistanceSq(0.0, -0.5), 0.0);
+        assertTrue(AutoMiner.routeProgressed(1.0,
+            AutoMiner.routeNodeDistanceSq(0.0, -0.5)));
+    }
+
+    @Test
     public void directMiningChecksStayBoundedInDenseVeins() {
         assertEquals(16, AutoMiner.visibleTargetInspectionLimit());
     }
