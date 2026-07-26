@@ -64,13 +64,11 @@ public final class AutoBridge {
             return;
         }
         prunePendingPlacements(tick);
+        BlockPos currentSupport = supportPosition(atApex);
         PendingPlacement oldestPending = oldestMissingPlacement();
-        BlockPos placePos;
-        if (oldestPending != null && placementRetryDue(tick, oldestPending.nextRetryTick)) {
-            placePos = oldestPending.pos;
-        } else {
-            placePos = supportPosition(atApex);
-        }
+        BlockPos placePos = preferredPlacement(currentSupport,
+            oldestPending == null ? null : oldestPending.pos,
+            oldestPending != null && placementRetryDue(tick, oldestPending.nextRetryTick));
         if (placePos == null) {
             if (delay > 0) delay--;
             return;
@@ -258,6 +256,12 @@ public final class AutoBridge {
 
     static boolean placementRetryDue(int tick, int nextRetryTick) {
         return tick >= nextRetryTick;
+    }
+
+    static BlockPos preferredPlacement(BlockPos currentSupport, BlockPos pendingRepair,
+            boolean repairDue) {
+        if (currentSupport != null) return currentSupport;
+        return repairDue ? pendingRepair : null;
     }
 
     static boolean playerTickResetNeeded(int previousTick, int currentTick) {

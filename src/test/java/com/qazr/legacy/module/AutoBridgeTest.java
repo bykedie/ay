@@ -35,6 +35,16 @@ public class AutoBridgeTest {
     }
 
     @Test
+    public void currentBridgeSupportPrecedesHistoricalGapRepair() {
+        BlockPos current = new BlockPos(12, 63, 4);
+        BlockPos oldGap = new BlockPos(8, 63, 4);
+
+        assertEquals(current, AutoBridge.preferredPlacement(current, oldGap, true));
+        assertEquals(oldGap, AutoBridge.preferredPlacement(null, oldGap, true));
+        assertEquals(null, AutoBridge.preferredPlacement(null, oldGap, false));
+    }
+
+    @Test
     public void keepsMissingPlacementsAndRecentConfirmations() {
         assertEquals(80, AutoBridge.placementConfirmationExpiry(20));
         assertEquals(true, AutoBridge.retainPendingPlacement(true, 80, 60));
