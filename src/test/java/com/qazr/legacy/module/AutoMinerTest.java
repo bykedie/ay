@@ -32,9 +32,12 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void verticalPathNodesRequireThePlayerToDropIntoTheCell() {
+    public void verticalPathNodesRequireThePlayersFeetToEnterTheCell() {
         assertFalse(AutoMiner.reachedPathNode(0.0, -1.0));
         assertTrue(AutoMiner.reachedPathNode(0.0, -0.20));
+        assertTrue(AutoMiner.reachedPathNode(0.0, 0.0));
+        assertTrue(AutoMiner.reachedPathNode(0.0, 0.04));
+        assertFalse(AutoMiner.reachedPathNode(0.0, 0.20));
     }
 
     @Test

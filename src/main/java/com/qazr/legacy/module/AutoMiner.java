@@ -414,7 +414,8 @@ public final class AutoMiner {
     }
 
     static boolean reachedPathNode(double horizontalDistanceSq, double verticalDistance) {
-        return horizontalDistanceSq < 0.20 && Math.abs(verticalDistance) < 0.35;
+        return horizontalDistanceSq < 0.20
+            && verticalDistance <= 0.05 && verticalDistance > -0.35;
     }
 
     private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
