@@ -36,14 +36,13 @@ import org.lwjgl.opengl.GL11;
 
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 1600;
-    private static final int MAX_PATH_TARGETS = 6;
+    private static final int PATH_TARGETS_PER_TICK = 1;
     private static final int MAX_CACHED_TARGETS = 96;
     private static final int PATH_RETRY_TICKS = 20;
     private static final int FAILED_ROUTE_RETRY_TICKS = 100;
     private static final double ROUTE_SPEED = 0.18;
     private static final int NEARBY_ROUTE_CHECK_TICKS = 5;
     private static final double NEARBY_ROUTE_RANGE = 6.0;
-    private static final int MAX_NEARBY_PATH_TARGETS = 2;
     private static final int MAX_VISIBLE_TARGETS = 16;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
@@ -67,6 +66,9 @@ public final class AutoMiner {
     private int manualPause;
     private int pathRetryDelay;
     private int pathCandidateOffset;
+    private int nearbyPathCandidateOffset;
+    private BlockPos pathCandidateAnchor;
+    private BlockPos nearbyPathCandidateAnchor;
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
@@ -87,6 +89,9 @@ public final class AutoMiner {
         minedCounts.clear();
         pathRetryDelay = 0;
         pathCandidateOffset = 0;
+        nearbyPathCandidateOffset = 0;
+        pathCandidateAnchor = null;
+        nearbyPathCandidateAnchor = null;
         failedRouteOre = null;
         failedRouteRetryDelay = 0;
         nearbyRouteCheckDelay = 0;
@@ -215,6 +220,9 @@ public final class AutoMiner {
             manualPause = 0;
             pathRetryDelay = 0;
             pathCandidateOffset = 0;
+            nearbyPathCandidateOffset = 0;
+            pathCandidateAnchor = null;
+            nearbyPathCandidateAnchor = null;
             failedRouteOre = null;
             failedRouteRetryDelay = 0;
             nearbyRouteCheckDelay = 0;
@@ -330,7 +338,7 @@ public final class AutoMiner {
                 : candidates;
             PathTarget target = findNearestPathTarget(available);
             if (target == null) {
-                pathRetryDelay = PATH_RETRY_TICKS;
+                pathRetryDelay = pathSearchRetryDelay(pathCandidateOffset);
                 return;
             }
             pathRetryDelay = 0;
@@ -422,6 +430,12 @@ public final class AutoMiner {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
+            if (eligible == 0) {
+                if (candidateBatchChanged(pathCandidateOffset, pathCandidateAnchor, candidate.pos())) {
+                    pathCandidateOffset = 0;
+                }
+                pathCandidateAnchor = candidate.pos();
+            }
             if (eligible++ < pathCandidateOffset) continue;
             PathRoute route = pathToOre(candidate.pos());
             attempts++;
@@ -433,10 +447,11 @@ public final class AutoMiner {
                     best = new PathTarget(candidate.pos(), candidate.type(), route.points);
                 }
             }
-            if (attempts >= MAX_PATH_TARGETS) break;
+            if (attempts >= pathTargetsPerTick()) break;
         }
         pathCandidateOffset = nextPathCandidateOffset(pathCandidateOffset, attempts,
-            MAX_PATH_TARGETS, best != null);
+            pathTargetsPerTick(), best != null);
+        if (pathCandidateOffset == 0) pathCandidateAnchor = null;
         return best;
     }
 
@@ -444,6 +459,8 @@ public final class AutoMiner {
         if (currentOre == null) return null;
         double currentDistanceSq = mc.player.getDistanceSqToCenter(currentOre);
         int attempts = 0;
+        int eligible = 0;
+        PathTarget target = null;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (candidate.pos().equals(currentOre) || quotaReached(candidate.type())) continue;
             if (!closerTargetWarrantsPreemption(candidate.distanceSq(), currentDistanceSq)) break;
@@ -453,12 +470,25 @@ public final class AutoMiner {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
+            if (eligible == 0) {
+                if (candidateBatchChanged(nearbyPathCandidateOffset, nearbyPathCandidateAnchor, candidate.pos())) {
+                    nearbyPathCandidateOffset = 0;
+                }
+                nearbyPathCandidateAnchor = candidate.pos();
+            }
+            if (eligible++ < nearbyPathCandidateOffset) continue;
             PathRoute route = pathToOre(candidate.pos());
             attempts++;
-            if (route != null) return new PathTarget(candidate.pos(), candidate.type(), route.points);
-            if (attempts >= MAX_NEARBY_PATH_TARGETS) break;
+            if (route != null) {
+                target = new PathTarget(candidate.pos(), candidate.type(), route.points);
+                break;
+            }
+            if (attempts >= pathTargetsPerTick()) break;
         }
-        return null;
+        nearbyPathCandidateOffset = nextPathCandidateOffset(nearbyPathCandidateOffset, attempts,
+            pathTargetsPerTick(), target != null);
+        if (nearbyPathCandidateOffset == 0) nearbyPathCandidateAnchor = null;
+        return target;
     }
 
     static boolean closerTargetWarrantsPreemption(double nearbyDistanceSq, double currentDistanceSq) {
@@ -469,6 +499,18 @@ public final class AutoMiner {
     static int nextPathCandidateOffset(int currentOffset, int attempts, int batchSize, boolean found) {
         if (found || attempts < batchSize) return 0;
         return currentOffset + attempts;
+    }
+
+    static int pathTargetsPerTick() {
+        return PATH_TARGETS_PER_TICK;
+    }
+
+    static int pathSearchRetryDelay(int nextCandidateOffset) {
+        return nextCandidateOffset > 0 ? 1 : PATH_RETRY_TICKS;
+    }
+
+    static boolean candidateBatchChanged(int offset, BlockPos anchor, BlockPos firstCandidate) {
+        return offset > 0 && (anchor == null || !anchor.equals(firstCandidate));
     }
 
     static boolean temporarilyBlocked(BlockPos candidate, BlockPos failed, int retryDelay) {
@@ -490,10 +532,7 @@ public final class AutoMiner {
         if (goals.isEmpty()) return null;
         Set<BlockPos> goalSet = new HashSet<>(goals);
         if (goalSet.contains(start)) return new PathRoute(java.util.Collections.emptyList(), 0);
-        PriorityQueue<PathNode> queue = new PriorityQueue<>((left, right) -> {
-            int priority = Integer.compare(left.priority, right.priority);
-            return priority != 0 ? priority : Integer.compare(left.cost, right.cost);
-        });
+        PriorityQueue<PathNode> queue = new PriorityQueue<>(AutoMiner::comparePathNodes);
         Map<BlockPos, BlockPos> previous = new HashMap<>();
         Map<BlockPos, Integer> costs = new HashMap<>();
         queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
@@ -553,6 +592,15 @@ public final class AutoMiner {
             nearest = Math.min(nearest, distance);
         }
         return nearest == Integer.MAX_VALUE ? cost : cost + nearest;
+    }
+
+    private static int comparePathNodes(PathNode left, PathNode right) {
+        return comparePathOrder(left.priority, left.cost, right.priority, right.cost);
+    }
+
+    static int comparePathOrder(int leftPriority, int leftCost, int rightPriority, int rightCost) {
+        int priority = Integer.compare(leftPriority, rightPriority);
+        return priority != 0 ? priority : Integer.compare(rightCost, leftCost);
     }
 
     private List<BlockPos> standPositionsAround(BlockPos ore) {
@@ -729,6 +777,9 @@ public final class AutoMiner {
         clearPath();
         pathRetryDelay = 0;
         pathCandidateOffset = 0;
+        nearbyPathCandidateOffset = 0;
+        pathCandidateAnchor = null;
+        nearbyPathCandidateAnchor = null;
         nearbyRouteCheckDelay = 0;
         delay = 2;
     }
@@ -738,6 +789,8 @@ public final class AutoMiner {
         currentOreType = target.type;
         path = target.path;
         pathIndex = 0;
+        nearbyPathCandidateOffset = 0;
+        nearbyPathCandidateAnchor = null;
         nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
         resetRouteProgress();
     }

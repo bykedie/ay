@@ -42,6 +42,13 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void equalCostEstimatesAdvanceTowardTheGoalBeforeFanningOut() {
+        assertTrue(AutoMiner.comparePathOrder(9, 1, 10, 8) < 0);
+        assertTrue(AutoMiner.comparePathOrder(10, 8, 10, 1) < 0);
+        assertTrue(AutoMiner.comparePathOrder(10, 1, 10, 8) > 0);
+    }
+
+    @Test
     public void knownCheaperNeighborSkipsWorldTraversalChecks() {
         assertTrue(AutoMiner.knownPathCostCannotImprove(5, 4, 0));
         assertTrue(AutoMiner.knownPathCostCannotImprove(7, 4, 2));
@@ -120,6 +127,23 @@ public class AutoMinerTest {
         assertEquals(12, AutoMiner.nextPathCandidateOffset(6, 6, 6, false));
         assertEquals(0, AutoMiner.nextPathCandidateOffset(12, 3, 6, false));
         assertEquals(0, AutoMiner.nextPathCandidateOffset(6, 2, 6, true));
+    }
+
+    @Test
+    public void pathPlanningSpreadsUnreachableCandidatesAcrossTicks() {
+        assertEquals(1, AutoMiner.pathTargetsPerTick());
+        assertEquals(1, AutoMiner.nextPathCandidateOffset(0, 1, 1, false));
+        assertEquals(1, AutoMiner.pathSearchRetryDelay(1));
+        assertEquals(20, AutoMiner.pathSearchRetryDelay(0));
+    }
+
+    @Test
+    public void newlyDiscoveredNearestOreRestartsTheCandidateBatch() {
+        BlockPos originalNearest = new BlockPos(5, 20, 0);
+        assertFalse(AutoMiner.candidateBatchChanged(1, originalNearest, originalNearest));
+        assertTrue(AutoMiner.candidateBatchChanged(1, originalNearest, new BlockPos(2, 20, 0)));
+        assertTrue(AutoMiner.candidateBatchChanged(1, null, originalNearest));
+        assertFalse(AutoMiner.candidateBatchChanged(0, originalNearest, new BlockPos(2, 20, 0)));
     }
 
     @Test
