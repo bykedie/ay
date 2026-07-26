@@ -64,6 +64,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void ascendingRouteWaitsUntilThePlayersFeetClearTheLandingSupport() {
+        assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.0));
+        assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.98));
+        assertFalse(AutoMiner.waitingForAscendingClearance(65, 64.99));
+        assertFalse(AutoMiner.waitingForAscendingClearance(65, 65.0));
+    }
+
+    @Test
     public void pathPriorityGuidesSearchTowardTheNearestGoal() {
         BlockPos goal = new BlockPos(10, 20, 30);
         assertEquals(4, AutoMiner.pathPriority(1, new BlockPos(8, 20, 29), Arrays.asList(goal)));

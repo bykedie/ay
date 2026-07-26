@@ -408,6 +408,12 @@ public final class AutoMiner {
             abandonCurrentRoute();
             return;
         }
+        if (waitingForAscendingClearance(next.getY(), mc.player.getEntityBoundingBox().minY)) {
+            stopRouteMotion();
+            if (mc.player.onGround) mc.player.jump();
+            delay = 0;
+            return;
+        }
         if (distanceSq > 0.0001) {
             double length = Math.sqrt(distanceSq);
             double motionX = routeMotionTowardNode(dx / length, length);
@@ -419,9 +425,6 @@ public final class AutoMiner {
             }
             mc.player.motionX = motionX;
             mc.player.motionZ = motionZ;
-        }
-        if (next.getY() > MathHelper.floor(mc.player.getEntityBoundingBox().minY) && mc.player.onGround) {
-            mc.player.jump();
         }
         delay = 0;
     }
@@ -463,6 +466,10 @@ public final class AutoMiner {
             && actualFeet.getY() <= Math.max(from.getY(), next.getY())
             && actualFeet.getZ() >= Math.min(from.getZ(), next.getZ())
             && actualFeet.getZ() <= Math.max(from.getZ(), next.getZ());
+    }
+
+    static boolean waitingForAscendingClearance(int nextY, double feetY) {
+        return feetY + 0.01 < nextY;
     }
 
     private void stopRouteMotion() {
