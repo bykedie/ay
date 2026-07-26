@@ -181,6 +181,20 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void disarmsOldRecoveryAfterThePlayerWalksAwayNormally() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+
+        assertEquals(true, BlinkStrike.shouldDisarmRecovery(origin,
+            new BlinkPath.Point(2.8, 64.0, 0.0), new BlinkPath.Point(3.4, 64.0, 0.0), true));
+        assertEquals(false, BlinkStrike.shouldDisarmRecovery(origin, origin,
+            new BlinkPath.Point(20.0, 64.0, 0.0), true));
+        assertEquals(false, BlinkStrike.shouldDisarmRecovery(origin,
+            new BlinkPath.Point(2.8, 64.0, 0.0), new BlinkPath.Point(3.4, 64.0, 0.0), false));
+        assertEquals(false, BlinkStrike.shouldDisarmRecovery(origin, origin,
+            new BlinkPath.Point(2.5, 64.0, 0.0), true));
+    }
+
+    @Test
     public void skipsExpiredStrikePlansInsteadOfCountingThemAsHits() {
         assertEquals(false, BlinkStrike.strikePlanStillUsable(false, true, true));
         assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false, true));

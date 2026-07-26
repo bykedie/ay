@@ -164,6 +164,11 @@ public final class BlinkStrike {
             return;
         }
         BlinkPath.Point current = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
+        if (shouldDisarmRecovery(recoveryOrigin, lastRecoveryPosition, current,
+                movementInputActive())) {
+            clearRecovery();
+            return;
+        }
         List<BlinkPath.Point> returnPath = recoveryReturnPath(recoveryOrigin, lastRecoveryPosition, current,
             recoveryRoutes, ModConfig.blinkStep);
         if (returnPath.isEmpty()) {
@@ -185,6 +190,20 @@ public final class BlinkStrike {
         mc.player.motionZ = recoveryMotionZ;
         mc.player.onGround = recoveryPlayerOnGround;
         lastRecoveryPosition = recoveryOrigin;
+    }
+
+    private boolean movementInputActive() {
+        return Math.abs(mc.player.movementInput.moveForward) > 0.01F
+            || Math.abs(mc.player.movementInput.moveStrafe) > 0.01F
+            || mc.gameSettings.keyBindJump.isKeyDown()
+            || mc.gameSettings.keyBindSneak.isKeyDown();
+    }
+
+    static boolean shouldDisarmRecovery(BlinkPath.Point origin, BlinkPath.Point previous,
+            BlinkPath.Point current, boolean movementInput) {
+        return movementInput && origin != null && previous != null && current != null
+            && origin.distanceTo(current) > RECOVERY_ORIGIN_RADIUS
+            && previous.distanceTo(current) <= RECOVERY_JUMP_DISTANCE;
     }
 
     private void clearRecovery() {
