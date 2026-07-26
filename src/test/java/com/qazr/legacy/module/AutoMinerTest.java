@@ -169,9 +169,14 @@ public class AutoMinerTest {
     @Test
     public void pathPlanningSpreadsUnreachableCandidatesAcrossTicks() {
         assertEquals(1, AutoMiner.pathTargetsPerTick());
+        assertEquals(128, AutoMiner.pathSearchSliceBudget(0));
+        assertEquals(128, AutoMiner.pathSearchSliceBudget(256));
+        assertEquals(64, AutoMiner.pathSearchSliceBudget(1536));
+        assertEquals(0, AutoMiner.pathSearchSliceBudget(1600));
         assertEquals(1, AutoMiner.nextPathCandidateOffset(0, 1, 1, false));
-        assertEquals(1, AutoMiner.pathSearchRetryDelay(1));
-        assertEquals(20, AutoMiner.pathSearchRetryDelay(0));
+        assertEquals(0, AutoMiner.pathSearchRetryDelay(0, true));
+        assertEquals(1, AutoMiner.pathSearchRetryDelay(1, false));
+        assertEquals(20, AutoMiner.pathSearchRetryDelay(0, false));
     }
 
     @Test

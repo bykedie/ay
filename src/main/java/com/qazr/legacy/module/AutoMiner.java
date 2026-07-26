@@ -37,6 +37,7 @@ import org.lwjgl.opengl.GL11;
 
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 1600;
+    private static final int PATH_NODES_PER_TICK = 128;
     private static final int PATH_TARGETS_PER_TICK = 1;
     private static final int PATH_CANDIDATE_BATCH_SIZE = 4;
     private static final int MAX_CACHED_TARGETS = 96;
@@ -74,6 +75,7 @@ public final class AutoMiner {
     private BlockPos nearbyPathCandidateAnchor;
     private PathTarget pendingPathTarget;
     private int pendingPathTargetScore = Integer.MAX_VALUE;
+    private PathSearch pendingPathSearch;
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
     private int nearbyRouteCheckDelay;
@@ -145,6 +147,8 @@ public final class AutoMiner {
                 if (closer != null) {
                     activatePathTarget(closer);
                     if (path.isEmpty()) return;
+                } else if (pendingPathSearch != null) {
+                    nearbyRouteCheckDelay = 0;
                 }
             }
             followPathToOre();
@@ -339,7 +343,7 @@ public final class AutoMiner {
                 : candidates;
             PathTarget target = findNearestPathTarget(available);
             if (target == null) {
-                pathRetryDelay = pathSearchRetryDelay(pathCandidateOffset);
+                pathRetryDelay = pathSearchRetryDelay(pathCandidateOffset, pendingPathSearch != null);
                 return;
             }
             pathRetryDelay = 0;
@@ -442,7 +446,9 @@ public final class AutoMiner {
                 hasMoreCandidates = true;
                 break;
             }
-            PathRoute route = pathToOre(candidate.pos());
+            PathSearchResult search = incrementalPathToOre(candidate.pos());
+            if (!search.complete) return null;
+            PathRoute route = search.route;
             attempts++;
             if (route != null) {
                 int score = pathTargetScore(route.cost, candidate.distanceSq(),
@@ -485,7 +491,12 @@ public final class AutoMiner {
                 nearbyPathCandidateAnchor = candidate.pos();
             }
             if (eligible++ < nearbyPathCandidateOffset) continue;
-            PathRoute route = pathToOre(candidate.pos());
+            PathSearchResult search = incrementalPathToOre(candidate.pos());
+            if (!search.complete) {
+                nearbyPathCandidateOffset = Math.max(0, eligible - 1);
+                return null;
+            }
+            PathRoute route = search.route;
             attempts++;
             if (route != null) {
                 target = new PathTarget(candidate.pos(), candidate.type(), route.points);
@@ -513,12 +524,17 @@ public final class AutoMiner {
         return PATH_TARGETS_PER_TICK;
     }
 
+    static int pathSearchSliceBudget(int visited) {
+        return Math.max(0, Math.min(PATH_NODES_PER_TICK, MAX_PATH_NODES - Math.max(0, visited)));
+    }
+
     static boolean shouldFinalizePathCandidateBatch(int evaluated, int batchSize,
             boolean hasMoreCandidates) {
         return evaluated >= batchSize || !hasMoreCandidates;
     }
 
-    static int pathSearchRetryDelay(int nextCandidateOffset) {
+    static int pathSearchRetryDelay(int nextCandidateOffset, boolean searchPending) {
+        if (searchPending) return 0;
         return nextCandidateOffset > 0 ? 1 : PATH_RETRY_TICKS;
     }
 
@@ -539,40 +555,54 @@ public final class AutoMiner {
         return routeCost + blockDistance * 8 - (sameVein ? 2 : 0);
     }
 
-    private PathRoute pathToOre(BlockPos ore) {
+    private PathSearchResult incrementalPathToOre(BlockPos ore) {
         BlockPos start = standPos(mc.player.getPosition());
-        List<BlockPos> goals = standPositionsAround(ore);
-        if (goals.isEmpty()) return null;
-        Set<BlockPos> goalSet = new HashSet<>(goals);
-        if (goalSet.contains(start)) return new PathRoute(java.util.Collections.emptyList(), 0);
-        PriorityQueue<PathNode> queue = new PriorityQueue<>(AutoMiner::comparePathNodes);
-        Map<BlockPos, BlockPos> previous = new HashMap<>();
-        Map<BlockPos, Integer> costs = new HashMap<>();
-        Map<BlockPos, Integer> traversalCosts = new HashMap<>();
-        Map<BlockPos, Integer> jumpClearanceCosts = new HashMap<>();
-        queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
-        previous.put(start, null);
-        costs.put(start, 0);
         double maxDistanceSq = ModConfig.minePathRange * ModConfig.minePathRange;
-        int visited = 0;
-        while (!queue.isEmpty() && visited < MAX_PATH_NODES) {
-            PathNode node = queue.remove();
+        if (pendingPathSearch == null || !pendingPathSearch.matches(ore, start, maxDistanceSq)) {
+            List<BlockPos> goals = standPositionsAround(ore);
+            if (goals.isEmpty()) {
+                pendingPathSearch = null;
+                return PathSearchResult.complete(null);
+            }
+            pendingPathSearch = new PathSearch(ore, start, goals, maxDistanceSq);
+        }
+        PathSearchResult result = advancePathSearch(pendingPathSearch,
+            pathSearchSliceBudget(pendingPathSearch.visited));
+        if (result.complete) pendingPathSearch = null;
+        return result;
+    }
+
+    private PathSearchResult advancePathSearch(PathSearch search, int nodeBudget) {
+        if (search.goalSet.contains(search.start)) {
+            return PathSearchResult.complete(new PathRoute(java.util.Collections.emptyList(), 0));
+        }
+        int expanded = 0;
+        while (!search.queue.isEmpty() && search.visited < MAX_PATH_NODES
+                && expanded < Math.max(0, nodeBudget)) {
+            PathNode node = search.queue.remove();
+            expanded++;
             BlockPos pos = node.pos;
-            Integer knownCost = costs.get(pos);
+            Integer knownCost = search.costs.get(pos);
             if (knownCost == null || node.cost != knownCost) continue;
-            visited++;
-            if (goalSet.contains(pos)) return new PathRoute(reconstruct(previous, pos), node.cost);
+            search.visited++;
+            if (search.goalSet.contains(pos)) {
+                return PathSearchResult.complete(new PathRoute(
+                    reconstruct(search.previous, pos), node.cost));
+            }
             for (EnumFacing facing : EnumFacing.HORIZONTALS) {
                 for (int dy : PATH_VERTICAL_OFFSETS) {
                     BlockPos next = standPos(pos.offset(facing).add(0, dy, 0));
-                    addPathNeighbor(queue, previous, costs, traversalCosts, jumpClearanceCosts,
-                        start, goals, maxDistanceSq, pos, node.cost, next, Math.abs(dy) * 2);
+                    addPathNeighbor(search.queue, search.previous, search.costs,
+                        search.traversalCosts, search.jumpClearanceCosts, search.start,
+                        search.goals, search.maxDistanceSq, pos, node.cost, next, Math.abs(dy) * 2);
                 }
             }
-            addPathNeighbor(queue, previous, costs, traversalCosts, jumpClearanceCosts, start,
-                goals, maxDistanceSq, pos, node.cost, pos.down(), 2);
+            addPathNeighbor(search.queue, search.previous, search.costs, search.traversalCosts,
+                search.jumpClearanceCosts, search.start, search.goals, search.maxDistanceSq,
+                pos, node.cost, pos.down(), 2);
         }
-        return null;
+        return search.queue.isEmpty() || search.visited >= MAX_PATH_NODES
+            ? PathSearchResult.complete(null) : PathSearchResult.pending();
     }
 
     private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
@@ -855,6 +885,7 @@ public final class AutoMiner {
         pathCandidateAnchor = null;
         pendingPathTarget = null;
         pendingPathTargetScore = Integer.MAX_VALUE;
+        pendingPathSearch = null;
     }
 
     private void selectBestPickaxe(BlockPos pos) {
@@ -1080,6 +1111,54 @@ public final class AutoMiner {
         private PathRoute(List<BlockPos> points, int cost) {
             this.points = points;
             this.cost = cost;
+        }
+    }
+
+    private static final class PathSearch {
+        private final BlockPos ore;
+        private final BlockPos start;
+        private final List<BlockPos> goals;
+        private final Set<BlockPos> goalSet;
+        private final PriorityQueue<PathNode> queue = new PriorityQueue<>(AutoMiner::comparePathNodes);
+        private final Map<BlockPos, BlockPos> previous = new HashMap<>();
+        private final Map<BlockPos, Integer> costs = new HashMap<>();
+        private final Map<BlockPos, Integer> traversalCosts = new HashMap<>();
+        private final Map<BlockPos, Integer> jumpClearanceCosts = new HashMap<>();
+        private final double maxDistanceSq;
+        private int visited;
+
+        private PathSearch(BlockPos ore, BlockPos start, List<BlockPos> goals, double maxDistanceSq) {
+            this.ore = ore.toImmutable();
+            this.start = start.toImmutable();
+            this.goals = goals;
+            this.goalSet = new HashSet<>(goals);
+            this.maxDistanceSq = maxDistanceSq;
+            queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
+            previous.put(start, null);
+            costs.put(start, 0);
+        }
+
+        private boolean matches(BlockPos targetOre, BlockPos playerStart, double rangeSq) {
+            return ore.equals(targetOre) && start.equals(playerStart)
+                && Double.compare(maxDistanceSq, rangeSq) == 0;
+        }
+    }
+
+    private static final class PathSearchResult {
+        private final boolean complete;
+        private final PathRoute route;
+
+        private PathSearchResult(boolean complete, PathRoute route) {
+            this.complete = complete;
+            this.route = route;
+        }
+
+        private static PathSearchResult pending() {
+            return new PathSearchResult(false, null);
+        }
+
+        private static PathSearchResult complete(PathRoute route) {
+            return new PathSearchResult(true, route);
         }
     }
 
