@@ -39,7 +39,7 @@ import org.lwjgl.opengl.GL11;
 public final class OreVisualizer {
     private static final int VISUALIZER_SECTIONS_PER_TICK = 12;
     private static final int AUTO_MINE_SECTIONS_PER_TICK = 2;
-    private static final int VALIDATION_CHUNKS_PER_TICK = 2;
+    private static final int VALIDATION_MARKERS_PER_PASS = 128;
     private static final double BOX_INSET = 0.002;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -48,7 +48,8 @@ public final class OreVisualizer {
     private final Map<OreType, Set<Long>> markerSetsByType = new EnumMap<>(OreType.class);
     private final Set<Long> scannedChunks = new HashSet<>();
     private final Deque<ScanTask> scanQueue = new ArrayDeque<>();
-    private int validationIndex;
+    private final Deque<ValidationTask> validationQueue = new ArrayDeque<>();
+    private final Map<Long, ValidationTask> validationTasks = new HashMap<>();
     private int validationDelay;
     private World seededWorld;
     private int seededRadiusChunks;
@@ -100,7 +101,8 @@ public final class OreVisualizer {
         markerSetsByType.clear();
         scannedChunks.clear();
         scanQueue.clear();
-        validationIndex = 0;
+        validationQueue.clear();
+        validationTasks.clear();
         validationDelay = 0;
         seededWorld = null;
         seededRadiusChunks = 0;
@@ -135,7 +137,7 @@ public final class OreVisualizer {
             }
         }
         if (validationDelay-- <= 0) {
-            validateCachedMarkers(VALIDATION_CHUNKS_PER_TICK);
+            validateCachedMarkers(VALIDATION_MARKERS_PER_PASS);
             validationDelay = 4;
         }
     }
@@ -237,7 +239,10 @@ public final class OreVisualizer {
             iterator.remove();
             removeTypeMarker(marker);
         }
-        if (markers.isEmpty()) markersByChunk.remove(key);
+        if (markers.isEmpty()) {
+            markersByChunk.remove(key);
+            validationTasks.remove(key);
+        }
     }
 
     private boolean cacheNeeded() {
@@ -303,7 +308,8 @@ public final class OreVisualizer {
         markerSetsByType.clear();
         scannedChunks.clear();
         scanQueue.clear();
-        validationIndex = 0;
+        validationQueue.clear();
+        validationTasks.clear();
         validationDelay = 0;
         seededWorld = null;
         seededRadiusChunks = 0;
@@ -404,10 +410,12 @@ public final class OreVisualizer {
         List<OreMarker> stored = markersByChunk.computeIfAbsent(key, ignored -> new ArrayList<>());
         stored.addAll(markers);
         for (OreMarker marker : markers) addTypeMarker(marker);
+        queueValidation(key);
     }
 
     private void removeChunkMarkers(long key) {
         List<OreMarker> markers = markersByChunk.remove(key);
+        validationTasks.remove(key);
         if (markers == null) return;
         for (OreMarker marker : markers) removeTypeMarker(marker);
     }
@@ -423,27 +431,52 @@ public final class OreVisualizer {
         if (markers.isEmpty()) markerSetsByType.remove(marker.type);
     }
 
-    private void validateCachedMarkers(int chunkBudget) {
-        if (markersByChunk.isEmpty()) return;
-        List<Long> keys = new ArrayList<>(markersByChunk.keySet());
-        for (int i = 0; i < chunkBudget && !keys.isEmpty(); i++) {
-            if (validationIndex >= keys.size()) validationIndex = 0;
-            validateChunk(keys.get(validationIndex++));
+    private void queueValidation(long key) {
+        if (validationTasks.containsKey(key)) return;
+        ValidationTask task = new ValidationTask(key);
+        validationTasks.put(key, task);
+        validationQueue.addLast(task);
+    }
+
+    private void validateCachedMarkers(int markerBudget) {
+        int tasksRemaining = validationQueue.size();
+        while (markerBudget > 0 && tasksRemaining-- > 0 && !validationQueue.isEmpty()) {
+            ValidationTask task = validationQueue.removeFirst();
+            if (validationTasks.get(task.key) != task) continue;
+            List<OreMarker> markers = markersByChunk.get(task.key);
+            if (markers == null || markers.isEmpty()) {
+                validationTasks.remove(task.key);
+                continue;
+            }
+            if (task.markerIndex >= markers.size()) task.markerIndex = 0;
+            int checks = validationChecksForSlice(markers.size(), task.markerIndex, markerBudget);
+            int checked = 0;
+            while (checked < checks && task.markerIndex < markers.size()) {
+                OreMarker marker = markers.get(task.markerIndex);
+                IBlockState state = mc.world.getBlockState(marker.pos);
+                if (OreType.fromBlock(state.getBlock()) == marker.type) {
+                    task.markerIndex++;
+                } else {
+                    markers.remove(task.markerIndex);
+                    removeTypeMarker(marker);
+                }
+                checked++;
+            }
+            markerBudget -= checked;
+            if (markers.isEmpty()) {
+                markersByChunk.remove(task.key);
+                validationTasks.remove(task.key);
+            } else {
+                if (task.markerIndex >= markers.size()) task.markerIndex = 0;
+                validationQueue.addLast(task);
+            }
         }
     }
 
-    private void validateChunk(long key) {
-        List<OreMarker> markers = markersByChunk.get(key);
-        if (markers == null) return;
-        Iterator<OreMarker> iterator = markers.iterator();
-        while (iterator.hasNext()) {
-            OreMarker marker = iterator.next();
-            IBlockState state = mc.world.getBlockState(marker.pos);
-            if (OreType.fromBlock(state.getBlock()) == marker.type) continue;
-            iterator.remove();
-            removeTypeMarker(marker);
-        }
-        if (markers.isEmpty()) markersByChunk.remove(key);
+    static int validationChecksForSlice(int markerCount, int markerIndex, int budget) {
+        if (markerCount <= 0 || budget <= 0) return 0;
+        int start = MathHelper.clamp(markerIndex, 0, markerCount);
+        return Math.min(budget, markerCount - start);
     }
 
     private void removeQueued(long key) {
@@ -603,6 +636,15 @@ public final class OreVisualizer {
             int dx = chunk.x - centerChunkX;
             int dz = chunk.z - centerChunkZ;
             return dx * dx + dz * dz;
+        }
+    }
+
+    private static final class ValidationTask {
+        private final long key;
+        private int markerIndex;
+
+        private ValidationTask(long key) {
+            this.key = key;
         }
     }
 

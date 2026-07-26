@@ -46,6 +46,14 @@ public class OreVisualizerTest {
     }
 
     @Test
+    public void cacheValidationNeverExceedsItsMarkerBudget() {
+        assertEquals(128, OreVisualizer.validationChecksForSlice(500, 0, 128));
+        assertEquals(20, OreVisualizer.validationChecksForSlice(500, 480, 128));
+        assertEquals(0, OreVisualizer.validationChecksForSlice(0, 0, 128));
+        assertEquals(0, OreVisualizer.validationChecksForSlice(500, 0, 0));
+    }
+
+    @Test
     public void drawsEveryEdgeForSingleOreBlock() {
         Set<BlockPos> positions = new HashSet<>();
         BlockPos block = new BlockPos(0, 0, 0);
