@@ -145,4 +145,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.routeProgressed(1.0, 0.999));
         assertFalse(AutoMiner.routeProgressed(1.0, 1.01));
     }
+
+    @Test
+    public void directMiningChecksStayBoundedInDenseVeins() {
+        assertEquals(16, AutoMiner.visibleTargetInspectionLimit());
+    }
 }

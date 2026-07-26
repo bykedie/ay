@@ -43,6 +43,7 @@ public final class AutoMiner {
     private static final int NEARBY_ROUTE_CHECK_TICKS = 5;
     private static final double NEARBY_ROUTE_RANGE = 6.0;
     private static final int MAX_NEARBY_PATH_TARGETS = 2;
+    private static final int MAX_VISIBLE_TARGETS = 16;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final int ROUTE_RENDER_LIMIT = 220;
@@ -737,22 +738,30 @@ public final class AutoMiner {
     private MineTarget findNearestReachable(List<OreVisualizer.CachedOre> candidates) {
         MineTarget veinTarget = findVisibleVeinTarget(candidates);
         if (veinTarget != null) return veinTarget;
+        int inspected = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (quotaReached(candidate.type())) continue;
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) return visible;
+            if (++inspected >= MAX_VISIBLE_TARGETS) break;
         }
         return null;
     }
 
     private MineTarget findVisibleVeinTarget(List<OreVisualizer.CachedOre> candidates) {
         if (lastMinedOre == null || lastMinedType == null) return null;
+        int inspected = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (!sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type())) continue;
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) return visible;
+            if (++inspected >= MAX_VISIBLE_TARGETS) break;
         }
         return null;
+    }
+
+    static int visibleTargetInspectionLimit() {
+        return MAX_VISIBLE_TARGETS;
     }
 
     private MineTarget visibleTarget(BlockPos pos) {
