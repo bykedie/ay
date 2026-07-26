@@ -24,6 +24,7 @@ public final class BlinkStrike {
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
     private static final int RECOVERY_TICKS = 40;
+    private static final int CORRECTION_BACKOFF_TICKS = 40;
     private static final double RECOVERY_ORIGIN_RADIUS = 3.0;
     private static final double RECOVERY_JUMP_DISTANCE = 2.0;
     private static final double RECOVERY_PATH_RADIUS = 1.5;
@@ -41,6 +42,7 @@ public final class BlinkStrike {
     private double recoveryMotionY;
     private double recoveryMotionZ;
     private int recoveryUntilTick;
+    private int correctionBackoffUntilTick;
     private int delay;
 
     public BlinkStrike(ModuleManager modules) {
@@ -54,6 +56,7 @@ public final class BlinkStrike {
         if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
+        if (mc.player.ticksExisted < correctionBackoffUntilTick) return;
         if (delay > 0) {
             delay--;
             return;
@@ -92,8 +95,7 @@ public final class BlinkStrike {
 
     private boolean strike(EntityLivingBase target, BlinkPath.Point origin, StrikePlan plan,
             boolean originOnGround) {
-        boolean transportOnGround = transportOnGround(originOnGround,
-            modules.isEnabled(ModuleId.FLIGHT));
+        boolean transportOnGround = transportOnGround(originOnGround);
         List<BlinkPath.Point> path = plan.path;
         double originalMotionX = mc.player.motionX;
         double originalMotionY = mc.player.motionY;
@@ -140,6 +142,7 @@ public final class BlinkStrike {
             delay = 0;
             unreachableUntil.clear();
             reachableUntil.clear();
+            correctionBackoffUntilTick = 0;
             clearRecovery();
         }
     }
@@ -148,7 +151,7 @@ public final class BlinkStrike {
         recoveryOrigin = origin;
         lastRecoveryPosition = origin;
         recoveryOnGround = onGround;
-        recoveryTransportOnGround = transportOnGround(onGround, modules.isEnabled(ModuleId.FLIGHT));
+        recoveryTransportOnGround = transportOnGround(onGround);
         recoveryPlayerOnGround = mc.player.onGround;
         recoveryMotionX = mc.player.motionX;
         recoveryMotionY = mc.player.motionY;
@@ -189,7 +192,9 @@ public final class BlinkStrike {
         mc.player.motionY = recoveryMotionY;
         mc.player.motionZ = recoveryMotionZ;
         mc.player.onGround = recoveryPlayerOnGround;
-        lastRecoveryPosition = recoveryOrigin;
+        reachableUntil.clear();
+        correctionBackoffUntilTick = mc.player.ticksExisted + CORRECTION_BACKOFF_TICKS;
+        clearRecovery();
     }
 
     private boolean movementInputActive() {
@@ -278,10 +283,15 @@ public final class BlinkStrike {
     boolean isReachableForRender(EntityLivingBase target) {
         if (mc.player == null || target == null) return false;
         int tick = mc.player.ticksExisted;
+        if (correctionBackoffActive(tick, correctionBackoffUntilTick)) return false;
         Integer blocked = unreachableUntil.get(target.getEntityId());
         if (blocked != null && blocked > tick) return false;
         Integer reachable = reachableUntil.get(target.getEntityId());
         return reachable != null && reachable > tick;
+    }
+
+    static boolean correctionBackoffActive(int currentTick, int backoffUntilTick) {
+        return currentTick < backoffUntilTick;
     }
 
     static int planningBudget(int requestedTargets) {
@@ -454,24 +464,30 @@ public final class BlinkStrike {
     }
 
     private boolean originOnGround(BlinkPath.Point origin) {
-        if (mc.player.onGround) return true;
         AxisAlignedBB box = mc.player.getEntityBoundingBox()
             .offset(origin.x - mc.player.posX, origin.y - mc.player.posY, origin.z - mc.player.posZ)
             .offset(0.0, -0.04, 0.0);
-        return !mc.world.getCollisionBoxes(mc.player, box).isEmpty();
+        boolean collisionBelow = !mc.world.getCollisionBoxes(mc.player, box).isEmpty();
+        return actualGrounded(mc.player.onGround, modules.isEnabled(ModuleId.FLIGHT), collisionBelow);
+    }
+
+    static boolean actualGrounded(boolean reportedOnGround, boolean controlledFlight,
+            boolean collisionBelow) {
+        return collisionBelow || (reportedOnGround && !controlledFlight);
     }
 
     private boolean safeAirborneOrigin() {
         return safeAirborneOrigin(mc.player.isInWater(), mc.player.isInLava(), mc.player.isOnLadder(),
-            mc.player.capabilities.isFlying);
+            mc.player.capabilities.isFlying, modules.isEnabled(ModuleId.FLIGHT));
     }
 
-    static boolean safeAirborneOrigin(boolean inWater, boolean inLava, boolean onLadder, boolean flying) {
-        return inWater || inLava || onLadder || flying;
+    static boolean safeAirborneOrigin(boolean inWater, boolean inLava, boolean onLadder, boolean flying,
+            boolean controlledFlight) {
+        return inWater || inLava || onLadder || flying || controlledFlight;
     }
 
-    static boolean transportOnGround(boolean originOnGround, boolean flightEnabled) {
-        return originOnGround || flightEnabled;
+    static boolean transportOnGround(boolean originOnGround) {
+        return originOnGround;
     }
 
     private void sendPosition(BlinkPath.Point point, boolean onGround) {

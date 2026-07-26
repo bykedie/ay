@@ -161,6 +161,8 @@ public class AutoMinerTest {
         for (BlockPos candidate : candidates) {
             assertTrue(AutoMiner.stableMiningPosition(candidate, ore));
         }
+        assertTrue(AutoMiner.compareMiningStandPriority(new BlockPos(4, 64, 0),
+            ore.up(), ore, 16.0, 1.0) < 0);
     }
 
     @Test
@@ -231,6 +233,59 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void invisibleLabelsKeepAConnectedVeinInOneStableOrder() {
+        BlockPos seed = new BlockPos(10, 20, 30);
+        OreVisualizer.CachedOre second = new OreVisualizer.CachedOre(
+            seed.east(), OreType.IRON, 1.0);
+        OreVisualizer.CachedOre diagonal = new OreVisualizer.CachedOre(
+            seed.east().up().south(), OreType.IRON, 2.0);
+        OreVisualizer.CachedOre otherType = new OreVisualizer.CachedOre(
+            seed.west(), OreType.GOLD, 1.0);
+        OreVisualizer.CachedOre detached = new OreVisualizer.CachedOre(
+            seed.add(4, 0, 0), OreType.IRON, 1.0);
+
+        Map<BlockPos, Integer> labels = AutoMiner.labelConnectedVein(seed, OreType.IRON,
+            Arrays.asList(second, diagonal, otherType, detached));
+
+        assertEquals(Integer.valueOf(1), labels.get(seed));
+        assertEquals(Integer.valueOf(2), labels.get(second.pos()));
+        assertEquals(Integer.valueOf(3), labels.get(diagonal.pos()));
+        assertFalse(labels.containsKey(otherType.pos()));
+        assertFalse(labels.containsKey(detached.pos()));
+    }
+
+    @Test
+    public void lowerInvisibleLabelWinsOverDistanceAndRouteCost() {
+        OreVisualizer.CachedOre first = new OreVisualizer.CachedOre(
+            new BlockPos(5, 20, 0), OreType.IRON, 25.0);
+        OreVisualizer.CachedOre second = new OreVisualizer.CachedOre(
+            new BlockPos(1, 20, 0), OreType.IRON, 1.0);
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(first.pos(), 1);
+        labels.put(second.pos(), 2);
+
+        assertTrue(AutoMiner.compareTargetPriority(first, second, labels, null, null) < 0);
+        assertTrue(AutoMiner.betterLabeledPathTarget(1, 100, false, 2, 1, true));
+        assertFalse(AutoMiner.betterLabeledPathTarget(2, 1, true, 1, 100, false));
+    }
+
+    @Test
+    public void onlyAnOreFromTheSameLabeledVeinMayExposeTheQueuedTarget() {
+        BlockPos desired = new BlockPos(10, 20, 30);
+        BlockPos blocker = desired.east();
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(desired, 1);
+        labels.put(blocker, 2);
+
+        assertTrue(AutoMiner.isLabeledVeinBlocker(desired, blocker, OreType.IRON,
+            OreType.IRON, labels));
+        assertFalse(AutoMiner.isLabeledVeinBlocker(desired, blocker, OreType.IRON,
+            OreType.GOLD, labels));
+        assertFalse(AutoMiner.isLabeledVeinBlocker(desired, desired.west(), OreType.IRON,
+            OreType.IRON, labels));
+    }
+
+    @Test
     public void pathPlanningSpreadsUnreachableCandidatesAcrossTicks() {
         assertEquals(128, AutoMiner.pathSearchSliceBudget(0));
         assertEquals(128, AutoMiner.pathSearchSliceBudget(256));
@@ -271,10 +326,12 @@ public class AutoMinerTest {
     @Test
     public void failedRouteIsSkippedOnlyDuringItsRetryWindow() {
         BlockPos failed = new BlockPos(4, 20, 7);
+        Map<BlockPos, Integer> blocked = new HashMap<>();
+        blocked.put(failed, 100);
 
-        assertTrue(AutoMiner.temporarilyBlocked(failed, failed, 1));
-        assertFalse(AutoMiner.temporarilyBlocked(failed, failed, 0));
-        assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), failed, 100));
+        assertTrue(AutoMiner.temporarilyBlocked(failed, blocked, 99));
+        assertFalse(AutoMiner.temporarilyBlocked(failed, blocked, 100));
+        assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), blocked, 0));
     }
 
     @Test

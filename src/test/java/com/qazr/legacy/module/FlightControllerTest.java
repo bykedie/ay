@@ -39,6 +39,35 @@ public class FlightControllerTest {
         assertEquals(0.0, FlightController.hypixelOffsetForTick(3), 0.0);
     }
 
+    @Test
+    public void safeLandingCapsFastDescentAndSlowsNearTheGround() {
+        assertEquals(-0.35, FlightController.safeLandingMotion(-4.0, Double.POSITIVE_INFINITY), 0.0001);
+        assertEquals(-0.35, FlightController.safeLandingMotion(0.0, Double.POSITIVE_INFINITY), 0.0001);
+        assertEquals(-0.35, FlightController.safeLandingMotion(-1.0, 3.0), 0.0001);
+        assertEquals(-0.08, FlightController.safeLandingMotion(-1.0, 0.5), 0.0001);
+        assertEquals(-0.03, FlightController.safeLandingMotion(-1.0, 0.03), 0.0001);
+        assertEquals(0.0, FlightController.safeLandingMotion(-1.0, 0.0), 0.0001);
+    }
+
+    @Test
+    public void confirmsGroundOnlyWhenTheNextDescentStepCanTouchIt() {
+        assertEquals(false, FlightController.shouldConfirmLanding(Double.POSITIVE_INFINITY, -0.08));
+        assertEquals(false, FlightController.shouldConfirmLanding(0.25, -0.08));
+        assertEquals(true, FlightController.shouldConfirmLanding(0.09, -0.08));
+        assertEquals(true, FlightController.shouldConfirmLanding(0.0, 0.0));
+        assertEquals(64.0, FlightController.landingPositionY(64.09, 0.09), 0.0001);
+        assertEquals(64.0, FlightController.landingPositionY(64.0, Double.POSITIVE_INFINITY), 0.0);
+        assertEquals(true, FlightController.shouldGuardFall(3, Double.POSITIVE_INFINITY));
+        assertEquals(true, FlightController.shouldGuardFall(6, 2.0));
+        assertEquals(false, FlightController.shouldGuardFall(7, 2.0));
+        assertEquals(false, FlightController.shouldGuardFall(9, 0.1));
+        assertEquals(true, FlightController.shouldResetLandingConfirmation(true, 0.3));
+        assertEquals(true, FlightController.shouldResetLandingConfirmation(
+            true, Double.POSITIVE_INFINITY));
+        assertEquals(false, FlightController.shouldResetLandingConfirmation(true, 0.1));
+        assertEquals(false, FlightController.shouldResetLandingConfirmation(false, 2.0));
+    }
+
     private static void assertOffset(double x, double z, double[] movement) {
         assertEquals(x, movement[0], 0.0001);
         assertEquals(z, movement[1], 0.0001);

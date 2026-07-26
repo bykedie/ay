@@ -9,17 +9,27 @@ import static org.junit.Assert.assertTrue;
 public class BlinkStrikeTest {
     @Test
     public void rejectsOrdinaryFreeFallButAllowsControlledAirborneOrigins() {
-        assertEquals(false, BlinkStrike.safeAirborneOrigin(false, false, false, false));
-        assertEquals(true, BlinkStrike.safeAirborneOrigin(true, false, false, false));
-        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, true, false));
-        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, false, true));
+        assertEquals(false, BlinkStrike.safeAirborneOrigin(false, false, false, false, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(true, false, false, false, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, true, false, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, false, true, false));
+        assertEquals(true, BlinkStrike.safeAirborneOrigin(false, false, false, false, true));
     }
 
     @Test
-    public void groundsTransportPacketsForGroundAndFlightOrigins() {
-        assertEquals(true, BlinkStrike.transportOnGround(true, false));
-        assertEquals(true, BlinkStrike.transportOnGround(false, true));
-        assertEquals(false, BlinkStrike.transportOnGround(false, false));
+    public void groundsTransportPacketsOnlyForActuallyGroundedOrigins() {
+        assertEquals(true, BlinkStrike.transportOnGround(true));
+        assertEquals(false, BlinkStrike.transportOnGround(false));
+        assertEquals(true, BlinkStrike.actualGrounded(true, false, false));
+        assertEquals(false, BlinkStrike.actualGrounded(true, true, false));
+        assertEquals(true, BlinkStrike.actualGrounded(false, true, true));
+    }
+
+    @Test
+    public void correctionBackoffMakesEveryBlinkTargetTemporarilyUnreachable() {
+        assertEquals(true, BlinkStrike.correctionBackoffActive(100, 140));
+        assertEquals(false, BlinkStrike.correctionBackoffActive(140, 140));
+        assertEquals(false, BlinkStrike.correctionBackoffActive(141, 140));
     }
 
     @Test

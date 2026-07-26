@@ -57,3 +57,12 @@
 - Added auto-mine route visualization, current-target highlighting and a manual-movement pause setting.
 - Added configurable `autoBridge` lookahead, down-scan, placement delay and anti-foot-collision settings for jump/fall bridging.
 - Reduced ore visualizer overhead with chunk-level distance culling and throttled cache validation.
+
+## Version 1.10.39 Mining, Flight And Blink Stability Update
+
+- Iteration 1: added stable invisible labels for connected ore veins so auto mining owns one ordered group instead of repeatedly selecting neighboring blocks.
+- Iteration 2: allowed a labeled same-vein blocker to be mined before the queued block, kept the active mining block exact, and preferred reachable side stands over the foot-level fallback.
+- Iteration 3: added per-block failed-route cooldowns and whole-vein release after an exhausted search so one impossible mining position cannot freeze automation.
+- Iteration 4: added guarded sneak-to-land descent with speed limiting, periodic fall reset packets, collision-surface alignment, and re-arming after walking off an edge.
+- Iteration 5: accepted controlled flight as a real airborne blink origin, stopped marking airborne transport packets as grounded, used collision-backed ground detection for Hypixel mode, and added a 40-tick red/unreachable backoff after a server position correction.
+- Re-ran the Forge 1.12.2 development client and confirmed `FMLFileResourcePack:Voris Hub` plus successful loading of all five development mods without a Voris Hub exception.
