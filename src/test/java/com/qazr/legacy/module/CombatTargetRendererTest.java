@@ -41,10 +41,11 @@ public class CombatTargetRendererTest {
     }
 
     @Test
-    public void skeletonBodiesUseBodyYawForFacing() {
-        assertEquals(10.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.QUADRUPED, 10.0F, 90.0F), 0.0F);
-        assertEquals(10.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.HORSE, 10.0F, 45.0F), 0.0F);
+    public void animalSkeletonsFollowTheTargetsHeadFacing() {
+        assertEquals(90.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.QUADRUPED, 10.0F, 90.0F), 0.0F);
+        assertEquals(45.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.HORSE, 10.0F, 45.0F), 0.0F);
         assertEquals(10.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.HUMANOID, 10.0F, 90.0F), 0.0F);
+        assertEquals(10.0F, CombatTargetRenderer.facingYaw(CombatTargetRenderer.SkeletonType.SPIDER, 10.0F, 90.0F), 0.0F);
     }
 
     @Test

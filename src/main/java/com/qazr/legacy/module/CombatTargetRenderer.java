@@ -165,7 +165,8 @@ public final class CombatTargetRenderer {
     }
 
     static float facingYaw(SkeletonType type, float bodyYaw, float headYaw) {
-        return bodyYaw;
+        return type == SkeletonType.QUADRUPED || type == SkeletonType.HORSE
+            ? headYaw : bodyYaw;
     }
 
     static double[] basisForYaw(float yaw) {
