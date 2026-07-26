@@ -133,6 +133,25 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void miningFaceUsesAStableExposedSideWithoutRemovingPlayerSupport() {
+        BlockPos ore = new BlockPos(0, 64, 0);
+
+        assertEquals(ore.up(), AutoMiner.miningFaceNeighbor(new BlockPos(1, 65, 0), ore));
+        assertEquals(ore.down(), AutoMiner.miningFaceNeighbor(new BlockPos(1, 62, 0), ore));
+        assertEquals(ore.east(), AutoMiner.miningFaceNeighbor(new BlockPos(1, 64, 0), ore));
+        assertEquals(ore.east(), AutoMiner.miningFaceNeighbor(new BlockPos(1, 63, 0), ore));
+        assertEquals(null, AutoMiner.miningFaceNeighbor(new BlockPos(1, 64, 1), ore));
+    }
+
+    @Test
+    public void miningWorkAreaRequiresClearPlayerCellsAndSolidSupport() {
+        assertTrue(AutoMiner.miningWorkAreaReady(true, true, true));
+        assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
+        assertFalse(AutoMiner.miningWorkAreaReady(true, false, true));
+        assertFalse(AutoMiner.miningWorkAreaReady(true, true, false));
+    }
+
+    @Test
     public void miningReachUsesTheNearestPointOnTheBlock() {
         BlockPos target = new BlockPos(5, 64, 0);
         Vec3d eyes = new Vec3d(0.5, 64.5, 0.5);
@@ -151,11 +170,33 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void nearbyReachableOreWinsOverAClearerDistantRoute() {
+    public void nearbyReachableOreWinsOverAClearerUnrelatedRoute() {
         int nearby = AutoMiner.pathTargetScore(8, 2.0, false);
-        int distant = AutoMiner.pathTargetScore(1, 36.0, true);
+        int distant = AutoMiner.pathTargetScore(1, 36.0, false);
 
         assertTrue(nearby < distant);
+    }
+
+    @Test
+    public void connectedVeinRouteFinishesBeforeAnyNewGlobalTarget() {
+        int connected = AutoMiner.pathTargetScore(20, 9.0, true);
+        int unrelated = AutoMiner.pathTargetScore(0, 1.0, false);
+
+        assertTrue(AutoMiner.betterPathTarget(connected, true, unrelated, false));
+        assertFalse(AutoMiner.betterPathTarget(unrelated, false, connected, true));
+        assertTrue(AutoMiner.betterPathTarget(2, true, 3, true));
+    }
+
+    @Test
+    public void connectedVeinCandidatesSortAheadOfCloserUnrelatedOre() {
+        BlockPos mined = new BlockPos(10, 20, 30);
+        OreVisualizer.CachedOre connected = new OreVisualizer.CachedOre(
+            mined.east(), OreType.IRON, 25.0);
+        OreVisualizer.CachedOre unrelated = new OreVisualizer.CachedOre(
+            new BlockPos(0, 20, 0), OreType.IRON, 1.0);
+
+        assertTrue(AutoMiner.compareVeinPriority(connected, unrelated, mined, OreType.IRON) < 0);
+        assertTrue(AutoMiner.compareVeinPriority(unrelated, connected, mined, OreType.IRON) > 0);
     }
 
     @Test
@@ -227,6 +268,13 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.closerTargetWarrantsPreemption(16.0, 25.0));
         assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 12.25));
         assertFalse(AutoMiner.closerTargetWarrantsPreemption(9.0, 9.0));
+    }
+
+    @Test
+    public void routeTargetLocksAfterTheFirstNodeIsReached() {
+        assertTrue(AutoMiner.routeTargetMayBePreempted(0));
+        assertFalse(AutoMiner.routeTargetMayBePreempted(1));
+        assertFalse(AutoMiner.routeTargetMayBePreempted(8));
     }
 
     @Test

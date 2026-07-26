@@ -1,6 +1,10 @@
 package com.qazr.legacy.module;
 
+import com.qazr.legacy.config.OreType;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -59,6 +63,23 @@ public class OreVisualizerTest {
         assertEquals(20, OreVisualizer.validationChecksForSlice(500, 480, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(0, 0, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(500, 0, 0));
+    }
+
+    @Test
+    public void equallyDistantCachedOresKeepAStableCoordinateOrder() {
+        OreVisualizer.CachedOre first = new OreVisualizer.CachedOre(
+            new BlockPos(-2, 12, 3), OreType.DIAMOND, 25.0);
+        OreVisualizer.CachedOre second = new OreVisualizer.CachedOre(
+            new BlockPos(2, 12, 3), OreType.DIAMOND, 25.0);
+        List<OreVisualizer.CachedOre> forward = new ArrayList<>(Arrays.asList(first, second));
+        List<OreVisualizer.CachedOre> reverse = new ArrayList<>(Arrays.asList(second, first));
+
+        forward.sort(OreVisualizer::compareCachedOres);
+        reverse.sort(OreVisualizer::compareCachedOres);
+
+        assertEquals(forward.get(0).pos(), reverse.get(0).pos());
+        assertEquals(forward.get(1).pos(), reverse.get(1).pos());
+        assertTrue(OreVisualizer.compareCachedOres(forward.get(0), forward.get(1)) < 0);
     }
 
     @Test

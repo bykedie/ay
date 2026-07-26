@@ -75,6 +75,7 @@ public final class AutoMiner {
     private BlockPos nearbyPathCandidateAnchor;
     private PathTarget pendingPathTarget;
     private int pendingPathTargetScore = Integer.MAX_VALUE;
+    private boolean pendingPathTargetSameVein;
     private PathSearch pendingPathSearch;
     private BlockPos failedRouteOre;
     private int failedRouteRetryDelay;
@@ -134,7 +135,7 @@ public final class AutoMiner {
         if (continueClearingObstacle()) return;
         if (continueMiningTarget()) return;
         if (hasActiveRoute()) {
-            if (nearbyRouteCheckDelay-- <= 0) {
+            if (routeTargetMayBePreempted(pathIndex) && nearbyRouteCheckDelay-- <= 0) {
                 nearbyRouteCheckDelay = NEARBY_ROUTE_CHECK_TICKS;
                 List<OreVisualizer.CachedOre> nearby = oreVisualizer.cachedMineOres(
                     NEARBY_ROUTE_RANGE, MAX_CACHED_TARGETS);
@@ -168,15 +169,15 @@ public final class AutoMiner {
             }
             return;
         }
-        List<OreVisualizer.CachedOre> candidates = oreVisualizer.cachedMineOres(
-            ModConfig.minePathRange, MAX_CACHED_TARGETS);
+        if (routeEndedBeforeMining(currentOre, pathIndex, path.size())) {
+            prepareAndMineCurrentOre();
+            return;
+        }
+        List<OreVisualizer.CachedOre> candidates = prioritizeCurrentVein(
+            oreVisualizer.cachedMineOres(ModConfig.minePathRange, MAX_CACHED_TARGETS));
         MineTarget visible = findNearestReachable(candidates);
         if (visible != null) {
             mine(visible);
-            return;
-        }
-        if (routeEndedBeforeMining(currentOre, pathIndex, path.size())) {
-            abandonCurrentRoute();
             return;
         }
         followPathToOre(candidates);
@@ -253,7 +254,7 @@ public final class AutoMiner {
         miningPos = null;
         miningType = null;
         oreVisualizer.removeMarker(mined);
-        if (mined.equals(currentOre)) clearPath();
+        clearPath();
     }
 
     private boolean allFiniteQuotasReached() {
@@ -311,6 +312,35 @@ public final class AutoMiner {
         }
         mine(target);
         return true;
+    }
+
+    private void prepareAndMineCurrentOre() {
+        if (currentOre == null || targetType(currentOre) == null
+                || !stableMiningPosition(miningPlayerFeet, currentOre)
+                || !miningWorkAreaReady(isPassable(miningPlayerFeet),
+                    isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet))) {
+            abandonCurrentRoute();
+            return;
+        }
+        BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, currentOre);
+        if (faceNeighbor == null) {
+            abandonCurrentRoute();
+            return;
+        }
+        if (!isPassable(faceNeighbor)) {
+            if (!clearCorridorCell(faceNeighbor, faceNeighbor)) {
+                abandonCurrentRoute();
+                return;
+            }
+            delay = ModConfig.mineDelayTicks;
+            return;
+        }
+        MineTarget routedTarget = visibleTarget(currentOre);
+        if (routedTarget != null) {
+            mine(routedTarget);
+        } else {
+            abandonCurrentRoute();
+        }
     }
 
     private boolean continueClearingObstacle() {
@@ -451,10 +481,13 @@ public final class AutoMiner {
             PathRoute route = search.route;
             attempts++;
             if (route != null) {
-                int score = pathTargetScore(route.cost, candidate.distanceSq(),
-                    sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type()));
-                if (score < pendingPathTargetScore) {
+                boolean sameVein = sameVein(
+                    lastMinedOre, candidate.pos(), lastMinedType, candidate.type());
+                int score = pathTargetScore(route.cost, candidate.distanceSq(), sameVein);
+                if (betterPathTarget(score, sameVein,
+                        pendingPathTargetScore, pendingPathTargetSameVein)) {
                     pendingPathTargetScore = score;
+                    pendingPathTargetSameVein = sameVein;
                     pendingPathTarget = new PathTarget(candidate.pos(), candidate.type(), route.points);
                 }
             }
@@ -515,6 +548,10 @@ public final class AutoMiner {
             < Math.sqrt(Math.max(0.0, currentDistanceSq));
     }
 
+    static boolean routeTargetMayBePreempted(int pathIndex) {
+        return pathIndex == 0;
+    }
+
     static int nextPathCandidateOffset(int currentOffset, int attempts, int batchSize, boolean found) {
         if (found || attempts < batchSize) return 0;
         return currentOffset + attempts;
@@ -553,6 +590,11 @@ public final class AutoMiner {
     static int pathTargetScore(int routeCost, double distanceSq, boolean sameVein) {
         int blockDistance = (int) Math.ceil(Math.sqrt(Math.max(0.0, distanceSq)));
         return routeCost + blockDistance * 8 - (sameVein ? 2 : 0);
+    }
+
+    static boolean betterPathTarget(int score, boolean sameVein, int bestScore, boolean bestSameVein) {
+        if (sameVein != bestSameVein) return sameVein;
+        return score < bestScore;
     }
 
     private PathSearchResult incrementalPathToOre(BlockPos ore) {
@@ -663,7 +705,11 @@ public final class AutoMiner {
         List<BlockPos> result = new ArrayList<>();
         for (BlockPos candidate : miningStandCandidates(ore)) {
             BlockPos stand = standPos(candidate);
-            if (canTraverse(stand)) result.add(stand);
+            BlockPos faceNeighbor = miningFaceNeighbor(stand, ore);
+            if (canTraverse(stand) && faceNeighbor != null
+                    && (isPassable(faceNeighbor) || canClearForCorridor(faceNeighbor))) {
+                result.add(stand);
+            }
         }
         result.sort(java.util.Comparator.comparingDouble(pos -> mc.player.getDistanceSqToCenter(pos)));
         return result;
@@ -677,6 +723,20 @@ public final class AutoMiner {
             for (int dy = -2; dy <= 1; dy++) result.add(side.add(0, dy, 0));
         }
         return result;
+    }
+
+    static BlockPos miningFaceNeighbor(BlockPos playerFeet, BlockPos ore) {
+        if (!stableMiningPosition(playerFeet, ore)) return null;
+        int dy = ore.getY() - playerFeet.getY();
+        if (dy < 0) return ore.up();
+        if (dy > 1) return ore.down();
+        int dx = Integer.signum(playerFeet.getX() - ore.getX());
+        int dz = Integer.signum(playerFeet.getZ() - ore.getZ());
+        return ore.add(dx, 0, dz);
+    }
+
+    static boolean miningWorkAreaReady(boolean feetClear, boolean headClear, boolean supported) {
+        return feetClear && headClear && supported;
     }
 
     private List<BlockPos> reconstruct(Map<BlockPos, BlockPos> previous, BlockPos goal) {
@@ -885,6 +945,7 @@ public final class AutoMiner {
         pathCandidateAnchor = null;
         pendingPathTarget = null;
         pendingPathTargetScore = Integer.MAX_VALUE;
+        pendingPathTargetSameVein = false;
         pendingPathSearch = null;
     }
 
@@ -937,6 +998,22 @@ public final class AutoMiner {
         return null;
     }
 
+    private List<OreVisualizer.CachedOre> prioritizeCurrentVein(
+            List<OreVisualizer.CachedOre> candidates) {
+        if (lastMinedOre == null || lastMinedType == null || candidates.size() < 2) return candidates;
+        List<OreVisualizer.CachedOre> prioritized = new ArrayList<>(candidates);
+        prioritized.sort((left, right) -> compareVeinPriority(left, right, lastMinedOre, lastMinedType));
+        return prioritized;
+    }
+
+    static int compareVeinPriority(OreVisualizer.CachedOre left, OreVisualizer.CachedOre right,
+            BlockPos lastMined, OreType lastType) {
+        boolean leftVein = sameVein(lastMined, left.pos(), lastType, left.type());
+        boolean rightVein = sameVein(lastMined, right.pos(), lastType, right.type());
+        if (leftVein != rightVein) return leftVein ? -1 : 1;
+        return OreVisualizer.compareCachedOres(left, right);
+    }
+
     private MineTarget findVisibleVeinTarget(List<OreVisualizer.CachedOre> candidates) {
         if (lastMinedOre == null || lastMinedType == null) return null;
         int inspected = 0;
@@ -957,6 +1034,10 @@ public final class AutoMiner {
         OreType type = targetType(pos);
         if (type == null || !visibilityContextReady(miningPlayerFeet, miningEyes, miningReachDistance)) return null;
         if (!stableMiningPosition(miningPlayerFeet, pos)) return null;
+        BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, pos);
+        if (faceNeighbor == null || !miningWorkAreaReady(isPassable(miningPlayerFeet),
+                isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet))
+                || !isPassable(faceNeighbor)) return null;
         if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         Vec3d center = blockCenter(pos);
         RayTraceResult hit = mc.world.rayTraceBlocks(miningEyes, center, false, true, false);

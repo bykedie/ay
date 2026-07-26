@@ -208,8 +208,8 @@ public final class OreVisualizer {
         if (mc.player == null || mc.world == null) return Collections.emptyList();
         if (limit <= 0) return Collections.emptyList();
         double rangeSq = range * range;
-        PriorityQueue<CachedOre> nearest = new PriorityQueue<>(
-            Comparator.comparingDouble(CachedOre::distanceSq).reversed());
+        PriorityQueue<CachedOre> nearest = new PriorityQueue<>((left, right) ->
+            compareCachedOres(right, left));
         for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
             if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, range)) continue;
             List<OreMarker> markers = entry.getValue();
@@ -217,17 +217,23 @@ public final class OreVisualizer {
                 if (!ModConfig.isMineOreEnabled(marker.type)) continue;
                 double distanceSq = distanceSq(marker.pos);
                 if (distanceSq > rangeSq) continue;
+                CachedOre candidate = new CachedOre(marker.pos, marker.type, distanceSq);
                 if (nearest.size() < limit) {
-                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
-                } else if (distanceSq < nearest.peek().distanceSq()) {
+                    nearest.add(candidate);
+                } else if (compareCachedOres(candidate, nearest.peek()) < 0) {
                     nearest.remove();
-                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
+                    nearest.add(candidate);
                 }
             }
         }
         List<CachedOre> result = new ArrayList<>(nearest);
-        result.sort(Comparator.comparingDouble(CachedOre::distanceSq));
+        result.sort(OreVisualizer::compareCachedOres);
         return result;
+    }
+
+    static int compareCachedOres(CachedOre left, CachedOre right) {
+        int distance = Double.compare(left.distanceSq(), right.distanceSq());
+        return distance != 0 ? distance : Long.compare(left.pos().toLong(), right.pos().toLong());
     }
 
     public void removeMarker(BlockPos pos) {
@@ -584,7 +590,7 @@ public final class OreVisualizer {
         private final OreType type;
         private final double distanceSq;
 
-        private CachedOre(BlockPos pos, OreType type, double distanceSq) {
+        CachedOre(BlockPos pos, OreType type, double distanceSq) {
             this.pos = pos;
             this.type = type;
             this.distanceSq = distanceSq;
