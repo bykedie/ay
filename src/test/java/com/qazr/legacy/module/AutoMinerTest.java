@@ -5,7 +5,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.junit.Test;
@@ -266,6 +268,21 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void directMiningSamplesTheCenterAndEveryExposedFace() {
+        BlockPos ore = new BlockPos(3, 64, 7);
+        List<Vec3d> samples = AutoMiner.blockVisibilitySamples(ore);
+
+        assertEquals(7, samples.size());
+        assertEquals(new Vec3d(3.5, 64.5, 7.5), samples.get(0));
+        assertEquals(new Vec3d(3.001, 64.5, 7.5), samples.get(1));
+        assertEquals(new Vec3d(3.999, 64.5, 7.5), samples.get(2));
+        assertEquals(new Vec3d(3.5, 64.001, 7.5), samples.get(3));
+        assertEquals(new Vec3d(3.5, 64.999, 7.5), samples.get(4));
+        assertEquals(new Vec3d(3.5, 64.5, 7.001), samples.get(5));
+        assertEquals(new Vec3d(3.5, 64.5, 7.999), samples.get(6));
+    }
+
+    @Test
     public void scaffoldAssistOnlyRaisesAStablePlayerForAnOverheadOre() {
         BlockPos feet = new BlockPos(0, 64, 0);
 
@@ -302,6 +319,33 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.stableScaffoldBlock(true, false));
         assertFalse(AutoMiner.stableScaffoldBlock(true, true));
         assertFalse(AutoMiner.stableScaffoldBlock(false, false));
+    }
+
+    @Test
+    public void scaffoldAllowsTheFinalPlacementAttemptToBeConfirmed() {
+        assertFalse(AutoMiner.scaffoldAttemptsExhausted(4, true));
+        assertTrue(AutoMiner.scaffoldAttemptsExhausted(5, true));
+        assertFalse(AutoMiner.scaffoldAttemptsExhausted(5, false));
+    }
+
+    @Test
+    public void scaffoldAssistCancelsWhenThePlayerLeavesTheOriginalColumn() {
+        BlockPos scaffold = new BlockPos(3, 64, 7);
+
+        assertTrue(AutoMiner.scaffoldColumnContains(scaffold, scaffold));
+        assertTrue(AutoMiner.scaffoldColumnContains(scaffold, scaffold.up()));
+        assertFalse(AutoMiner.scaffoldColumnContains(scaffold, scaffold.east()));
+        assertFalse(AutoMiner.scaffoldColumnContains(scaffold, scaffold.up(2)));
+    }
+
+    @Test
+    public void scaffoldClicksTheCenterOfTheSupportingFace() {
+        BlockPos support = new BlockPos(3, 63, 7);
+
+        assertEquals(new Vec3d(3.5, 64.0, 7.5),
+            AutoMiner.scaffoldHitVec(support, EnumFacing.UP));
+        assertEquals(new Vec3d(4.0, 63.5, 7.5),
+            AutoMiner.scaffoldHitVec(support, EnumFacing.EAST));
     }
 
     @Test
@@ -382,6 +426,33 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.temporarilyBlocked(failed, blocked, 99));
         assertFalse(AutoMiner.temporarilyBlocked(failed, blocked, 100));
         assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), blocked, 0));
+    }
+
+    @Test
+    public void pathFailureCooldownIncludesOnlyTargetsActuallySearchedAndFailed() {
+        BlockPos failed = new BlockPos(4, 20, 7);
+        BlockPos untouched = new BlockPos(5, 20, 7);
+        Set<BlockPos> failures = new java.util.HashSet<>();
+        failures.add(failed);
+
+        Set<BlockPos> blocked = AutoMiner.failedPathTargetsToBlock(failures, false);
+
+        assertTrue(blocked.contains(failed));
+        assertFalse(blocked.contains(untouched));
+        assertTrue(AutoMiner.failedPathTargetsToBlock(failures, true).isEmpty());
+    }
+
+    @Test
+    public void staleVeinLockIsReleasedAfterThePlayerLeavesItsCandidateRange() {
+        BlockPos labeled = new BlockPos(30, 20, 0);
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(labeled, 1);
+        List<OreVisualizer.CachedOre> nearby = Arrays.asList(
+            new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0));
+
+        assertFalse(AutoMiner.containsLabeledCandidate(nearby, labels));
+        assertTrue(AutoMiner.containsLabeledCandidate(Arrays.asList(
+            new OreVisualizer.CachedOre(labeled, OreType.IRON, 900.0)), labels));
     }
 
     @Test

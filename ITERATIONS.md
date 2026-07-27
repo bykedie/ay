@@ -83,3 +83,11 @@
 - Iteration 3: assigned each connected vein a nearest-first label order at acquisition time, retained that order while mining, and used a set-backed traversal for large veins.
 - Iteration 4: added the default-off `辅助垫方块` parameter, which can jump and place one stable non-falling block under a grounded player when exactly one block of extra height brings overhead ore into reach.
 - Iteration 5: bounded assist placement to five attempts and 40 ticks, restored temporarily swapped inventory blocks, added failed-target cooldowns, and covered reach, ordering, placement, configuration, and GUI-setting counts with tests.
+
+## Version 1.10.42 Auto Mining Cancellation And Confirmation Update
+
+- Iteration 1: moved scaffold exhaustion checks before each retry so the fifth placement request gets its full server-confirmation window instead of failing against the same-tick world state.
+- Iteration 2: made module disable, screen opening and quota completion stop route motion, cancel active block breaking and clear partial mining/scaffold state immediately.
+- Iteration 3: made manual movement cancel the old route and vein lock while preserving the player's own horizontal motion, then reacquire from the new position after the configured pause.
+- Iteration 4: bound scaffold assistance to the original vertical column, used the supporting face center for reach and placement, sampled the ore center plus all six face centers, and revalidated then mined the ore immediately after placement confirmation.
+- Iteration 5: tracked only path candidates that were actually searched and found unreachable, cooled down only those blocks, and released stale vein labels after they leave the current candidate range.
