@@ -173,6 +173,9 @@ public class AutoMinerTest {
         }
         assertTrue(AutoMiner.compareMiningStandPriority(new BlockPos(4, 64, 0),
             ore.up(), ore, 16.0, 1.0) < 0);
+        assertFalse(AutoMiner.safeRemoteMiningStand(ore.up(), ore));
+        assertTrue(AutoMiner.safeRemoteMiningStand(ore.down(2), ore));
+        assertTrue(AutoMiner.safeRemoteMiningStand(ore.east(), ore));
     }
 
     @Test
@@ -488,6 +491,14 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.reusePathCandidateSnapshot(java.util.Collections.emptyList()));
         assertTrue(AutoMiner.reusePathCandidateSnapshot(Arrays.asList(
             new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0))));
+        BlockPos feet = new BlockPos(1, 64, 1);
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 8, feet, feet));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 5L, 8, 8, feet, feet));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 9, feet, feet));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 8, feet, feet.east()));
+        assertTrue(AutoMiner.continuePathRetryDelay(20, 4L, 4L));
+        assertFalse(AutoMiner.continuePathRetryDelay(20, 4L, 5L));
+        assertFalse(AutoMiner.continuePathRetryDelay(0, 4L, 4L));
     }
 
     @Test
@@ -592,6 +603,9 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeOwnsTarget(ore, 3, 4));
         assertFalse(AutoMiner.routeOwnsTarget(ore, 4, 4));
         assertFalse(AutoMiner.routeOwnsTarget(null, 0, 4));
+        assertTrue(AutoMiner.invalidActiveRouteTarget(ore, null));
+        assertFalse(AutoMiner.invalidActiveRouteTarget(ore, OreType.IRON));
+        assertFalse(AutoMiner.invalidActiveRouteTarget(null, null));
     }
 
     @Test

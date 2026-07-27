@@ -61,6 +61,7 @@ public final class OreVisualizer {
     private boolean cacheActive;
     private int cachedVisibleOreCount;
     private int cachedVisibleOreCountTick = Integer.MIN_VALUE;
+    private long markerRevision;
 
     public OreVisualizer(ModuleManager modules) {
         this.modules = modules;
@@ -219,6 +220,10 @@ public final class OreVisualizer {
         return cachedVisibleOreCount;
     }
 
+    public long markerRevision() {
+        return markerRevision;
+    }
+
     static boolean reuseVisibleOreCount(int cachedTick, int currentTick) {
         return cachedTick == currentTick;
     }
@@ -299,24 +304,7 @@ public final class OreVisualizer {
         long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
         if (!markerCacheOwnsChunk(key)) return;
         List<OreMarker> markers = markersByChunk.computeIfAbsent(key, ignored -> new ArrayList<>());
-        int markersAtPosition = 0;
-        int matchingMarkers = 0;
-        for (OreMarker marker : markers) {
-            if (!marker.pos.equals(pos)) continue;
-            markersAtPosition++;
-            if (marker.type == type) matchingMarkers++;
-        }
-        if (!markerRestoreNeeded(type, matchingMarkers, markersAtPosition)) return;
-        Iterator<OreMarker> iterator = markers.iterator();
-        while (iterator.hasNext()) {
-            OreMarker marker = iterator.next();
-            if (!marker.pos.equals(pos)) continue;
-            iterator.remove();
-            removeTypeMarker(marker);
-        }
-        OreMarker restored = new OreMarker(pos.toImmutable(), type);
-        markers.add(restored);
-        addTypeMarker(restored);
+        if (!mergeMarker(markers, new OreMarker(pos.toImmutable(), type))) return;
         queueValidation(key);
         invalidateVisibleOreCount();
     }
@@ -520,10 +508,58 @@ public final class OreVisualizer {
     private void appendChunkMarkers(long key, List<OreMarker> markers) {
         if (markers.isEmpty()) return;
         List<OreMarker> stored = markersByChunk.computeIfAbsent(key, ignored -> new ArrayList<>());
-        stored.addAll(markers);
-        for (OreMarker marker : markers) addTypeMarker(marker);
+        if (!mergeScannedMarkers(stored, markers)) return;
         queueValidation(key);
         invalidateVisibleOreCount();
+    }
+
+    private boolean mergeScannedMarkers(List<OreMarker> stored, List<OreMarker> scanned) {
+        Map<Long, OreMarker> merged = new LinkedHashMap<>();
+        Map<Long, OreType> storedTypes = new LinkedHashMap<>();
+        for (OreMarker marker : stored) {
+            merged.put(marker.pos.toLong(), marker);
+            storedTypes.put(marker.pos.toLong(), marker.type);
+        }
+        for (OreMarker marker : scanned) {
+            merged.put(marker.pos.toLong(), marker);
+        }
+        Map<Long, OreType> mergedTypes = new LinkedHashMap<>();
+        for (Map.Entry<Long, OreMarker> entry : merged.entrySet()) {
+            mergedTypes.put(entry.getKey(), entry.getValue().type);
+        }
+        if (!markerMergeChanged(stored.size(), storedTypes, mergedTypes)) return false;
+        for (OreMarker marker : stored) removeTypeMarker(marker);
+        stored.clear();
+        stored.addAll(merged.values());
+        for (OreMarker marker : stored) addTypeMarker(marker);
+        return true;
+    }
+
+    static boolean markerMergeChanged(int storedCount, Map<Long, OreType> storedTypes,
+            Map<Long, OreType> mergedTypes) {
+        return storedTypes == null || mergedTypes == null
+            || storedCount != mergedTypes.size() || !storedTypes.equals(mergedTypes);
+    }
+
+    private boolean mergeMarker(List<OreMarker> stored, OreMarker desired) {
+        int markersAtPosition = 0;
+        int matchingMarkers = 0;
+        for (OreMarker marker : stored) {
+            if (!marker.pos.equals(desired.pos)) continue;
+            markersAtPosition++;
+            if (marker.type == desired.type) matchingMarkers++;
+        }
+        if (!markerRestoreNeeded(desired.type, matchingMarkers, markersAtPosition)) return false;
+        Iterator<OreMarker> iterator = stored.iterator();
+        while (iterator.hasNext()) {
+            OreMarker marker = iterator.next();
+            if (!marker.pos.equals(desired.pos)) continue;
+            iterator.remove();
+            removeTypeMarker(marker);
+        }
+        stored.add(desired);
+        addTypeMarker(desired);
+        return true;
     }
 
     private void removeChunkMarkers(long key) {
@@ -597,6 +633,7 @@ public final class OreVisualizer {
 
     private void invalidateVisibleOreCount() {
         cachedVisibleOreCountTick = Integer.MIN_VALUE;
+        markerRevision++;
     }
 
     static int validationChecksForSlice(int markerCount, int markerIndex, int budget) {

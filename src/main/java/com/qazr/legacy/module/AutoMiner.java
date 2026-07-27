@@ -97,6 +97,7 @@ public final class AutoMiner {
     private int delay;
     private int manualPause;
     private int pathRetryDelay;
+    private long pathRetryMarkerRevision = Long.MIN_VALUE;
     private int pathCandidateOffset;
     private List<OreVisualizer.CachedOre> pathCandidateBatch = java.util.Collections.emptyList();
     private PathTarget pendingPathTarget;
@@ -122,6 +123,10 @@ public final class AutoMiner {
     private List<BlockPos> plannedObstacleCachePath = java.util.Collections.emptyList();
     private int plannedObstacleCacheTick = Integer.MIN_VALUE;
     private int plannedObstacleCacheIndex = -1;
+    private List<OreVisualizer.CachedOre> currentCandidateCache = java.util.Collections.emptyList();
+    private long currentCandidateMarkerRevision = Long.MIN_VALUE;
+    private int currentCandidateTickBucket = Integer.MIN_VALUE;
+    private BlockPos currentCandidateFeet;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -137,6 +142,7 @@ public final class AutoMiner {
         blockedTargetsUntil.clear();
         rejectedTargetsUntil.clear();
         rejectedObstaclesUntil.clear();
+        invalidateCurrentCandidateCache();
         clearPendingCompletion();
         clearTargetLabels();
         clearPath();
@@ -189,29 +195,32 @@ public final class AutoMiner {
             followPathToOre();
             return;
         }
-        if (pathRetryDelay > 0) {
+        long markerRevision = oreVisualizer.markerRevision();
+        if (continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
             pathRetryDelay--;
             mc.player.motionX = planningMotion(mc.player.motionX);
             mc.player.motionZ = planningMotion(mc.player.motionZ);
             return;
         }
+        pathRetryDelay = 0;
         if (routeEndedBeforeMining(currentOre, pathIndex, path.size())) {
             prepareAndMineCurrentOre();
             return;
         }
-        List<OreVisualizer.CachedOre> candidates = reusePathCandidateSnapshot(pathCandidateBatch)
-            ? pathCandidateBatch : cachedMineCandidates();
-        if (!targetLabels.isEmpty() && !containsLabeledCandidate(candidates, targetLabels)) {
+        List<OreVisualizer.CachedOre> currentCandidates = currentMineCandidates();
+        if (!targetLabels.isEmpty() && !containsLabeledCandidate(currentCandidates, targetLabels)) {
             clearTargetLabels();
         }
-        MineTarget visible = findNearestReachable(candidates);
+        MineTarget visible = findNearestReachable(currentCandidates);
         if (visible != null) {
-            ensureTargetLabels(visible.pos, visible.type, candidates);
+            ensureTargetLabels(visible.pos, visible.type, currentCandidates);
             mine(visible);
             return;
         }
-        if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(candidates)) return;
-        followPathToOre(candidates);
+        if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentCandidates)) return;
+        List<OreVisualizer.CachedOre> pathCandidates = reusePathCandidateSnapshot(pathCandidateBatch)
+            ? pathCandidateBatch : currentCandidates;
+        followPathToOre(pathCandidates);
     }
 
     @SubscribeEvent
@@ -269,6 +278,7 @@ public final class AutoMiner {
             miningPlayerFeet = null;
             miningEyes = null;
             miningReachDistance = 0.0;
+            invalidateCurrentCandidateCache();
             clearScaffoldAssist();
             clearPendingCompletion();
         }
@@ -705,12 +715,21 @@ public final class AutoMiner {
         return currentOre != null && pathIndex >= 0 && pathIndex < pathSize;
     }
 
+    static boolean invalidActiveRouteTarget(BlockPos currentOre, OreType currentType) {
+        return currentOre != null && currentType == null;
+    }
+
     private void followPathToOre() {
         followPathToOre(null);
     }
 
     private void followPathToOre(List<OreVisualizer.CachedOre> candidates) {
-        if (currentOre == null || targetType(currentOre) == null || pathIndex >= path.size()) {
+        OreType activeType = currentOre == null ? null : targetType(currentOre);
+        if (invalidActiveRouteTarget(currentOre, activeType)) {
+            clearPath();
+            clearTargetLabels();
+        }
+        if (currentOre == null || activeType == null || pathIndex >= path.size()) {
             List<OreVisualizer.CachedOre> available = candidates == null
                 ? prioritizeCurrentVein(oreVisualizer.cachedMineOres(
                     ModConfig.minePathRange, MAX_CACHED_TARGETS, type -> !quotaReached(type),
@@ -722,6 +741,7 @@ public final class AutoMiner {
             if (target == null) {
                 pathRetryDelay = pathSnapshotRefreshRequested ? 1
                     : pathSearchRetryDelay(pathCandidateOffset, pendingPathSearch != null);
+                pathRetryMarkerRevision = oreVisualizer.markerRevision();
                 pathSnapshotRefreshRequested = false;
                 return;
             }
@@ -1013,6 +1033,10 @@ public final class AutoMiner {
         return nextCandidateOffset > 0 ? 1 : PATH_RETRY_TICKS;
     }
 
+    static boolean continuePathRetryDelay(int delay, long scheduledRevision, long currentRevision) {
+        return delay > 0 && scheduledRevision == currentRevision;
+    }
+
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
         return !routeFound && failedCandidates >= MAX_FAILED_CANDIDATES_PER_SNAPSHOT;
     }
@@ -1170,6 +1194,7 @@ public final class AutoMiner {
     private List<BlockPos> standPositionsAround(BlockPos ore) {
         List<BlockPos> result = new ArrayList<>();
         for (BlockPos candidate : miningStandCandidates(ore)) {
+            if (!safeRemoteMiningStand(candidate, ore)) continue;
             BlockPos stand = standPos(candidate);
             BlockPos faceNeighbor = miningFaceNeighbor(stand, ore);
             if (canTraverse(stand) && faceNeighbor != null
@@ -1180,6 +1205,10 @@ public final class AutoMiner {
         result.sort((left, right) -> compareMiningStandPriority(left, right, ore,
             mc.player.getDistanceSqToCenter(left), mc.player.getDistanceSqToCenter(right)));
         return result;
+    }
+
+    static boolean safeRemoteMiningStand(BlockPos stand, BlockPos ore) {
+        return stand != null && ore != null && !stand.equals(ore.up());
     }
 
     static List<BlockPos> miningStandCandidates(BlockPos ore) {
@@ -1638,6 +1667,33 @@ public final class AutoMiner {
             ModConfig.minePathRange, MAX_CACHED_TARGETS,
             type -> availableTypes.getOrDefault(type, false),
             pos -> !targetTemporarilyUnavailable(pos)));
+    }
+
+    private List<OreVisualizer.CachedOre> currentMineCandidates() {
+        long markerRevision = oreVisualizer.markerRevision();
+        int tickBucket = mc.player.ticksExisted / 4;
+        BlockPos feet = miningPlayerFeet;
+        if (!reuseCurrentCandidateCache(currentCandidateMarkerRevision, markerRevision,
+                currentCandidateTickBucket, tickBucket, currentCandidateFeet, feet)) {
+            currentCandidateCache = cachedMineCandidates();
+            currentCandidateMarkerRevision = markerRevision;
+            currentCandidateTickBucket = tickBucket;
+            currentCandidateFeet = feet == null ? null : feet.toImmutable();
+        }
+        return currentCandidateCache;
+    }
+
+    static boolean reuseCurrentCandidateCache(long cachedRevision, long currentRevision,
+            int cachedTickBucket, int currentTickBucket, BlockPos cachedFeet, BlockPos currentFeet) {
+        return cachedRevision == currentRevision && cachedTickBucket == currentTickBucket
+            && java.util.Objects.equals(cachedFeet, currentFeet);
+    }
+
+    private void invalidateCurrentCandidateCache() {
+        currentCandidateCache = java.util.Collections.emptyList();
+        currentCandidateMarkerRevision = Long.MIN_VALUE;
+        currentCandidateTickBucket = Integer.MIN_VALUE;
+        currentCandidateFeet = null;
     }
 
     private float toolSpeed(ItemStack stack, IBlockState state) {

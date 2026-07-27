@@ -123,3 +123,11 @@
 - Iteration 3: restored an ore marker when the server rolls back a client-predicted block break, preventing the last ore from disappearing permanently after a rejected completion.
 - Iteration 4: made marker restoration collapse duplicate entries and refuse to recreate markers for chunks already evicted from the active cache.
 - Iteration 5: reconciled cached ore-type changes in direct, vein, labeled, scaffold, path and background-validation flows instead of dropping the replacement ore until a chunk reload.
+
+## Version 1.10.47 Auto Mining Target Freshness Update
+
+- Iteration 1: merged partial chunk scans by block position, preventing restored server-rollback markers from being duplicated when their section is scanned later.
+- Iteration 2: used hash-based marker reconciliation for dense chunks and compacted historical duplicates while preserving ore-type replacements.
+- Iteration 3: cleared invalid active routes and vein labels immediately when their ore disappears, allowing the normal retry backoff to run instead of searching every tick.
+- Iteration 4: separated live direct-mining candidates from stable incremental path snapshots, so newly scanned, restored or replaced ores become eligible without disrupting an in-progress A* search.
+- Iteration 5: excluded the block directly above an ore from remote path goals, preventing the miner from deliberately standing on and then removing its own support.
