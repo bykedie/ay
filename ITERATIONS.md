@@ -99,3 +99,11 @@
 - Iteration 3: retained horizontal motion while ascending, allowed only earlier obstacles from the active route corridor to be cleared, and kept unrelated blocks outside the clearing authorization.
 - Iteration 4: bounded ore and corridor destruction with tool-aware hardness budgets plus elapsed-time deadlines, and separated server-rejected destruction cooldowns from route-unreachable cooldowns.
 - Iteration 5: replaced the single completion slot with a bounded world-bound queue, required three loaded-world missing ticks before counting a block, reserved pending quota, and prevented delayed confirmations from cancelling a newer route.
+
+## Version 1.10.44 Auto Mining Navigation And Cache Update
+
+- Iteration 1: normalized grounded fractional foot heights only on movement-blocking support, so slab and stair landings match route nodes without treating carpet-like surfaces as a full block.
+- Iteration 2: retained vein labels across temporary quota and cooldown states while pruning labels whose configured ore block is actually gone.
+- Iteration 3: reused the active path-candidate snapshot and cached per-ore quota availability for each batch, avoiding a full ore-cache sort on every sliced search tick.
+- Iteration 4: skipped corridor breakability and tool checks for already-passable feet, head and jump-clearance cells, reducing A* work in open tunnels.
+- Iteration 5: cached route obstacles and visible-ore HUD counts per tick, removed stale scaffold candidates before spending the inspection budget, and prevented the generic visibility pass from rechecking the current vein.

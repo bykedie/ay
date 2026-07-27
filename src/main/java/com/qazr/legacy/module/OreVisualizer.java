@@ -58,6 +58,8 @@ public final class OreVisualizer {
     private int seededCenterChunkX = Integer.MIN_VALUE;
     private int seededCenterChunkZ = Integer.MIN_VALUE;
     private boolean cacheActive;
+    private int cachedVisibleOreCount;
+    private int cachedVisibleOreCountTick = Integer.MIN_VALUE;
 
     public OreVisualizer(ModuleManager modules) {
         this.modules = modules;
@@ -112,6 +114,7 @@ public final class OreVisualizer {
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
         cacheActive = false;
+        invalidateVisibleOreCount();
     }
 
     @SubscribeEvent
@@ -189,6 +192,10 @@ public final class OreVisualizer {
 
     public int countVisibleOres() {
         if (mc.player == null || mc.world == null) return 0;
+        int currentTick = mc.player.ticksExisted;
+        if (reuseVisibleOreCount(cachedVisibleOreCountTick, currentTick)) {
+            return cachedVisibleOreCount;
+        }
         double rangeSq = ModConfig.oreVisualizerRange * ModConfig.oreVisualizerRange;
         int count = 0;
         for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
@@ -198,7 +205,13 @@ public final class OreVisualizer {
                 if (ModConfig.isOreEnabled(marker.type) && distanceSq(marker.pos) <= rangeSq) count++;
             }
         }
-        return count;
+        cachedVisibleOreCount = count;
+        cachedVisibleOreCountTick = currentTick;
+        return cachedVisibleOreCount;
+    }
+
+    static boolean reuseVisibleOreCount(int cachedTick, int currentTick) {
+        return cachedTick == currentTick;
     }
 
     public List<CachedOre> cachedMineOres(double range) {
@@ -257,12 +270,15 @@ public final class OreVisualizer {
         List<OreMarker> markers = markersByChunk.get(key);
         if (markers == null) return;
         Iterator<OreMarker> iterator = markers.iterator();
+        boolean removed = false;
         while (iterator.hasNext()) {
             OreMarker marker = iterator.next();
             if (!marker.pos.equals(pos)) continue;
             iterator.remove();
             removeTypeMarker(marker);
+            removed = true;
         }
+        if (removed) invalidateVisibleOreCount();
         if (markers.isEmpty()) {
             markersByChunk.remove(key);
             validationTasks.remove(key);
@@ -350,6 +366,7 @@ public final class OreVisualizer {
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
         cacheActive = false;
+        invalidateVisibleOreCount();
     }
 
     private boolean hasCacheState() {
@@ -445,6 +462,7 @@ public final class OreVisualizer {
         stored.addAll(markers);
         for (OreMarker marker : markers) addTypeMarker(marker);
         queueValidation(key);
+        invalidateVisibleOreCount();
     }
 
     private void removeChunkMarkers(long key) {
@@ -452,6 +470,7 @@ public final class OreVisualizer {
         validationTasks.remove(key);
         if (markers == null) return;
         for (OreMarker marker : markers) removeTypeMarker(marker);
+        invalidateVisibleOreCount();
     }
 
     private void addTypeMarker(OreMarker marker) {
@@ -485,6 +504,7 @@ public final class OreVisualizer {
             if (task.markerIndex >= markers.size()) task.markerIndex = 0;
             int checks = validationChecksForSlice(markers.size(), task.markerIndex, markerBudget);
             int checked = 0;
+            boolean removed = false;
             while (checked < checks && task.markerIndex < markers.size()) {
                 OreMarker marker = markers.get(task.markerIndex);
                 IBlockState state = mc.world.getBlockState(marker.pos);
@@ -493,10 +513,12 @@ public final class OreVisualizer {
                 } else {
                     markers.remove(task.markerIndex);
                     removeTypeMarker(marker);
+                    removed = true;
                 }
                 checked++;
             }
             markerBudget -= checked;
+            if (removed) invalidateVisibleOreCount();
             if (markers.isEmpty()) {
                 markersByChunk.remove(task.key);
                 validationTasks.remove(task.key);
@@ -505,6 +527,10 @@ public final class OreVisualizer {
                 validationQueue.addLast(task);
             }
         }
+    }
+
+    private void invalidateVisibleOreCount() {
+        cachedVisibleOreCountTick = Integer.MIN_VALUE;
     }
 
     static int validationChecksForSlice(int markerCount, int markerIndex, int budget) {

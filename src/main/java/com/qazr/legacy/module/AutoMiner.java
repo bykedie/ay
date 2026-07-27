@@ -118,6 +118,10 @@ public final class AutoMiner {
     private int scaffoldStartedTick;
     private int scaffoldNextPlaceTick;
     private int scaffoldAttempts;
+    private List<BlockPos> plannedObstacleCache = java.util.Collections.emptyList();
+    private List<BlockPos> plannedObstacleCachePath = java.util.Collections.emptyList();
+    private int plannedObstacleCacheTick = Integer.MIN_VALUE;
+    private int plannedObstacleCacheIndex = -1;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -156,8 +160,7 @@ public final class AutoMiner {
             stopAutomatedWork(true);
             return;
         }
-        miningPlayerFeet = playerFeetCell(mc.player.posX,
-            mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        miningPlayerFeet = playerNavigationFeetCell();
         miningEyes = mc.player.getPositionEyes(1.0F);
         miningReachDistance = mc.playerController.getBlockReachDistance();
         pruneBlockedTargets(mc.player.ticksExisted);
@@ -196,9 +199,8 @@ public final class AutoMiner {
             prepareAndMineCurrentOre();
             return;
         }
-        List<OreVisualizer.CachedOre> candidates = prioritizeCurrentVein(
-            oreVisualizer.cachedMineOres(ModConfig.minePathRange, MAX_CACHED_TARGETS,
-                type -> !quotaReached(type), pos -> !targetTemporarilyUnavailable(pos)));
+        List<OreVisualizer.CachedOre> candidates = reusePathCandidateSnapshot(pathCandidateBatch)
+            ? pathCandidateBatch : cachedMineCandidates();
         if (!targetLabels.isEmpty() && !containsLabeledCandidate(candidates, targetLabels)) {
             clearTargetLabels();
         }
@@ -304,6 +306,8 @@ public final class AutoMiner {
                 }
                 continue;
             }
+            pending.reservesQuota = quotaReservationAfterBlockObservation(
+                pending.reservesQuota, true);
             pending.missingTicks++;
             if (!completionAbsenceConfirmed(true, pending.missingTicks)) continue;
             iterator.remove();
@@ -337,9 +341,7 @@ public final class AutoMiner {
     private int pendingCompletionCount(OreType type) {
         int count = 0;
         for (PendingCompletion pending : pendingCompletions) {
-            if (pending.world == mc.world && pending.type == type
-                    && pendingCompletionReservesQuota(pending.pos.equals(miningPos),
-                        pending.missingTicks)) count++;
+            if (pending.world == mc.world && pending.type == type && pending.reservesQuota) count++;
         }
         return count;
     }
@@ -398,6 +400,7 @@ public final class AutoMiner {
         }
         MineTarget target = visibleExactTarget(miningPos);
         if (target == null) {
+            releasePendingQuotaReservation(miningPos);
             miningPos = null;
             miningType = null;
             return false;
@@ -460,6 +463,11 @@ public final class AutoMiner {
             if ((!targetLabels.isEmpty() && !targetLabels.containsKey(candidate.pos()))
                     || quotaReached(candidate.type())
                     || targetTemporarilyUnavailable(candidate.pos())) continue;
+            OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
+            if (!cachedOreStillPresent(candidate.type(), actual)) {
+                oreVisualizer.removeMarker(candidate.pos());
+                continue;
+            }
             if (beginScaffoldAssist(candidate.pos(), candidate.type())) {
                 ensureTargetLabels(candidate.pos(), candidate.type(), candidates);
                 return true;
@@ -504,8 +512,7 @@ public final class AutoMiner {
             failScaffoldAssist();
             return false;
         }
-        BlockPos actualFeet = playerFeetCell(mc.player.posX,
-            mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        BlockPos actualFeet = playerNavigationFeetCell();
         if (!scaffoldColumnContains(scaffoldPos, actualFeet)) {
             failScaffoldAssist();
             return false;
@@ -724,8 +731,10 @@ public final class AutoMiner {
             }
         }
         BlockPos next = path.get(pathIndex);
-        BlockPos actualFeet = playerFeetCell(mc.player.posX,
-            mc.player.getEntityBoundingBox().minY, mc.player.posZ);
+        double physicalFeetY = mc.player.getEntityBoundingBox().minY;
+        boolean navigationSupport = standingSurfaceSupportsNavigation(physicalFeetY);
+        double navigationFeetY = navigationFeetY(physicalFeetY, mc.player.onGround, navigationSupport);
+        BlockPos actualFeet = playerFeetCell(mc.player.posX, navigationFeetY, mc.player.posZ);
         BlockPos from = pathIndex == 0
             ? standPos(actualFeet)
             : path.get(pathIndex - 1);
@@ -759,7 +768,7 @@ public final class AutoMiner {
             abandonCurrentRoute();
             return;
         }
-        double verticalDistance = next.getY() - mc.player.getEntityBoundingBox().minY;
+        double verticalDistance = next.getY() - navigationFeetY;
         if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance)) {
             pathIndex++;
             resetRouteProgress();
@@ -778,7 +787,7 @@ public final class AutoMiner {
             abandonCurrentRoute();
             return;
         }
-        if (waitingForAscendingClearance(next.getY(), mc.player.getEntityBoundingBox().minY)) {
+        if (waitingForAscendingClearance(next.getY(), physicalFeetY)) {
             mc.player.motionX = routeMotionComponent(dx, distanceSq);
             mc.player.motionZ = routeMotionComponent(dz, distanceSq);
             if (mc.player.onGround) mc.player.jump();
@@ -825,6 +834,26 @@ public final class AutoMiner {
 
     static BlockPos playerFeetCell(double x, double feetY, double z) {
         return new BlockPos(MathHelper.floor(x), MathHelper.floor(feetY + 0.01), MathHelper.floor(z));
+    }
+
+    static double navigationFeetY(double feetY, boolean onGround, boolean supportingSurface) {
+        return onGround && supportingSurface ? Math.ceil(feetY - 0.01) : feetY;
+    }
+
+    static BlockPos navigationFeetCell(double x, double feetY, double z, boolean onGround,
+            boolean supportingSurface) {
+        return playerFeetCell(x, navigationFeetY(feetY, onGround, supportingSurface), z);
+    }
+
+    private BlockPos playerNavigationFeetCell() {
+        double feetY = mc.player.getEntityBoundingBox().minY;
+        return navigationFeetCell(mc.player.posX, feetY, mc.player.posZ, mc.player.onGround,
+            standingSurfaceSupportsNavigation(feetY));
+    }
+
+    private boolean standingSurfaceSupportsNavigation(double feetY) {
+        BlockPos surface = new BlockPos(mc.player.posX, feetY - 0.01, mc.player.posZ);
+        return mc.world.getBlockState(surface).getMaterial().blocksMovement();
     }
 
     static boolean reachedPathNode(BlockPos actualFeet, BlockPos expectedFeet,
@@ -985,6 +1014,10 @@ public final class AutoMiner {
         return !routeFound && failedCandidates >= MAX_FAILED_CANDIDATES_PER_SNAPSHOT;
     }
 
+    static boolean reusePathCandidateSnapshot(List<OreVisualizer.CachedOre> snapshot) {
+        return snapshot != null && !snapshot.isEmpty();
+    }
+
     static boolean temporarilyBlocked(BlockPos candidate, Map<BlockPos, Integer> blockedUntil,
             int currentTick) {
         Integer until = blockedUntil == null ? null : blockedUntil.get(candidate);
@@ -1028,8 +1061,7 @@ public final class AutoMiner {
     }
 
     private PathSearchResult incrementalPathToOre(BlockPos ore) {
-        BlockPos start = standPos(playerFeetCell(mc.player.posX,
-            mc.player.getEntityBoundingBox().minY, mc.player.posZ));
+        BlockPos start = standPos(playerNavigationFeetCell());
         double maxDistanceSq = ModConfig.minePathRange * ModConfig.minePathRange;
         if (pendingPathSearch == null || !pendingPathSearch.matches(ore, start, maxDistanceSq)) {
             List<BlockPos> goals = standPositionsAround(ore);
@@ -1089,7 +1121,7 @@ public final class AutoMiner {
         if (stepCost < 0) return;
         int jumpExcavation = next.getY() > from.getY()
             ? cachedPathCost(jumpClearanceCosts, from.up(2),
-                pos -> jumpClearanceCost(isPassable(pos), canClearForCorridor(pos)))
+                this::jumpClearanceCostAt)
             : 0;
         if (jumpExcavation < 0) return;
         int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
@@ -1206,8 +1238,10 @@ public final class AutoMiner {
         if (!hasSolidSupport(feet)) return -1;
         boolean feetClear = isPassable(feet);
         boolean headClear = isPassable(feet.up());
+        boolean feetBreakable = !feetClear && canClearForCorridor(feet);
+        boolean headBreakable = !headClear && canClearForCorridor(feet.up());
         int excavation = corridorExcavationCost(feetClear, headClear,
-            canClearForCorridor(feet), canClearForCorridor(feet.up()));
+            feetBreakable, headBreakable);
         return excavation < 0 ? -1 : 1 + excavation * 5;
     }
 
@@ -1221,6 +1255,11 @@ public final class AutoMiner {
     static int jumpClearanceCost(boolean clear, boolean breakable) {
         if (clear) return 0;
         return breakable ? 1 : -1;
+    }
+
+    private int jumpClearanceCostAt(BlockPos pos) {
+        boolean clear = isPassable(pos);
+        return clear ? 0 : jumpClearanceCost(false, canClearForCorridor(pos));
     }
 
     private boolean hasSolidSupport(BlockPos feet) {
@@ -1317,14 +1356,28 @@ public final class AutoMiner {
     }
 
     private List<BlockPos> plannedObstacles() {
+        int currentTick = mc.player.ticksExisted;
+        if (reusePlannedObstacleCache(plannedObstacleCacheTick, currentTick,
+                plannedObstacleCacheIndex, pathIndex, plannedObstacleCachePath == path)) {
+            return plannedObstacleCache;
+        }
         List<BlockPos> result = new ArrayList<>();
         BlockPos routeStart = pathIndex == 0
-            ? standPos(new BlockPos(mc.player.posX, mc.player.getEntityBoundingBox().minY, mc.player.posZ))
+            ? standPos(playerNavigationFeetCell())
             : path.get(pathIndex - 1);
         for (BlockPos cell : corridorCells(path, pathIndex, ROUTE_RENDER_LIMIT, routeStart)) {
             if (!isPassable(cell)) result.add(cell);
         }
-        return result;
+        plannedObstacleCache = result;
+        plannedObstacleCachePath = path;
+        plannedObstacleCacheTick = currentTick;
+        plannedObstacleCacheIndex = pathIndex;
+        return plannedObstacleCache;
+    }
+
+    static boolean reusePlannedObstacleCache(int cachedTick, int currentTick, int cachedIndex,
+            int currentIndex, boolean samePath) {
+        return samePath && cachedTick == currentTick && cachedIndex == currentIndex;
     }
 
     static List<BlockPos> corridorCells(List<BlockPos> path, int start, int limit) {
@@ -1423,6 +1476,14 @@ public final class AutoMiner {
         pathIndex = 0;
         clearScaffoldAssist();
         resetRouteProgress();
+        invalidatePlannedObstacleCache();
+    }
+
+    private void invalidatePlannedObstacleCache() {
+        plannedObstacleCache = java.util.Collections.emptyList();
+        plannedObstacleCachePath = java.util.Collections.emptyList();
+        plannedObstacleCacheTick = Integer.MIN_VALUE;
+        plannedObstacleCacheIndex = -1;
     }
 
     private void stopAutomatedWork(boolean stopMotion) {
@@ -1456,6 +1517,7 @@ public final class AutoMiner {
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world == mc.world && pending.pos.equals(pos) && pending.type == type) {
                 pending.untilTick = untilTick;
+                pending.reservesQuota = true;
                 return;
             }
         }
@@ -1469,6 +1531,12 @@ public final class AutoMiner {
     private void forgetPendingCompletion(BlockPos pos) {
         pendingCompletions.removeIf(pending ->
             pending.world == mc.world && pending.pos.equals(pos));
+    }
+
+    private void releasePendingQuotaReservation(BlockPos pos) {
+        for (PendingCompletion pending : pendingCompletions) {
+            if (pending.world == mc.world && pending.pos.equals(pos)) pending.reservesQuota = false;
+        }
     }
 
     static int destructionAttemptBudget(float relativeHardness) {
@@ -1506,8 +1574,9 @@ public final class AutoMiner {
         return consecutiveMissingTicks > 0;
     }
 
-    static boolean pendingCompletionReservesQuota(boolean activelyMining, int missingTicks) {
-        return activelyMining || missingTicks > 0;
+    static boolean quotaReservationAfterBlockObservation(boolean currentlyReserved,
+            boolean blockMissing) {
+        return currentlyReserved || blockMissing;
     }
 
     static boolean completionOwnsCurrentWork(BlockPos completed, BlockPos current) {
@@ -1547,6 +1616,15 @@ public final class AutoMiner {
         }
     }
 
+    private List<OreVisualizer.CachedOre> cachedMineCandidates() {
+        EnumMap<OreType, Boolean> availableTypes = new EnumMap<>(OreType.class);
+        for (OreType type : OreType.values()) availableTypes.put(type, !quotaReached(type));
+        return prioritizeCurrentVein(oreVisualizer.cachedMineOres(
+            ModConfig.minePathRange, MAX_CACHED_TARGETS,
+            type -> availableTypes.getOrDefault(type, false),
+            pos -> !targetTemporarilyUnavailable(pos)));
+    }
+
     private float toolSpeed(ItemStack stack, IBlockState state) {
         if (stack.isEmpty() || !(stack.getItem() instanceof ItemPickaxe)) return -1.0F;
         return stack.getDestroySpeed(state);
@@ -1569,6 +1647,7 @@ public final class AutoMiner {
         if (veinTarget != null) return veinTarget;
         int inspected = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
+            if (sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type())) continue;
             if (targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
@@ -1666,8 +1745,14 @@ public final class AutoMiner {
 
     private void pruneTargetLabels() {
         if (targetLabels.isEmpty()) return;
-        targetLabels.entrySet().removeIf(entry -> targetType(entry.getKey()) != targetLabelType);
+        targetLabels.entrySet().removeIf(entry -> !labelOreStillPresent(
+            targetLabelType, OreType.fromBlock(mc.world.getBlockState(entry.getKey()).getBlock()),
+            targetLabelType != null && ModConfig.isMineOreEnabled(targetLabelType)));
         if (targetLabels.isEmpty()) targetLabelType = null;
+    }
+
+    static boolean labelOreStillPresent(OreType expected, OreType actual, boolean configured) {
+        return configured && expected != null && expected == actual;
     }
 
     private void clearTargetLabels() {
@@ -1952,6 +2037,7 @@ public final class AutoMiner {
         private final OreType type;
         private int untilTick;
         private int missingTicks;
+        private boolean reservesQuota = true;
 
         private PendingCompletion(World world, BlockPos pos, OreType type, int untilTick) {
             this.world = world;

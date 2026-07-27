@@ -32,6 +32,7 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.sameVein(origin, origin.add(1, 1, -1), OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.sameVein(origin, origin.add(2, 0, 0), OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.sameVein(origin, origin.add(1, 0, 0), OreType.IRON, OreType.GOLD));
+        assertFalse(AutoMiner.sameVein(null, origin, OreType.IRON, OreType.IRON));
     }
 
     @Test
@@ -51,6 +52,11 @@ public class AutoMinerTest {
     public void playerFeetCellToleratesTinyVerticalRoundingErrors() {
         assertEquals(new BlockPos(3, 64, -3), AutoMiner.playerFeetCell(3.9, 63.999, -2.1));
         assertEquals(new BlockPos(4, 65, -2), AutoMiner.playerFeetCell(4.0, 65.0, -2.0));
+        assertEquals(64.0, AutoMiner.navigationFeetY(63.5, true, true), 0.0);
+        assertEquals(63.5, AutoMiner.navigationFeetY(63.5, false, true), 0.0);
+        assertEquals(64.0625, AutoMiner.navigationFeetY(64.0625, true, false), 0.0);
+        assertEquals(new BlockPos(3, 64, -3),
+            AutoMiner.navigationFeetCell(3.9, 63.5, -2.1, true, true));
     }
 
     @Test
@@ -479,6 +485,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.pathSnapshotRefreshNeeded(7, false));
         assertTrue(AutoMiner.pathSnapshotRefreshNeeded(8, false));
         assertFalse(AutoMiner.pathSnapshotRefreshNeeded(8, true));
+        assertFalse(AutoMiner.reusePathCandidateSnapshot(java.util.Collections.emptyList()));
+        assertTrue(AutoMiner.reusePathCandidateSnapshot(Arrays.asList(
+            new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0))));
     }
 
     @Test
@@ -490,6 +499,10 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.corridorObstacleAllowed(nearer, desired, desired, corridor));
         assertFalse(AutoMiner.corridorObstacleAllowed(new BlockPos(2, 65, 1),
             desired, desired, corridor));
+        assertTrue(AutoMiner.reusePlannedObstacleCache(20, 20, 3, 3, true));
+        assertFalse(AutoMiner.reusePlannedObstacleCache(20, 21, 3, 3, true));
+        assertFalse(AutoMiner.reusePlannedObstacleCache(20, 20, 3, 4, true));
+        assertFalse(AutoMiner.reusePlannedObstacleCache(20, 20, 3, 3, false));
     }
 
     @Test
@@ -497,6 +510,9 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.GOLD));
         assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, null));
+        assertTrue(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.IRON, true));
+        assertFalse(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.GOLD, true));
+        assertFalse(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.IRON, false));
     }
 
     @Test
@@ -528,9 +544,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.completionAbsenceConfirmed(false, 3));
         assertFalse(AutoMiner.completionRolledBack(0));
         assertTrue(AutoMiner.completionRolledBack(1));
-        assertTrue(AutoMiner.pendingCompletionReservesQuota(true, 0));
-        assertTrue(AutoMiner.pendingCompletionReservesQuota(false, 1));
-        assertFalse(AutoMiner.pendingCompletionReservesQuota(false, 0));
+        assertTrue(AutoMiner.quotaReservationAfterBlockObservation(false, true));
+        assertTrue(AutoMiner.quotaReservationAfterBlockObservation(true, false));
+        assertFalse(AutoMiner.quotaReservationAfterBlockObservation(false, false));
         BlockPos oldOre = new BlockPos(1, 20, 0);
         BlockPos newOre = new BlockPos(2, 20, 0);
         assertTrue(AutoMiner.completionOwnsCurrentWork(oldOre, oldOre));

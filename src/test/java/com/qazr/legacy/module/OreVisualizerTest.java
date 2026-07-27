@@ -70,6 +70,8 @@ public class OreVisualizerTest {
         assertEquals(20, OreVisualizer.validationChecksForSlice(500, 480, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(0, 0, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(500, 0, 0));
+        assertTrue(OreVisualizer.reuseVisibleOreCount(20, 20));
+        assertTrue(!OreVisualizer.reuseVisibleOreCount(20, 21));
     }
 
     @Test
