@@ -62,6 +62,7 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(2, 2), 0, 0, 32.0));
         assertTrue(OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(3, 0), 0, 0, 32.0));
         assertTrue(!OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(3, 2), 0, 0, 32.0));
+        assertTrue(!OreVisualizer.chunkCouldEnterRange(ChunkPos.asLong(0, 0), 10, 0, 32.0));
     }
 
     @Test
@@ -70,6 +71,9 @@ public class OreVisualizerTest {
         assertEquals(20, OreVisualizer.validationChecksForSlice(500, 480, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(0, 0, 128));
         assertEquals(0, OreVisualizer.validationChecksForSlice(500, 0, 0));
+        assertEquals(128, OreVisualizer.validationTaskVisitLimit(500, 128));
+        assertEquals(2, OreVisualizer.validationTaskVisitLimit(2, 128));
+        assertEquals(0, OreVisualizer.validationTaskVisitLimit(500, 0));
         assertTrue(OreVisualizer.reuseVisibleOreCount(20, 20));
         assertTrue(!OreVisualizer.reuseVisibleOreCount(20, 21));
     }

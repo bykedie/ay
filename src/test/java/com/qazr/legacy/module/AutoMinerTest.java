@@ -606,6 +606,13 @@ public class AutoMinerTest {
     @Test
     public void directMiningChecksStayBoundedInDenseVeins() {
         assertEquals(16, AutoMiner.visibleTargetInspectionLimit());
+        assertTrue(AutoMiner.skipPreviouslyInspectedVein(true, 0, 16));
+        assertTrue(AutoMiner.skipPreviouslyInspectedVein(true, 15, 16));
+        assertFalse(AutoMiner.skipPreviouslyInspectedVein(true, 16, 16));
+        assertFalse(AutoMiner.skipPreviouslyInspectedVein(false, 0, 16));
+        assertTrue(AutoMiner.candidateTypeAvailable(true, false));
+        assertFalse(AutoMiner.candidateTypeAvailable(false, false));
+        assertFalse(AutoMiner.candidateTypeAvailable(true, true));
     }
 
     @Test

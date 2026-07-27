@@ -461,7 +461,8 @@ public final class AutoMiner {
         int inspected = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if ((!targetLabels.isEmpty() && !targetLabels.containsKey(candidate.pos()))
-                    || quotaReached(candidate.type())
+                    || !candidateTypeAvailable(
+                        ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))
                     || targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
@@ -932,7 +933,8 @@ public final class AutoMiner {
         while (pathCandidateOffset < pathCandidateBatch.size()) {
             OreVisualizer.CachedOre candidate = pathCandidateBatch.get(pathCandidateOffset);
             if ((!targetLabels.isEmpty() && !targetLabels.containsKey(candidate.pos()))
-                    || quotaReached(candidate.type())
+                    || !candidateTypeAvailable(
+                        ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))
                     || targetTemporarilyUnavailable(candidate.pos())) {
                 pathCandidateOffset++;
                 continue;
@@ -1646,20 +1648,37 @@ public final class AutoMiner {
         MineTarget veinTarget = findVisibleVeinTarget(candidates);
         if (veinTarget != null) return veinTarget;
         int inspected = 0;
+        int previouslyInspectedVein = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
-            if (sameVein(lastMinedOre, candidate.pos(), lastMinedType, candidate.type())) continue;
             if (targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
-            if (quotaReached(candidate.type())) continue;
+            if (!candidateTypeAvailable(
+                    ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
+            boolean sameVein = sameVein(lastMinedOre, candidate.pos(),
+                lastMinedType, candidate.type());
+            if (skipPreviouslyInspectedVein(sameVein, previouslyInspectedVein,
+                    MAX_VISIBLE_TARGETS)) {
+                previouslyInspectedVein++;
+                continue;
+            }
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) return visible;
             if (++inspected >= MAX_VISIBLE_TARGETS) break;
         }
         return null;
+    }
+
+    static boolean skipPreviouslyInspectedVein(boolean sameVein, int previouslyInspected,
+            int inspectionLimit) {
+        return sameVein && previouslyInspected < Math.max(0, inspectionLimit);
+    }
+
+    static boolean candidateTypeAvailable(boolean configured, boolean quotaReached) {
+        return configured && !quotaReached;
     }
 
     private List<OreVisualizer.CachedOre> prioritizeCurrentVein(
@@ -1699,6 +1718,8 @@ public final class AutoMiner {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
+            if (!candidateTypeAvailable(
+                    ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) return visible;
             if (++inspected >= MAX_VISIBLE_TARGETS) break;
@@ -1720,6 +1741,8 @@ public final class AutoMiner {
                 oreVisualizer.removeMarker(candidate.pos());
                 continue;
             }
+            if (!candidateTypeAvailable(
+                    ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
             MineTarget visible = visibleTarget(candidate.pos());
             if (visible != null) {
                 best = visible;

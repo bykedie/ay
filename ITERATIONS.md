@@ -107,3 +107,11 @@
 - Iteration 3: reused the active path-candidate snapshot and cached per-ore quota availability for each batch, avoiding a full ore-cache sort on every sliced search tick.
 - Iteration 4: skipped corridor breakability and tool checks for already-passable feet, head and jump-clearance cells, reducing A* work in open tunnels.
 - Iteration 5: cached route obstacles and visible-ore HUD counts per tick, removed stale scaffold candidates before spending the inspection budget, and prevented the generic visibility pass from rechecking the current vein.
+
+## Version 1.10.45 Auto Mining Cache Lifecycle Update
+
+- Iteration 1: evicted scanned chunks and ore markers after the player leaves the active cache range, preventing validation and candidate costs from growing across long mining trips.
+- Iteration 2: tracked queued chunks in an O(1) membership set and kept it synchronized through loading, resuming, pruning, unloading and world resets.
+- Iteration 3: removed the redundant pre-sort used while seeding loaded chunks, retained the final distance-priority ordering, and rejected newly loaded chunks outside the active range.
+- Iteration 4: bounded invalid validation-task visits per pass and restored direct visibility checks for the seventeenth and later blocks of a large connected vein.
+- Iteration 5: revalidated ore enablement and quota state across visible, scaffold and path candidates so an in-progress snapshot immediately respects control-panel changes.
