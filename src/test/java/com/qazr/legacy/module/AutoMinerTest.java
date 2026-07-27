@@ -3,6 +3,7 @@ package com.qazr.legacy.module;
 import com.qazr.legacy.config.OreType;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -397,6 +398,22 @@ public class AutoMinerTest {
         assertEquals(0, AutoMiner.pathSearchRetryDelay(0, true));
         assertEquals(1, AutoMiner.pathSearchRetryDelay(1, false));
         assertEquals(20, AutoMiner.pathSearchRetryDelay(0, false));
+        Set<BlockPos> planned = new HashSet<>(Arrays.asList(
+            new BlockPos(1, 64, 0), new BlockPos(2, 64, 0)));
+        assertFalse(AutoMiner.pathGoalsChanged(planned, new java.util.ArrayList<>(planned)));
+        assertTrue(AutoMiner.pathGoalsChanged(planned, Arrays.asList(new BlockPos(1, 64, 0))));
+        Map<BlockPos, Integer> cached = new HashMap<>();
+        BlockPos corridor = new BlockPos(3, 64, 0);
+        cached.put(corridor, -1);
+        assertFalse(AutoMiner.cachedPathStateChanged(cached, corridor, -1));
+        assertTrue(AutoMiner.cachedPathStateChanged(cached, corridor, 1));
+        assertFalse(AutoMiner.cachedPathStateChanged(cached, corridor.east(), 1));
+        assertTrue(AutoMiner.pathCacheEntryNeedsValidation(-1, false));
+        assertFalse(AutoMiner.pathCacheEntryNeedsValidation(1, false));
+        assertTrue(AutoMiner.pathCacheEntryNeedsValidation(1, true));
+        cached.put(corridor.east(), 1);
+        assertEquals(1, AutoMiner.pathStateEntriesForValidation(cached, false).size());
+        assertEquals(2, AutoMiner.pathStateEntriesForValidation(cached, true).size());
     }
 
     @Test

@@ -131,3 +131,11 @@
 - Iteration 3: cleared invalid active routes and vein labels immediately when their ore disappears, allowing the normal retry backoff to run instead of searching every tick.
 - Iteration 4: separated live direct-mining candidates from stable incremental path snapshots, so newly scanned, restored or replaced ores become eligible without disrupting an in-progress A* search.
 - Iteration 5: excluded the block directly above an ore from remote path goals, preventing the miner from deliberately standing on and then removing its own support.
+
+## Version 1.10.48 Auto Mining Path State Update
+
+- Iteration 1: validated completed incremental routes against current corridor and jump-clearance costs before movement begins.
+- Iteration 2: compared the current mining stand set with the search snapshot, detecting newly exposed approaches beside an ore even when they were absent from the old cost cache.
+- Iteration 3: split failed-search validation into bounded 64-state slices, preventing a large stale-world check from creating a single-frame spike.
+- Iteration 4: required two stable failed-search validation passes, reducing the chance that a block opened between slices is accepted as permanently unreachable.
+- Iteration 5: rebuilt the complete A* search at most once after a detected world change, then rejected any still-stale second result so an old tree is never resumed or an endless restart loop created.

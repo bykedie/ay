@@ -48,6 +48,9 @@ import org.lwjgl.opengl.GL11;
 public final class AutoMiner {
     private static final int MAX_PATH_NODES = 1600;
     private static final int PATH_NODES_PER_TICK = 128;
+    private static final int PATH_STATE_CHECKS_PER_TICK = 64;
+    private static final int MAX_PATH_SEARCH_RESTARTS = 1;
+    private static final int REQUIRED_STABLE_PATH_VALIDATION_PASSES = 2;
     private static final int PATH_CANDIDATE_BATCH_SIZE = 4;
     private static final int MAX_FAILED_CANDIDATES_PER_SNAPSHOT = 8;
     private static final int MAX_CACHED_TARGETS = 96;
@@ -1100,13 +1103,29 @@ public final class AutoMiner {
         }
         PathSearchResult result = advancePathSearch(pendingPathSearch,
             pathSearchSliceBudget(pendingPathSearch.visited));
+        if (result.restart) {
+            PathSearch stale = pendingPathSearch;
+            List<BlockPos> goals = standPositionsAround(ore);
+            if (stale.restarts < MAX_PATH_SEARCH_RESTARTS && !goals.isEmpty()) {
+                pendingPathSearch = new PathSearch(ore, start, goals, maxDistanceSq,
+                    stale.restarts + 1);
+                return PathSearchResult.pending();
+            }
+            pendingPathSearch = null;
+            return PathSearchResult.complete(null);
+        }
         if (result.complete) pendingPathSearch = null;
         return result;
     }
 
     private PathSearchResult advancePathSearch(PathSearch search, int nodeBudget) {
+        if (search.validatingFailure) {
+            return validateFailedPathSearch(search, PATH_STATE_CHECKS_PER_TICK);
+        }
         if (search.goalSet.contains(search.start)) {
-            return PathSearchResult.complete(new PathRoute(java.util.Collections.emptyList(), 0));
+            PathRoute route = new PathRoute(java.util.Collections.emptyList(), 0);
+            return completedPathStateChanged(search, route)
+                ? PathSearchResult.restart() : PathSearchResult.complete(route);
         }
         int expanded = 0;
         while (!search.queue.isEmpty() && search.visited < MAX_PATH_NODES
@@ -1118,8 +1137,9 @@ public final class AutoMiner {
             if (knownCost == null || node.cost != knownCost) continue;
             search.visited++;
             if (search.goalSet.contains(pos)) {
-                return PathSearchResult.complete(new PathRoute(
-                    reconstruct(search.previous, pos), node.cost));
+                PathRoute route = new PathRoute(reconstruct(search.previous, pos), node.cost);
+                return completedPathStateChanged(search, route)
+                    ? PathSearchResult.restart() : PathSearchResult.complete(route);
             }
             for (EnumFacing facing : EnumFacing.HORIZONTALS) {
                 for (int dy : PATH_VERTICAL_OFFSETS) {
@@ -1133,8 +1153,79 @@ public final class AutoMiner {
                 search.jumpClearanceCosts, search.start, search.goals, search.maxDistanceSq,
                 pos, node.cost, pos.down(), 2);
         }
-        return search.queue.isEmpty() || search.visited >= MAX_PATH_NODES
-            ? PathSearchResult.complete(null) : PathSearchResult.pending();
+        if (!search.queue.isEmpty() && search.visited < MAX_PATH_NODES) {
+            return PathSearchResult.pending();
+        }
+        if (search.restarts >= MAX_PATH_SEARCH_RESTARTS) return PathSearchResult.complete(null);
+        search.beginFailureValidation(!search.queue.isEmpty());
+        return PathSearchResult.pending();
+    }
+
+    private boolean completedPathStateChanged(PathSearch search, PathRoute route) {
+        if (pathGoalsChanged(search.goalSet, standPositionsAround(search.ore))) return true;
+        BlockPos from = search.start;
+        for (BlockPos point : route.points) {
+            if (cachedPathStateChanged(search.traversalCosts, point, traversalCost(point))) return true;
+            if (point.getY() > from.getY()
+                    && cachedPathStateChanged(search.jumpClearanceCosts, from.up(2),
+                        jumpClearanceCostAt(from.up(2)))) return true;
+            from = point;
+        }
+        return false;
+    }
+
+    private PathSearchResult validateFailedPathSearch(PathSearch search, int budget) {
+        if (!search.failureGoalsValidated) {
+            search.failureGoalsValidated = true;
+            if (pathGoalsChanged(search.goalSet, standPositionsAround(search.ore))) {
+                return PathSearchResult.restart();
+            }
+        }
+        int checked = 0;
+        while (checked < Math.max(0, budget) && search.failureTraversalValidation.hasNext()) {
+            Map.Entry<BlockPos, Integer> entry = search.failureTraversalValidation.next();
+            checked++;
+            if (entry.getValue() != traversalCost(entry.getKey())) return PathSearchResult.restart();
+        }
+        while (checked < Math.max(0, budget) && search.failureJumpValidation.hasNext()) {
+            Map.Entry<BlockPos, Integer> entry = search.failureJumpValidation.next();
+            checked++;
+            if (entry.getValue() != jumpClearanceCostAt(entry.getKey())) {
+                return PathSearchResult.restart();
+            }
+        }
+        if (search.failureTraversalValidation.hasNext() || search.failureJumpValidation.hasNext()) {
+            return PathSearchResult.pending();
+        }
+        if (search.failureValidationPass < REQUIRED_STABLE_PATH_VALIDATION_PASSES) {
+            search.beginNextFailureValidationPass();
+            return PathSearchResult.pending();
+        }
+        return PathSearchResult.complete(null);
+    }
+
+    static boolean pathGoalsChanged(Set<BlockPos> planned, List<BlockPos> current) {
+        return planned == null || current == null || planned.size() != current.size()
+            || !planned.containsAll(current);
+    }
+
+    static boolean cachedPathStateChanged(Map<BlockPos, Integer> cache, BlockPos pos, int current) {
+        Integer cached = cache == null ? null : cache.get(pos);
+        return cached != null && cached != current;
+    }
+
+    static boolean pathCacheEntryNeedsValidation(int cachedCost, boolean exhaustive) {
+        return exhaustive || cachedCost < 0;
+    }
+
+    static <K> List<Map.Entry<K, Integer>> pathStateEntriesForValidation(
+            Map<K, Integer> cache, boolean exhaustive) {
+        List<Map.Entry<K, Integer>> result = new ArrayList<>();
+        if (cache == null) return result;
+        for (Map.Entry<K, Integer> entry : cache.entrySet()) {
+            if (pathCacheEntryNeedsValidation(entry.getValue(), exhaustive)) result.add(entry);
+        }
+        return result;
     }
 
     private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
@@ -2169,17 +2260,45 @@ public final class AutoMiner {
         private final Map<BlockPos, Integer> traversalCosts = new HashMap<>();
         private final Map<BlockPos, Integer> jumpClearanceCosts = new HashMap<>();
         private final double maxDistanceSq;
+        private final int restarts;
         private int visited;
+        private boolean validatingFailure;
+        private int failureValidationPass;
+        private boolean failureGoalsValidated;
+        private List<Map.Entry<BlockPos, Integer>> failureTraversalEntries;
+        private List<Map.Entry<BlockPos, Integer>> failureJumpEntries;
+        private Iterator<Map.Entry<BlockPos, Integer>> failureTraversalValidation;
+        private Iterator<Map.Entry<BlockPos, Integer>> failureJumpValidation;
 
         private PathSearch(BlockPos ore, BlockPos start, List<BlockPos> goals, double maxDistanceSq) {
+            this(ore, start, goals, maxDistanceSq, 0);
+        }
+
+        private PathSearch(BlockPos ore, BlockPos start, List<BlockPos> goals,
+                double maxDistanceSq, int restarts) {
             this.ore = ore.toImmutable();
             this.start = start.toImmutable();
             this.goals = goals;
             this.goalSet = new HashSet<>(goals);
             this.maxDistanceSq = maxDistanceSq;
+            this.restarts = restarts;
             queue.add(new PathNode(start, 0, pathPriority(0, start, goals)));
             previous.put(start, null);
             costs.put(start, 0);
+        }
+
+        private void beginFailureValidation(boolean exhaustive) {
+            validatingFailure = true;
+            failureTraversalEntries = pathStateEntriesForValidation(traversalCosts, exhaustive);
+            failureJumpEntries = pathStateEntriesForValidation(jumpClearanceCosts, exhaustive);
+            beginNextFailureValidationPass();
+        }
+
+        private void beginNextFailureValidationPass() {
+            failureValidationPass++;
+            failureGoalsValidated = false;
+            failureTraversalValidation = failureTraversalEntries.iterator();
+            failureJumpValidation = failureJumpEntries.iterator();
         }
 
         private boolean matches(BlockPos targetOre, BlockPos playerStart, double rangeSq) {
@@ -2191,18 +2310,24 @@ public final class AutoMiner {
     private static final class PathSearchResult {
         private final boolean complete;
         private final PathRoute route;
+        private final boolean restart;
 
-        private PathSearchResult(boolean complete, PathRoute route) {
+        private PathSearchResult(boolean complete, PathRoute route, boolean restart) {
             this.complete = complete;
             this.route = route;
+            this.restart = restart;
         }
 
         private static PathSearchResult pending() {
-            return new PathSearchResult(false, null);
+            return new PathSearchResult(false, null, false);
         }
 
         private static PathSearchResult complete(PathRoute route) {
-            return new PathSearchResult(true, route);
+            return new PathSearchResult(true, route, false);
+        }
+
+        private static PathSearchResult restart() {
+            return new PathSearchResult(false, null, true);
         }
     }
 
