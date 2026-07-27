@@ -66,3 +66,12 @@
 - Iteration 4: added guarded sneak-to-land descent with speed limiting, periodic fall reset packets, collision-surface alignment, and re-arming after walking off an edge.
 - Iteration 5: accepted controlled flight as a real airborne blink origin, stopped marking airborne transport packets as grounded, used collision-backed ground detection for Hypixel mode, and added a 40-tick red/unreachable backoff after a server position correction.
 - Re-ran the Forge 1.12.2 development client and confirmed `FMLFileResourcePack:Voris Hub` plus successful loading of all five development mods without a Voris Hub exception.
+
+## Version 1.10.40 Flight, Blink And Tools Update
+
+- Iteration 1: removed periodic fake-ground packets during sneak descent so horizontal input and vertical landing motion remain continuous.
+- Iteration 2: restored direct controller attacks for visible targets inside vanilla reach and based that path on the target's current hitbox rather than its predicted remote position.
+- Iteration 3: limited remote Blink Strike excursions to one per attack cycle, removed the client-side correction replay loop, and preferred the player's current flight height for uneven targets.
+- Iteration 4: added a Tools-panel Survival/Creative control, with direct integrated-server switching in singleplayer, permission-respecting `/gamemode` commands in multiplayer, and an in-panel explanation of Creative Tools.
+- Iteration 5: restricted Auto Miner route rendering to remaining stand nodes, so directly mineable ore keeps only its target marker and route lines no longer terminate inside ore or blocker blocks.
+- Verified 128 tests, the Forge 1.12.2 release JAR metadata and Java 8 bytecode, then loaded Voris Hub successfully in the development client.

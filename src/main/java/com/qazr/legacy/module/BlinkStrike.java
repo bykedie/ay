@@ -23,26 +23,12 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class BlinkStrike {
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
-    private static final int RECOVERY_TICKS = 40;
-    private static final int CORRECTION_BACKOFF_TICKS = 40;
-    private static final double RECOVERY_ORIGIN_RADIUS = 3.0;
-    private static final double RECOVERY_JUMP_DISTANCE = 2.0;
-    private static final double RECOVERY_PATH_RADIUS = 1.5;
+    private static final double SURVIVAL_DIRECT_REACH = 3.0;
+    private static final double CREATIVE_DIRECT_REACH = 6.0;
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
     private final Map<Integer, Integer> reachableUntil = new HashMap<>();
-    private final List<List<BlinkPath.Point>> recoveryRoutes = new ArrayList<>();
-    private BlinkPath.Point recoveryOrigin;
-    private BlinkPath.Point lastRecoveryPosition;
-    private boolean recoveryOnGround;
-    private boolean recoveryTransportOnGround;
-    private boolean recoveryPlayerOnGround;
-    private double recoveryMotionX;
-    private double recoveryMotionY;
-    private double recoveryMotionZ;
-    private int recoveryUntilTick;
-    private int correctionBackoffUntilTick;
     private int delay;
 
     public BlinkStrike(ModuleManager modules) {
@@ -52,11 +38,9 @@ public final class BlinkStrike {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        recoverUnexpectedTeleport();
         if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
-        if (mc.player.ticksExisted < correctionBackoffUntilTick) return;
         if (delay > 0) {
             delay--;
             return;
@@ -78,12 +62,22 @@ public final class BlinkStrike {
         if (ModConfig.blinkRotate) face(strikes.get(0).target);
 
         boolean attacked = false;
-        beginRecovery(origin, originOnGround);
+        boolean remoteAttacked = false;
         for (PlannedStrike strike : strikes) {
             StrikePlan currentPlan = refreshStrikePlan(strike.target, origin, strike.plan);
             if (currentPlan == null) continue;
-            if (!currentPlan.path.isEmpty()) recoveryRoutes.add(new ArrayList<>(currentPlan.path));
-            if (strike(strike.target, origin, currentPlan, originOnGround)) attacked = true;
+            if (currentPlan.path.isEmpty()) {
+                if (ModConfig.blinkRotate) face(strike.target);
+                mc.playerController.attackEntity(mc.player, strike.target);
+                mc.player.swingArm(EnumHand.MAIN_HAND);
+                attacked = true;
+                continue;
+            }
+            if (remoteAttacked) continue;
+            if (strike(strike.target, origin, currentPlan, originOnGround)) {
+                attacked = true;
+                remoteAttacked = true;
+            }
         }
         if (attacked) {
             mc.player.resetCooldown();
@@ -142,112 +136,7 @@ public final class BlinkStrike {
             delay = 0;
             unreachableUntil.clear();
             reachableUntil.clear();
-            correctionBackoffUntilTick = 0;
-            clearRecovery();
         }
-    }
-
-    private void beginRecovery(BlinkPath.Point origin, boolean onGround) {
-        recoveryOrigin = origin;
-        lastRecoveryPosition = origin;
-        recoveryOnGround = onGround;
-        recoveryTransportOnGround = transportOnGround(onGround);
-        recoveryPlayerOnGround = mc.player.onGround;
-        recoveryMotionX = mc.player.motionX;
-        recoveryMotionY = mc.player.motionY;
-        recoveryMotionZ = mc.player.motionZ;
-        recoveryRoutes.clear();
-        recoveryUntilTick = mc.player.ticksExisted + RECOVERY_TICKS;
-    }
-
-    private void recoverUnexpectedTeleport() {
-        if (mc.player == null || mc.world == null || mc.player.connection == null || recoveryOrigin == null) return;
-        if (mc.player.ticksExisted > recoveryUntilTick) {
-            clearRecovery();
-            return;
-        }
-        BlinkPath.Point current = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
-        if (shouldDisarmRecovery(recoveryOrigin, lastRecoveryPosition, current,
-                movementInputActive())) {
-            clearRecovery();
-            return;
-        }
-        List<BlinkPath.Point> returnPath = recoveryReturnPath(recoveryOrigin, lastRecoveryPosition, current,
-            recoveryRoutes, ModConfig.blinkStep);
-        if (returnPath.isEmpty()) {
-            lastRecoveryPosition = current;
-            recoveryPlayerOnGround = mc.player.onGround;
-            recoveryMotionX = mc.player.motionX;
-            recoveryMotionY = mc.player.motionY;
-            recoveryMotionZ = mc.player.motionZ;
-            return;
-        }
-        for (int i = 0; i < returnPath.size(); i++) {
-            sendPosition(returnPath.get(i), i + 1 == returnPath.size()
-                ? recoveryOnGround : recoveryTransportOnGround);
-        }
-        mc.player.setPosition(recoveryOrigin.x, recoveryOrigin.y, recoveryOrigin.z);
-        mc.player.fallDistance = 0.0F;
-        mc.player.motionX = recoveryMotionX;
-        mc.player.motionY = recoveryMotionY;
-        mc.player.motionZ = recoveryMotionZ;
-        mc.player.onGround = recoveryPlayerOnGround;
-        reachableUntil.clear();
-        correctionBackoffUntilTick = mc.player.ticksExisted + CORRECTION_BACKOFF_TICKS;
-        clearRecovery();
-    }
-
-    private boolean movementInputActive() {
-        return Math.abs(mc.player.movementInput.moveForward) > 0.01F
-            || Math.abs(mc.player.movementInput.moveStrafe) > 0.01F
-            || mc.gameSettings.keyBindJump.isKeyDown()
-            || mc.gameSettings.keyBindSneak.isKeyDown();
-    }
-
-    static boolean shouldDisarmRecovery(BlinkPath.Point origin, BlinkPath.Point previous,
-            BlinkPath.Point current, boolean movementInput) {
-        return movementInput && origin != null && previous != null && current != null
-            && origin.distanceTo(current) > RECOVERY_ORIGIN_RADIUS
-            && previous.distanceTo(current) <= RECOVERY_JUMP_DISTANCE;
-    }
-
-    private void clearRecovery() {
-        recoveryOrigin = null;
-        lastRecoveryPosition = null;
-        recoveryOnGround = false;
-        recoveryTransportOnGround = false;
-        recoveryPlayerOnGround = false;
-        recoveryMotionX = 0.0;
-        recoveryMotionY = 0.0;
-        recoveryMotionZ = 0.0;
-        recoveryRoutes.clear();
-        recoveryUntilTick = 0;
-    }
-
-    static List<BlinkPath.Point> recoveryReturnPath(BlinkPath.Point origin, BlinkPath.Point previous,
-            BlinkPath.Point current, List<List<BlinkPath.Point>> routes, double maxStep) {
-        if (origin.distanceTo(current) <= RECOVERY_ORIGIN_RADIUS
-                || previous == null || previous.distanceTo(current) <= RECOVERY_JUMP_DISTANCE) {
-            return java.util.Collections.emptyList();
-        }
-        List<BlinkPath.Point> nearestRoute = null;
-        int nearestIndex = -1;
-        double nearestDistance = RECOVERY_PATH_RADIUS;
-        for (List<BlinkPath.Point> route : routes) {
-            for (int i = 0; i < route.size(); i++) {
-                double distance = route.get(i).distanceTo(current);
-                if (distance <= nearestDistance) {
-                    nearestDistance = distance;
-                    nearestRoute = route;
-                    nearestIndex = i;
-                }
-            }
-        }
-        if (nearestRoute == null) return java.util.Collections.emptyList();
-        List<BlinkPath.Point> result = new ArrayList<>();
-        result.addAll(BlinkPath.interpolate(current, nearestRoute.get(nearestIndex), maxStep));
-        result.addAll(BlinkPath.returnPath(origin, nearestRoute, nearestIndex + 1));
-        return result;
     }
 
     private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
@@ -283,15 +172,10 @@ public final class BlinkStrike {
     boolean isReachableForRender(EntityLivingBase target) {
         if (mc.player == null || target == null) return false;
         int tick = mc.player.ticksExisted;
-        if (correctionBackoffActive(tick, correctionBackoffUntilTick)) return false;
         Integer blocked = unreachableUntil.get(target.getEntityId());
         if (blocked != null && blocked > tick) return false;
         Integer reachable = reachableUntil.get(target.getEntityId());
         return reachable != null && reachable > tick;
-    }
-
-    static boolean correctionBackoffActive(int currentTick, int backoffUntilTick) {
-        return currentTick < backoffUntilTick;
     }
 
     static int planningBudget(int requestedTargets) {
@@ -304,7 +188,20 @@ public final class BlinkStrike {
         return 50;
     }
 
+    static double directAttackReach(boolean creativeExtendedReach) {
+        return creativeExtendedReach ? CREATIVE_DIRECT_REACH : SURVIVAL_DIRECT_REACH;
+    }
+
     private StrikePlan findStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
+        Vec3d originEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
+        Vec3d currentAttackPoint = ModConfig.blinkAttackPoint.point(target);
+        double directReach = directAttackReach(mc.playerController.extendedReach());
+        if (CombatSupport.distanceSqToHitbox(originEyes, target.getEntityBoundingBox())
+                <= directReach * directReach && hasAttackLine(originEyes, currentAttackPoint)) {
+            return new StrikePlan(origin, java.util.Collections.emptyList(),
+                java.util.Collections.emptyList());
+        }
+
         BlinkPath.Point predicted = predictedTargetPosition(target.posX,
             target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
             ModConfig.blinkPredictTicks);
@@ -317,14 +214,6 @@ public final class BlinkStrike {
         Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
             targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
             targetPoint.z + predictedZ - target.posZ);
-        if (CombatSupport.distanceSqToHitbox(new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z), predictedBox)
-                <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) {
-            Vec3d originEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
-            if (hasAttackLine(originEyes, attackPoint)) {
-                return new StrikePlan(origin, java.util.Collections.emptyList(),
-                    java.util.Collections.emptyList());
-            }
-        }
         for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
                 ModConfig.blinkAttackDistance)) {
             if (origin.distanceTo(candidate) > ModConfig.blinkRange) continue;
@@ -426,7 +315,7 @@ public final class BlinkStrike {
         double baseAngle = length > 0.001 ? Math.atan2(dz, dx) : 0.0;
         double radius = Math.max(0.65, attackDistance * 0.72);
         List<BlinkPath.Point> result = new ArrayList<>(16);
-        double[] heights = {targetY, origin.y};
+        double[] heights = candidateHeights(origin.y, targetY);
         for (double height : heights) {
             for (int i = 0; i < 8; i++) {
                 double angle = baseAngle + Math.PI * 2.0 * i / 8.0;
@@ -435,6 +324,12 @@ public final class BlinkStrike {
             }
         }
         return result;
+    }
+
+    static double[] candidateHeights(double originY, double targetY) {
+        return Math.abs(originY - targetY) > 2.0
+            ? new double[] {originY, targetY}
+            : new double[] {targetY, originY};
     }
 
     private void face(EntityLivingBase target) {

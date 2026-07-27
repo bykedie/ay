@@ -422,4 +422,16 @@ public class AutoMinerTest {
             new BlockPos(1, 65, 0), new BlockPos(1, 65, 1),
             new BlockPos(1, 65, 2)), route);
     }
+
+    @Test
+    public void renderedRouteContainsOnlyRemainingStandNodes() {
+        List<BlockPos> path = Arrays.asList(
+            new BlockPos(0, 64, 0), new BlockPos(1, 64, 0),
+            new BlockPos(2, 64, 0), new BlockPos(3, 64, 0));
+
+        assertEquals(Arrays.asList(new BlockPos(2, 64, 0), new BlockPos(3, 64, 0)),
+            AutoMiner.remainingRoutePoints(path, 2, 10));
+        assertTrue(AutoMiner.remainingRoutePoints(path, path.size(), 10).isEmpty());
+        assertTrue(AutoMiner.remainingRoutePoints(java.util.Collections.emptyList(), 0, 10).isEmpty());
+    }
 }

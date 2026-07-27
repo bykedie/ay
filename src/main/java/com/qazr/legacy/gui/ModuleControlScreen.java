@@ -13,11 +13,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.UUID;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.GameType;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
@@ -40,12 +44,13 @@ public final class ModuleControlScreen extends GuiScreen {
     private static final int COLOR_SLIDER = 0xFF555A62;
     private static final int COLOR_SLIDER_FILL = 0xFFCF3C45;
 
+    private static final Category TOOLS_CATEGORY = new Category("工具", ModuleId.CREATIVE_TOOLS);
     private static final Category[] CATEGORIES = {
         new Category("战斗",
             ModuleId.MELEE_AURA, ModuleId.BLINK_STRIKE, ModuleId.FLIGHT, ModuleId.CRITICALS, ModuleId.TARGET_VISUALIZER),
         new Category("自动化",
             ModuleId.AUTO_GG, ModuleId.AUTO_REPLY, ModuleId.AUTO_MINE, ModuleId.AUTO_BRIDGE, ModuleId.ORE_VISUALIZER),
-        new Category("工具", ModuleId.CREATIVE_TOOLS)
+        TOOLS_CATEGORY
     };
 
     private final ModuleManager modules;
@@ -101,6 +106,10 @@ public final class ModuleControlScreen extends GuiScreen {
             if (inside(mouseX, mouseY, area.x, area.y, area.width, area.height)) return;
         }
         for (int i = 0; i < CATEGORIES.length; i++) {
+            if (mouseButton == 0 && gameModeAt(CATEGORIES[i], i, mouseX, mouseY)) {
+                toggleGameMode();
+                return;
+            }
             ModuleId selected = moduleAt(CATEGORIES[i], i, mouseX, mouseY);
             if (selected != null) {
                 if (mouseButton == 0) {
@@ -226,7 +235,13 @@ public final class ModuleControlScreen extends GuiScreen {
             else if (hovered) drawRect(bounds.x + 1, rowY, bounds.x + bounds.width, rowY + ROW_HEIGHT, COLOR_ROW_HOVER);
 
             int textY = rowY + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
-            fontRenderer.drawStringWithShadow(id.displayName(), bounds.x + 6, textY, 0xFFFFFF);
+            if (id == ModuleId.CREATIVE_TOOLS) {
+                drawLabelWithHelp(id.displayName(),
+                    "开启后允许使用 /qazr give 和 /qazr potion 创建物品或自定义药水；需要玩家处于创造模式。",
+                    bounds.x + 6, textY, bounds.x + bounds.width - 37, mouseX, mouseY);
+            } else {
+                fontRenderer.drawStringWithShadow(id.displayName(), bounds.x + 6, textY, 0xFFFFFF);
+            }
             String state = enabled ? "开" : "关";
             int stateColor = enabled ? COLOR_ENABLED : COLOR_DISABLED;
             fontRenderer.drawStringWithShadow(state, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(state),
@@ -236,6 +251,40 @@ public final class ModuleControlScreen extends GuiScreen {
             rowY += ROW_HEIGHT;
             if (expanded.contains(id)) rowY = drawSettings(id, bounds, rowY, mouseX, mouseY);
         }
+        if (category == TOOLS_CATEGORY) drawGameModeRow(bounds, rowY, mouseX, mouseY);
+    }
+
+    private void drawGameModeRow(Bounds bounds, int y, int mouseX, int mouseY) {
+        boolean hovered = inside(mouseX, mouseY, bounds.x, y, bounds.width, ROW_HEIGHT);
+        drawRect(bounds.x + 1, y, bounds.x + bounds.width, y + ROW_HEIGHT,
+            hovered ? COLOR_ROW_HOVER : COLOR_SETTING);
+        int textY = y + (ROW_HEIGHT - fontRenderer.FONT_HEIGHT) / 2;
+        drawLabelWithHelp("游戏模式",
+            "点击在生存与创造模式间切换；多人服务器需要管理员或对应命令权限。",
+            bounds.x + 6, textY, bounds.x + bounds.width - 42, mouseX, mouseY);
+        String mode = mc.player != null && mc.player.capabilities.isCreativeMode ? "创造" : "生存";
+        fontRenderer.drawStringWithShadow(mode, bounds.x + bounds.width - 7 - fontRenderer.getStringWidth(mode),
+            textY, mc.player != null && mc.player.capabilities.isCreativeMode ? COLOR_ENABLED : COLOR_DISABLED);
+    }
+
+    private void toggleGameMode() {
+        if (mc.player == null) return;
+        boolean creativeMode = mc.player.capabilities.isCreativeMode;
+        IntegratedServer server = mc.getIntegratedServer();
+        if (server == null) {
+            mc.player.sendChatMessage(nextGameModeCommand(creativeMode));
+            return;
+        }
+        UUID playerId = mc.player.getUniqueID();
+        GameType nextMode = creativeMode ? GameType.SURVIVAL : GameType.CREATIVE;
+        server.addScheduledTask(() -> {
+            EntityPlayerMP player = server.getPlayerList().getPlayerByUUID(playerId);
+            if (player != null) player.setGameType(nextMode);
+        });
+    }
+
+    static String nextGameModeCommand(boolean creativeMode) {
+        return creativeMode ? "/gamemode 0" : "/gamemode 1";
     }
 
     private int drawSettings(ModuleId id, Bounds bounds, int startY, int mouseX, int mouseY) {
@@ -371,6 +420,14 @@ public final class ModuleControlScreen extends GuiScreen {
         return null;
     }
 
+    private boolean gameModeAt(Category category, int index, int mouseX, int mouseY) {
+        if (category != TOOLS_CATEGORY) return false;
+        Bounds bounds = boundsFor(category, index);
+        int y = bounds.y + HEADER_HEIGHT;
+        for (ModuleId id : category.modules) y += ROW_HEIGHT + expandedHeight(id);
+        return inside(mouseX, mouseY, bounds.x, y, bounds.width, ROW_HEIGHT);
+    }
+
     private ModuleSetting settingAt(Category category, int index, int mouseX, int mouseY) {
         Bounds bounds = boundsFor(category, index);
         int y = bounds.y + HEADER_HEIGHT;
@@ -411,7 +468,7 @@ public final class ModuleControlScreen extends GuiScreen {
         int panelWidth = columns ? (availableWidth - GAP * (CATEGORIES.length - 1)) / CATEGORIES.length : availableWidth;
         int x = columns ? MARGIN + index * (panelWidth + GAP) : MARGIN;
         int y = columns ? TITLE_HEIGHT + GAP : TITLE_HEIGHT + GAP + stackedOffset(index);
-        int height = HEADER_HEIGHT + category.modules.length * ROW_HEIGHT;
+        int height = HEADER_HEIGHT + category.modules.length * ROW_HEIGHT + extraRows(category) * ROW_HEIGHT;
         for (ModuleId id : category.modules) height += expandedHeight(id);
         return new Bounds(x, y, panelWidth, height);
     }
@@ -419,10 +476,14 @@ public final class ModuleControlScreen extends GuiScreen {
     private int stackedOffset(int categoryIndex) {
         int offset = 0;
         for (int i = 0; i < categoryIndex; i++) {
-            offset += HEADER_HEIGHT + CATEGORIES[i].modules.length * ROW_HEIGHT + GAP;
+            offset += HEADER_HEIGHT + (CATEGORIES[i].modules.length + extraRows(CATEGORIES[i])) * ROW_HEIGHT + GAP;
             for (ModuleId id : CATEGORIES[i].modules) offset += expandedHeight(id);
         }
         return offset;
+    }
+
+    private static int extraRows(Category category) {
+        return category == TOOLS_CATEGORY ? 1 : 0;
     }
 
     private int expandedHeight(ModuleId id) {
@@ -434,7 +495,7 @@ public final class ModuleControlScreen extends GuiScreen {
         int total = ModuleSetting.forModule(id).length;
         if (total == 0) return 1;
         Category category = categoryFor(id);
-        int baseHeight = HEADER_HEIGHT + category.modules.length * ROW_HEIGHT + SETTING_HEIGHT;
+        int baseHeight = HEADER_HEIGHT + (category.modules.length + extraRows(category)) * ROW_HEIGHT + SETTING_HEIGHT;
         int available = Math.max(SETTING_HEIGHT, height - MARGIN - categoryTop(category) - baseHeight);
         return Math.max(1, Math.min(total, available / SETTING_HEIGHT));
     }
@@ -444,7 +505,7 @@ public final class ModuleControlScreen extends GuiScreen {
         int y = TITLE_HEIGHT + GAP;
         for (Category category : CATEGORIES) {
             if (category == target) return y;
-            y += HEADER_HEIGHT + category.modules.length * ROW_HEIGHT + GAP;
+            y += HEADER_HEIGHT + (category.modules.length + extraRows(category)) * ROW_HEIGHT + GAP;
         }
         return y;
     }

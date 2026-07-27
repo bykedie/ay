@@ -16,7 +16,6 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class FlightController {
     private static final double HYPIXEL_OFFSET = 1.0E-9;
     private static final double LANDING_SEARCH_DISTANCE = 4.0;
-    private static final int LANDING_GUARD_INTERVAL = 3;
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
@@ -124,9 +123,6 @@ public final class FlightController {
         if (shouldResetLandingConfirmation(landingConfirmed, distance)) landingConfirmed = false;
         mc.player.motionY = safeLandingMotion(mc.player.motionY, distance);
         mc.player.fallDistance = 0.0F;
-        if (!landingConfirmed && shouldGuardFall(mc.player.ticksExisted, distance)) {
-            mc.player.connection.sendPacket(new CPacketPlayer(true));
-        }
         if (!landingConfirmed && shouldConfirmLanding(distance, mc.player.motionY)) {
             mc.player.setPosition(mc.player.posX, landingPositionY(mc.player.posY, distance),
                 mc.player.posZ);
@@ -186,11 +182,6 @@ public final class FlightController {
     static double landingPositionY(double currentY, double groundDistance) {
         if (!Double.isFinite(groundDistance) || groundDistance <= 0.0) return currentY;
         return currentY - groundDistance;
-    }
-
-    static boolean shouldGuardFall(int ticksExisted, double groundDistance) {
-        return ticksExisted % LANDING_GUARD_INTERVAL == 0
-            && (!Double.isFinite(groundDistance) || groundDistance > 0.25);
     }
 
     static boolean shouldResetLandingConfirmation(boolean confirmed, double groundDistance) {

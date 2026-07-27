@@ -1294,16 +1294,19 @@ public final class AutoMiner {
     }
 
     private List<BlockPos> plannedRoutePoints() {
+        return remainingRoutePoints(path, pathIndex, ROUTE_RENDER_LIMIT);
+    }
+
+    static List<BlockPos> remainingRoutePoints(List<BlockPos> path, int pathIndex, int limit) {
+        if (path == null || path.isEmpty() || limit <= 0) {
+            return java.util.Collections.emptyList();
+        }
         LinkedHashSet<BlockPos> points = new LinkedHashSet<>();
         int from = Math.max(0, pathIndex);
-        int end = Math.min(path.size(), from + ROUTE_RENDER_LIMIT);
+        int end = Math.min(path.size(), from + limit);
         for (int i = from; i < end; i++) {
-            BlockPos feet = path.get(i);
-            if (!isPassable(feet.up())) points.add(feet.up());
-            if (!isPassable(feet)) points.add(feet);
-            points.add(feet);
+            points.add(path.get(i));
         }
-        points.add(currentOre);
         return new ArrayList<>(points);
     }
 
