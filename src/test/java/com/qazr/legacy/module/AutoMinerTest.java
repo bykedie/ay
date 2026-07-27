@@ -70,6 +70,10 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeTransitionContains(next, from, next));
         assertFalse(AutoMiner.routeTransitionContains(new BlockPos(0, 63, 0), from, next));
         assertFalse(AutoMiner.routeTransitionContains(new BlockPos(1, 65, 1), from, next));
+        assertFalse(AutoMiner.completionAwaitingConfirmation(0));
+        assertTrue(AutoMiner.completionAwaitingConfirmation(1));
+        assertTrue(AutoMiner.completionAwaitingConfirmation(2));
+        assertFalse(AutoMiner.completionAwaitingConfirmation(3));
     }
 
     @Test
@@ -412,8 +416,12 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.pathCacheEntryNeedsValidation(1, false));
         assertTrue(AutoMiner.pathCacheEntryNeedsValidation(1, true));
         cached.put(corridor.east(), 1);
-        assertEquals(1, AutoMiner.pathStateEntriesForValidation(cached, false).size());
-        assertEquals(2, AutoMiner.pathStateEntriesForValidation(cached, true).size());
+        assertEquals(1, AutoMiner.pathStateEntriesForValidation(cached, false, 8).size());
+        assertEquals(2, AutoMiner.pathStateEntriesForValidation(cached, true, 8).size());
+        assertEquals(1, AutoMiner.pathStateEntriesForValidation(cached, true, 1).size());
+        assertEquals(1, AutoMiner.pathStateValidationCount(cached, false, 8));
+        assertEquals(2, AutoMiner.pathStateValidationCount(cached, true, 8));
+        assertEquals(1, AutoMiner.pathStateValidationCount(cached, true, 1));
     }
 
     @Test
@@ -479,6 +487,10 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.containsLabeledCandidate(nearby, labels));
         assertTrue(AutoMiner.containsLabeledCandidate(Arrays.asList(
             new OreVisualizer.CachedOre(labeled, OreType.IRON, 900.0)), labels));
+        assertTrue(AutoMiner.preserveExistingLabelsForVisibleTarget(labels, new BlockPos(1, 20, 0)));
+        assertFalse(AutoMiner.preserveExistingLabelsForVisibleTarget(labels, labeled));
+        assertFalse(AutoMiner.preserveExistingLabelsForVisibleTarget(
+            java.util.Collections.emptyMap(), new BlockPos(1, 20, 0)));
     }
 
     @Test

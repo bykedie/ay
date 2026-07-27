@@ -139,3 +139,11 @@
 - Iteration 3: split failed-search validation into bounded 64-state slices, preventing a large stale-world check from creating a single-frame spike.
 - Iteration 4: required two stable failed-search validation passes, reducing the chance that a block opened between slices is accepted as permanently unreachable.
 - Iteration 5: rebuilt the complete A* search at most once after a detected world change, then rejected any still-stale second result so an old tree is never resumed or an endless restart loop created.
+
+## Version 1.10.49 Auto Mining Continuity Update
+
+- Iteration 1: held the current ore through the three-tick server absence confirmation window, preventing the miner from planning a distant target while the final block is still being confirmed or rolled back.
+- Iteration 2: treated a player leaving the current route segment as a recoverable position change, immediately replanning from the actual feet cell without applying the 100-tick unreachable-target cooldown.
+- Iteration 3: capped failed-search world validation at 128 relevant states and stopped counting as soon as truncation is known, keeping both world checks and cache inspection bounded.
+- Iteration 4: forced the one permitted full search restart when a failed-state sample is truncated, so unchecked stale nodes are never accepted as proof that the ore is permanently unreachable.
+- Iteration 5: allowed an immediately visible unlabeled ore to yield ahead of a hidden labeled vein target while preserving the original vein labels, avoiding idle time without reintroducing distant target thrashing.

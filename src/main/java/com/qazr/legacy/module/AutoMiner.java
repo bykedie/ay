@@ -49,6 +49,7 @@ public final class AutoMiner {
     private static final int MAX_PATH_NODES = 1600;
     private static final int PATH_NODES_PER_TICK = 128;
     private static final int PATH_STATE_CHECKS_PER_TICK = 64;
+    private static final int MAX_PATH_STATES_TO_VALIDATE = 128;
     private static final int MAX_PATH_SEARCH_RESTARTS = 1;
     private static final int REQUIRED_STABLE_PATH_VALIDATION_PASSES = 2;
     private static final int PATH_CANDIDATE_BATCH_SIZE = 4;
@@ -192,6 +193,10 @@ public final class AutoMiner {
         if (continueScaffoldAssist()) return;
         if (continueClearingObstacle()) return;
         if (continueMiningTarget()) return;
+        if (currentTargetAwaitingCompletion()) {
+            stopRouteMotion();
+            return;
+        }
         if (tryMineCurrentOreDirectly()) return;
         if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentOre, currentOreType)) return;
         if (hasActiveRoute()) {
@@ -216,7 +221,9 @@ public final class AutoMiner {
         }
         MineTarget visible = findNearestReachable(currentCandidates);
         if (visible != null) {
-            ensureTargetLabels(visible.pos, visible.type, currentCandidates);
+            if (!preserveExistingLabelsForVisibleTarget(targetLabels, visible.pos)) {
+                ensureTargetLabels(visible.pos, visible.type, currentCandidates);
+            }
             mine(visible);
             return;
         }
@@ -765,7 +772,7 @@ public final class AutoMiner {
             : path.get(pathIndex - 1);
         if (!routeTransitionContains(actualFeet, from, next)) {
             stopRouteMotion();
-            abandonCurrentRoute();
+            restartRouteFromCurrentPosition();
             return;
         }
         BlockPos jumpStart = actualFeet.equals(next) ? from : actualFeet;
@@ -896,6 +903,10 @@ public final class AutoMiner {
             && actualFeet.getY() <= Math.max(from.getY(), next.getY())
             && actualFeet.getZ() >= Math.min(from.getZ(), next.getZ())
             && actualFeet.getZ() <= Math.max(from.getZ(), next.getZ());
+    }
+
+    static boolean completionAwaitingConfirmation(int missingTicks) {
+        return missingTicks > 0 && missingTicks < REQUIRED_MISSING_CONFIRM_TICKS;
     }
 
     static boolean waitingForAscendingClearance(int nextY, double feetY) {
@@ -1201,7 +1212,8 @@ public final class AutoMiner {
             search.beginNextFailureValidationPass();
             return PathSearchResult.pending();
         }
-        return PathSearchResult.complete(null);
+        return search.failureValidationTruncated
+            ? PathSearchResult.restart() : PathSearchResult.complete(null);
     }
 
     static boolean pathGoalsChanged(Set<BlockPos> planned, List<BlockPos> current) {
@@ -1219,13 +1231,24 @@ public final class AutoMiner {
     }
 
     static <K> List<Map.Entry<K, Integer>> pathStateEntriesForValidation(
-            Map<K, Integer> cache, boolean exhaustive) {
+            Map<K, Integer> cache, boolean exhaustive, int limit) {
         List<Map.Entry<K, Integer>> result = new ArrayList<>();
-        if (cache == null) return result;
+        if (cache == null || limit <= 0) return result;
         for (Map.Entry<K, Integer> entry : cache.entrySet()) {
             if (pathCacheEntryNeedsValidation(entry.getValue(), exhaustive)) result.add(entry);
+            if (result.size() >= limit) break;
         }
         return result;
+    }
+
+    static int pathStateValidationCount(Map<?, Integer> cache, boolean exhaustive, int limit) {
+        if (cache == null || cache.isEmpty() || limit <= 0) return 0;
+        int count = 0;
+        for (Integer cost : cache.values()) {
+            if (cost != null && pathCacheEntryNeedsValidation(cost, exhaustive)) count++;
+            if (count >= limit) break;
+        }
+        return count;
     }
 
     private void addPathNeighbor(PriorityQueue<PathNode> queue, Map<BlockPos, BlockPos> previous,
@@ -1554,6 +1577,12 @@ public final class AutoMiner {
         delay = 2;
     }
 
+    private void restartRouteFromCurrentPosition() {
+        clearPath();
+        pathRetryDelay = 0;
+        delay = 0;
+    }
+
     private void activatePathTarget(PathTarget target) {
         resetPathCandidateBatch();
         currentOre = target.ore;
@@ -1633,6 +1662,15 @@ public final class AutoMiner {
 
     private void clearPendingCompletion() {
         pendingCompletions.clear();
+    }
+
+    private boolean currentTargetAwaitingCompletion() {
+        if (currentOre == null) return false;
+        for (PendingCompletion pending : pendingCompletions) {
+            if (pending.world == mc.world && pending.pos.equals(currentOre)
+                    && completionAwaitingConfirmation(pending.missingTicks)) return true;
+        }
+        return false;
     }
 
     private void rememberPendingCompletion(BlockPos pos, OreType type) {
@@ -1804,7 +1842,8 @@ public final class AutoMiner {
 
     private MineTarget findNearestReachable(List<OreVisualizer.CachedOre> candidates) {
         MineTarget labeledTarget = findVisibleLabeledTarget(candidates);
-        if (!targetLabels.isEmpty()) return labeledTarget;
+        if (labeledTarget != null) return labeledTarget;
+        if (!targetLabels.isEmpty()) return findVisibleUnlabeledTarget(candidates);
         MineTarget veinTarget = findVisibleVeinTarget(candidates);
         if (veinTarget != null) return veinTarget;
         int inspected = 0;
@@ -1830,6 +1869,30 @@ public final class AutoMiner {
             if (++inspected >= MAX_VISIBLE_TARGETS) break;
         }
         return null;
+    }
+
+    private MineTarget findVisibleUnlabeledTarget(List<OreVisualizer.CachedOre> candidates) {
+        int inspected = 0;
+        for (OreVisualizer.CachedOre candidate : candidates) {
+            if (targetLabels.containsKey(candidate.pos())
+                    || targetTemporarilyUnavailable(candidate.pos())) continue;
+            OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
+            if (!cachedOreStillPresent(candidate.type(), actual)) {
+                oreVisualizer.reconcileMarker(candidate.pos(), actual);
+                continue;
+            }
+            if (!candidateTypeAvailable(
+                    ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
+            MineTarget visible = visibleTarget(candidate.pos());
+            if (visible != null) return visible;
+            if (++inspected >= MAX_VISIBLE_TARGETS) break;
+        }
+        return null;
+    }
+
+    static boolean preserveExistingLabelsForVisibleTarget(
+            Map<BlockPos, Integer> labels, BlockPos target) {
+        return labels != null && !labels.isEmpty() && target != null && !labels.containsKey(target);
     }
 
     static boolean skipPreviouslyInspectedVein(boolean sameVein, int previouslyInspected,
@@ -2264,6 +2327,7 @@ public final class AutoMiner {
         private int visited;
         private boolean validatingFailure;
         private int failureValidationPass;
+        private boolean failureValidationTruncated;
         private boolean failureGoalsValidated;
         private List<Map.Entry<BlockPos, Integer>> failureTraversalEntries;
         private List<Map.Entry<BlockPos, Integer>> failureJumpEntries;
@@ -2289,8 +2353,16 @@ public final class AutoMiner {
 
         private void beginFailureValidation(boolean exhaustive) {
             validatingFailure = true;
-            failureTraversalEntries = pathStateEntriesForValidation(traversalCosts, exhaustive);
-            failureJumpEntries = pathStateEntriesForValidation(jumpClearanceCosts, exhaustive);
+            int countLimit = MAX_PATH_STATES_TO_VALIDATE + 1;
+            int traversalCount = pathStateValidationCount(traversalCosts, exhaustive, countLimit);
+            int jumpCount = pathStateValidationCount(jumpClearanceCosts, exhaustive,
+                Math.max(1, countLimit - Math.min(countLimit, traversalCount)));
+            int traversalLimit = Math.min(MAX_PATH_STATES_TO_VALIDATE, traversalCount);
+            int jumpLimit = Math.max(0, MAX_PATH_STATES_TO_VALIDATE - traversalLimit);
+            failureTraversalEntries = pathStateEntriesForValidation(
+                traversalCosts, exhaustive, traversalLimit);
+            failureJumpEntries = pathStateEntriesForValidation(jumpClearanceCosts, exhaustive, jumpLimit);
+            failureValidationTruncated = traversalCount + jumpCount > MAX_PATH_STATES_TO_VALIDATE;
             beginNextFailureValidationPass();
         }
 
