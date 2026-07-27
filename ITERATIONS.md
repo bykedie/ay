@@ -91,3 +91,11 @@
 - Iteration 3: made manual movement cancel the old route and vein lock while preserving the player's own horizontal motion, then reacquire from the new position after the configured pause.
 - Iteration 4: bound scaffold assistance to the original vertical column, used the supporting face center for reach and placement, sampled the ore center plus all six face centers, and revalidated then mined the ore immediately after placement confirmation.
 - Iteration 5: tracked only path candidates that were actually searched and found unreachable, cooled down only those blocks, and released stale vein labels after they leave the current candidate range.
+
+## Version 1.10.43 Auto Mining Routing And Server Confirmation Update
+
+- Iteration 1: filtered completed quotas, route cooldowns and server-rejected targets before the nearest 96-candidate cache window, and removed stale ore markers without spending the direct-visibility budget.
+- Iteration 2: refreshed stale planning snapshots after eight failed targets, skipped invalid candidates in the same tick, and kept expensive path searches sliced across ticks to avoid frame spikes.
+- Iteration 3: retained horizontal motion while ascending, allowed only earlier obstacles from the active route corridor to be cleared, and kept unrelated blocks outside the clearing authorization.
+- Iteration 4: bounded ore and corridor destruction with tool-aware hardness budgets plus elapsed-time deadlines, and separated server-rejected destruction cooldowns from route-unreachable cooldowns.
+- Iteration 5: replaced the single completion slot with a bounded world-bound queue, required three loaded-world missing ticks before counting a block, reserved pending quota, and prevented delayed confirmations from cancelling a newer route.

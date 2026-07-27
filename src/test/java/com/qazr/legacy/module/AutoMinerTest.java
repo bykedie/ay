@@ -470,6 +470,76 @@ public class AutoMinerTest {
         assertEquals(-0.18, AutoMiner.routeMotionTowardNode(-1.0, 1.0), 0.0001);
         assertEquals(0.04, AutoMiner.routeMotionTowardNode(1.0, 0.04), 0.0001);
         assertEquals(0.0, AutoMiner.routeMotionTowardNode(0.0, 1.0), 0.0001);
+        assertEquals(0.18, AutoMiner.routeMotionComponent(1.0, 1.0), 0.0001);
+        assertEquals(0.0, AutoMiner.routeMotionComponent(0.0, 0.0), 0.0001);
+    }
+
+    @Test
+    public void stalePathSnapshotsRefreshAfterEightFailedCandidates() {
+        assertFalse(AutoMiner.pathSnapshotRefreshNeeded(7, false));
+        assertTrue(AutoMiner.pathSnapshotRefreshNeeded(8, false));
+        assertFalse(AutoMiner.pathSnapshotRefreshNeeded(8, true));
+    }
+
+    @Test
+    public void nearerRouteObstacleMayBeClearedBeforeTheRequestedCell() {
+        BlockPos desired = new BlockPos(3, 65, 0);
+        BlockPos nearer = new BlockPos(2, 65, 0);
+        List<BlockPos> corridor = Arrays.asList(new BlockPos(1, 65, 0), nearer, desired);
+
+        assertTrue(AutoMiner.corridorObstacleAllowed(nearer, desired, desired, corridor));
+        assertFalse(AutoMiner.corridorObstacleAllowed(new BlockPos(2, 65, 1),
+            desired, desired, corridor));
+    }
+
+    @Test
+    public void staleCachedOresDoNotConsumeDirectInspectionSlots() {
+        assertTrue(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.IRON));
+        assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.GOLD));
+        assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, null));
+    }
+
+    @Test
+    public void destructionAttemptBudgetScalesWithBlockHardnessAndStaysBounded() {
+        assertEquals(12, AutoMiner.destructionAttemptBudget(1.0F));
+        assertEquals(18, AutoMiner.destructionAttemptBudget(0.1F));
+        assertEquals(109, AutoMiner.destructionAttemptBudget(0.01F));
+        assertEquals(240, AutoMiner.destructionAttemptBudget(0.0F));
+        assertEquals(240, AutoMiner.destructionAttemptBudget(0.001F));
+    }
+
+    @Test
+    public void destructionAttemptLimitStopsOnlyAfterBudgetIsConsumed() {
+        assertFalse(AutoMiner.destructionAttemptsExhausted(11, 12));
+        assertTrue(AutoMiner.destructionAttemptsExhausted(12, 12));
+        assertFalse(AutoMiner.destructionAttemptsExhausted(100, 0));
+        assertFalse(AutoMiner.destructionWorkExhausted(11, 12, 75, 76));
+        assertTrue(AutoMiner.destructionWorkExhausted(12, 12, 75, 76));
+        assertTrue(AutoMiner.destructionWorkExhausted(1, 12, 77, 76));
+        assertEquals(76, AutoMiner.destructionDeadlineTick(0, 12, 2));
+    }
+
+    @Test
+    public void completionConfirmationKeepsTheDeadlineTick() {
+        assertFalse(AutoMiner.completionConfirmationExpired(140, 140));
+        assertTrue(AutoMiner.completionConfirmationExpired(141, 140));
+        assertFalse(AutoMiner.completionAbsenceConfirmed(true, 2));
+        assertTrue(AutoMiner.completionAbsenceConfirmed(true, 3));
+        assertFalse(AutoMiner.completionAbsenceConfirmed(false, 3));
+        assertFalse(AutoMiner.completionRolledBack(0));
+        assertTrue(AutoMiner.completionRolledBack(1));
+        assertTrue(AutoMiner.pendingCompletionReservesQuota(true, 0));
+        assertTrue(AutoMiner.pendingCompletionReservesQuota(false, 1));
+        assertFalse(AutoMiner.pendingCompletionReservesQuota(false, 0));
+        BlockPos oldOre = new BlockPos(1, 20, 0);
+        BlockPos newOre = new BlockPos(2, 20, 0);
+        assertTrue(AutoMiner.completionOwnsCurrentWork(oldOre, oldOre));
+        assertFalse(AutoMiner.completionOwnsCurrentWork(oldOre, newOre));
+        assertTrue(AutoMiner.quotaSatisfied(2, 1, 1));
+        assertFalse(AutoMiner.quotaSatisfied(2, 1, 0));
+        assertFalse(AutoMiner.quotaSatisfied(0, 99, 1));
+        assertFalse(AutoMiner.quotaBlocksTarget(true, true));
+        assertTrue(AutoMiner.quotaBlocksTarget(true, false));
     }
 
     @Test

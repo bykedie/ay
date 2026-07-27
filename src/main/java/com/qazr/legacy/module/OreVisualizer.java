@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.Predicate;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ChunkProviderClient;
@@ -205,6 +206,15 @@ public final class OreVisualizer {
     }
 
     public List<CachedOre> cachedMineOres(double range, int limit) {
+        return cachedMineOres(range, limit, type -> true);
+    }
+
+    public List<CachedOre> cachedMineOres(double range, int limit, Predicate<OreType> typeFilter) {
+        return cachedMineOres(range, limit, typeFilter, pos -> true);
+    }
+
+    public List<CachedOre> cachedMineOres(double range, int limit, Predicate<OreType> typeFilter,
+            Predicate<BlockPos> positionFilter) {
         if (mc.player == null || mc.world == null) return Collections.emptyList();
         if (limit <= 0) return Collections.emptyList();
         double rangeSq = range * range;
@@ -214,7 +224,9 @@ public final class OreVisualizer {
             if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, range)) continue;
             List<OreMarker> markers = entry.getValue();
             for (OreMarker marker : markers) {
-                if (!ModConfig.isMineOreEnabled(marker.type)) continue;
+                if (!mineTypeEligible(ModConfig.isMineOreEnabled(marker.type),
+                        typeFilter == null || typeFilter.test(marker.type))) continue;
+                if (positionFilter != null && !positionFilter.test(marker.pos)) continue;
                 double distanceSq = distanceSq(marker.pos);
                 if (distanceSq > rangeSq) continue;
                 CachedOre candidate = new CachedOre(marker.pos, marker.type, distanceSq);
@@ -229,6 +241,10 @@ public final class OreVisualizer {
         List<CachedOre> result = new ArrayList<>(nearest);
         result.sort(OreVisualizer::compareCachedOres);
         return result;
+    }
+
+    static boolean mineTypeEligible(boolean configured, boolean quotaAvailable) {
+        return configured && quotaAvailable;
     }
 
     static int compareCachedOres(CachedOre left, CachedOre right) {

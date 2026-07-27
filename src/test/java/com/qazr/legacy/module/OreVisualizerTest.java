@@ -35,6 +35,13 @@ public class OreVisualizerTest {
     }
 
     @Test
+    public void completedOreQuotasAreFilteredBeforeTheNearestWindow() {
+        assertTrue(OreVisualizer.mineTypeEligible(true, true));
+        assertTrue(!OreVisualizer.mineTypeEligible(true, false));
+        assertTrue(!OreVisualizer.mineTypeEligible(false, true));
+    }
+
+    @Test
     public void unchangedSeedStateSkipsRepeatedQueueTraversal() {
         assertTrue(OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
         assertTrue(!OreVisualizer.sameSeedState(false, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
