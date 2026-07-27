@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.10.40`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
+Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.10.41`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
 
 用户可见名称已经迁移为 `Voris Hub`，控制面板标题是 `Voris Hub 控制面板`。为了保留旧配置、旧按键记录和安装兼容性，内部仍保留这些历史标识：
 
@@ -25,7 +25,7 @@ Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本�
 - Gradle wrapper: `7.6.1`
 - ForgeGradle: `5.1.77`
 - MCP mappings: `stable_39-1.12`
-- 当前发行 JAR: `build/libs/voris-hub-1.10.40.jar`
+- 当前发行 JAR: `build/libs/voris-hub-1.10.41.jar`
 
 Windows 构建命令：
 
@@ -62,7 +62,7 @@ Windows 构建命令：
 - `src/main/java/com/qazr/legacy/module/BlinkStrike.java`: 闪现攻击。
 - `src/main/java/com/qazr/legacy/module/CombatTargetRenderer.java`: 战斗/目标可视化方框、射线、骨骼绘制。
 - `src/main/java/com/qazr/legacy/module/OreVisualizer.java`: 矿物可视化扫描、缓存、相邻矿块外边界绘制。
-- `src/main/java/com/qazr/legacy/module/AutoMiner.java`: 自动挖矿、矿种预设、每矿种目标数量、路线可视化、手动让权和简单寻路。
+- `src/main/java/com/qazr/legacy/module/AutoMiner.java`: 自动挖矿、直挖判定、稳定矿脉标签、可选辅助垫块、矿种预设、路线可视化、手动让权和简单寻路。
 - `src/main/java/com/qazr/legacy/module/AutoBridge.java`: 自动搭路，使用快捷栏或临时背包换位放置方块，支持跳跃/下落补桥参数。
 - `src/main/java/com/qazr/legacy/module/FlightController.java`: 战斗分类里的 WWE 风格飞行模块，含静态、原版、Hypixel 三种模式和潜行安全落地保护。
 - `src/main/java/com/qazr/legacy/module/CountOverlay.java`: 目标/矿物数量 HUD。
@@ -88,7 +88,7 @@ Windows 构建命令：
 
 - `autoGg`，中文名 `自动发送 GG`：检测本地玩家击杀相关聊天消息，延迟后随机发送 5 条候选消息之一。空白项不会参与随机。
 - `autoReply`，中文名 `自动回复`：按指定玩家或所有玩家匹配聊天，带冷却，随机发送 5 条候选回复之一。
-- `autoMine`，中文名 `自动挖矿`：复用矿物可视化的区块缓存找矿，不再每 tick 大范围立方体扫描。每片相连矿脉使用稳定的内部顺序标签，当前块完成、失效或超时后才切换；同矿脉遮挡块可以优先清除，坏站位按块冷却后继续尝试其他目标。按寻路范围找目标并规划路线，可高亮当前目标和路线；每种矿石有独立预定数量，`0` 表示该矿种不限数量；检测到玩家手动移动、跳跃或潜行时会按配置暂停寻路让权。
+- `autoMine`，中文名 `自动挖矿`：复用矿物可视化的区块缓存找矿。建立矿脉标签时按最近距离排序，之后保持该顺序，避免相邻矿物反复抢目标；每 tick 会优先直挖原版触及距离内且射线真实命中的矿，包括暴露的头顶矿。同矿脉遮挡矿可以优先清除，坏目标按块冷却。可选参数 `辅助垫方块` 默认关闭；开启后，仅当玩家落地且垫高一格恰好能触及头顶矿时，才会跳起并在脚下放一块稳定非下落方块。仍支持寻路、路线显示、每矿种预定数量和手动让权。
 - `autoBridge`，中文名 `自动搭路`：玩家即将走出边缘、跳跃或下落时，尝试在移动方向前方/下方放置可用实体方块。优先快捷栏，必要时临时从背包换入当前快捷栏槽位再换回。参数包括前探距离、下探高度、放置间隔和防卡脚。
 - `oreVisualizer`，中文名 `矿物可视化`：扫描客户端已加载区块，绘制原版矿石方框。默认距离 `150`，最大 `500`。每种矿石有独立开关和颜色。相邻同类矿石会合并成外边界线框，九宫格中心和内部边线不再绘制。扫描结果被缓存并提供给自动挖矿，渲染与计数会先做区块级距离裁剪。
 
@@ -131,6 +131,7 @@ Windows 构建命令：
 - `oreVisualizer.diamondColor`
 - `autoMine.coalTargetCount` 等每矿种目标数量
 - `autoMine.manualPauseTicks`
+- `autoMine.scaffoldAssist`
 - `autoBridge.lookAhead` / `autoBridge.downScan` / `autoBridge.delayTicks`
 - `autoGg.messages`
 - `autoReply.messages`
@@ -229,14 +230,14 @@ git ls-remote origin refs/heads/main
 
 ## 10. 当前交接状态
 
-截至本文档编写时，项目主功能状态为 `Voris Hub 1.10.40`：
+截至本文档编写时，项目主功能状态为 `Voris Hub 1.10.41`：
 
-- 构建产物名：`voris-hub-1.10.40.jar`
+- 构建产物名：`voris-hub-1.10.41.jar`
 - 面板入口：`·`（Esc 下方的反引号键）
 - 模块快捷键：默认未绑定，由用户自行绑定
 - 目标可视化：默认 `150`，最大 `500`
 - 矿物可视化：默认 `150`，最大 `500`，相邻同类矿石只绘制外边界
-- 自动挖矿：支持矿脉稳定顺序标签、同矿脉遮挡块优先、坏目标按块冷却、矿种预设、每矿种预定数量、寻路范围、路线可视化和手动让权
+- 自动挖矿：支持原版距离真实射线直挖、最近优先且稳定的矿脉标签、同矿脉遮挡块优先、默认关闭的辅助垫方块、坏目标按块冷却、矿种预设、每矿种预定数量、寻路范围、路线可视化和手动让权
 - 自动搭路：支持快捷栏/背包方块临时换位放置、跳跃/下落补桥、前探距离、下探高度、放置间隔和防卡脚参数
 - 飞行：支持 WWE 静态/原版/Hypixel 模式、速度参数和潜行安全落地
 - 自动近战和闪现攻击最大目标数：`50`，并支持攻击部位选择

@@ -16,7 +16,7 @@ The included wrapper pins Gradle 7.6.1 and ForgeGradle 5.1.77.
 
 - `autoGg`: detects local-player kills from chat death messages and sends a delayed configurable response.
 - `autoReply`: responds to a selected player's common chat format with rate limiting.
-- `autoMine`: mines selected ore presets from the shared ore cache, locks each connected vein into a stable internal order, clears exposed vein blockers first, walks only to usable mining positions, pauses when you move manually, and supports per-ore target counts.
+- `autoMine`: mines selected ore presets from the shared ore cache, locks each connected vein into a nearest-first stable order, directly mines any ray-visible ore inside vanilla reach, optionally places one stable assist block for overhead ore, pauses when you move manually, and supports per-ore target counts.
 - `autoBridge`: places a solid block under or ahead of the next walking position, including jump/fall gaps, with configurable lookahead, down-scan, delay, and anti-foot-collision behavior.
 - `oreVisualizer`: incrementally scans client-loaded chunks and draws configurable colored outlines for each vanilla ore type, merging adjacent ore blocks into outer boundary wireframes.
 - `creativeTools`: enables commands that create normal items and NBT custom potions in Creative mode.
@@ -30,7 +30,7 @@ The included wrapper pins Gradle 7.6.1 and ForgeGradle 5.1.77.
 
 Target and ore visualization both default to `150` blocks and can be configured up to `500`. Ore visualization can only inspect chunks currently loaded by the client. Each vanilla ore has an independent switch and RGB outline color. Adjacent ore blocks are rendered as a shared outer wireframe so internal nine-grid style lines are skipped. Both visualizers can show compact nearby-count HUD items, sharing the same selectable screen corner. Ore scanning is chunk-cached, distance-culled, and reused by auto mining to avoid repeated large cube scans.
 
-Auto mining uses `pathRange` for both target acquisition and route planning; the old close-range radius setting is no longer used. Each connected vein receives stable invisible sequence labels so one ore remains owned until mined, invalid, or timed out. A labeled ore that blocks line of sight can be mined first, while failed destinations receive a short per-block retry cooldown so one bad position cannot freeze the whole vein. Side mining positions are preferred; standing above a foot-level ore is retained only as the final fallback. Each ore type has its own target count slider, where `0` means unlimited for that ore. When route visualization is enabled, the current target is boxed and the planned route is drawn as a thin line.
+Auto mining uses `pathRange` for both target acquisition and route planning. Each connected vein receives nearest-first invisible sequence labels when acquired, then keeps that order so adjacent ore cannot steal the active target. Before planning or continuing a route, any ore inside vanilla reach and actually hit by the player's ray trace is mined directly, including exposed overhead ore. A labeled same-vein ore that blocks line of sight can be mined first, while failed destinations receive a short per-block retry cooldown. The optional `辅助垫方块` setting is off by default; when enabled, it may jump and place one stable non-falling block under a grounded player only when that height gain brings an overhead ore into reach. Each ore type has its own target count slider, where `0` means unlimited.
 
 For a guarded landing, keep `flight` enabled and hold Sneak until the player touches the ground, then disable flight. Descent is capped without repeatedly sending fake grounded packets, horizontal direction input remains active, fall accumulation is cleared locally, and one final grounded position is sent only when the detected collision surface is reached. This reduces fall damage but still depends on the server accepting the final movement packet.
 
@@ -45,7 +45,7 @@ All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. T
 - The Tools panel has a clickable `游戏模式` row for switching between Survival and Creative; multiplayer servers still require the corresponding command permission.
 - `创造工具` unlocks `/qazr give` and `/qazr potion` for creating items and custom potions while in Creative mode; its question-mark tooltip repeats this requirement in the panel.
 - Combat modules have independent player, hostile, animal, peaceful and mod-entity filters, camera rotation, attack body point, and multi-target limits up to 50. The separate target visualizer has skeleton, box, ray and nearby-count switches.
-- Auto mine exposes per-ore switches and target counts, path range, mining delay, manual-movement pause, and route visualization. Auto bridge exposes lookahead, down-scan, place delay, and anti-foot-collision settings.
+- Auto mine exposes per-ore switches and target counts, path range, mining delay, manual-movement pause, route visualization, and an optional overhead-ore assist-block switch. Auto bridge exposes lookahead, down-scan, place delay, and anti-foot-collision settings.
 - Auto GG and auto reply expose five editable random message slots; blank slots are skipped and `{player}` inserts the matched player name.
 - `/qazr status`
 - `/qazr toggle <module>`
@@ -70,7 +70,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.10.40.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.10.41.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

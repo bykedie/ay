@@ -75,3 +75,11 @@
 - Iteration 4: added a Tools-panel Survival/Creative control, with direct integrated-server switching in singleplayer, permission-respecting `/gamemode` commands in multiplayer, and an in-panel explanation of Creative Tools.
 - Iteration 5: restricted Auto Miner route rendering to remaining stand nodes, so directly mineable ore keeps only its target marker and route lines no longer terminate inside ore or blocker blocks.
 - Verified 128 tests, the Forge 1.12.2 release JAR metadata and Java 8 bytecode, then loaded Voris Hub successfully in the development client.
+
+## Version 1.10.41 Auto Mining Reach And Scaffold Update
+
+- Iteration 1: moved direct mining ahead of active route following, so the final ore is reconsidered every tick instead of waiting on a stale stand position.
+- Iteration 2: separated direct mining from path-planning posture rules; any valid ore inside vanilla reach now mines when the real world ray trace hits it, including exposed overhead ore.
+- Iteration 3: assigned each connected vein a nearest-first label order at acquisition time, retained that order while mining, and used a set-backed traversal for large veins.
+- Iteration 4: added the default-off `辅助垫方块` parameter, which can jump and place one stable non-falling block under a grounded player when exactly one block of extra height brings overhead ore into reach.
+- Iteration 5: bounded assist placement to five attempts and 40 ticks, restored temporarily swapped inventory blocks, added failed-target cooldowns, and covered reach, ordering, placement, configuration, and GUI-setting counts with tests.

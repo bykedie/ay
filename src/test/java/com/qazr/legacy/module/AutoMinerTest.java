@@ -143,9 +143,10 @@ public class AutoMinerTest {
 
         assertTrue(AutoMiner.stableMiningPosition(feet, new BlockPos(1, 64, 0)));
         assertTrue(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 63, 0)));
+        assertTrue(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 66, 0)));
         assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(1, 64, 1)));
         assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(4, 64, 0)));
-        assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 66, 0)));
+        assertFalse(AutoMiner.stableMiningPosition(feet, new BlockPos(0, 67, 0)));
     }
 
     @Test
@@ -153,8 +154,9 @@ public class AutoMinerTest {
         BlockPos ore = new BlockPos(0, 64, 0);
         List<BlockPos> candidates = AutoMiner.miningStandCandidates(ore);
 
-        assertEquals(17, candidates.size());
+        assertEquals(18, candidates.size());
         assertTrue(candidates.contains(ore.up()));
+        assertTrue(candidates.contains(ore.down(2)));
         assertTrue(candidates.contains(new BlockPos(1, 62, 0)));
         assertTrue(candidates.contains(new BlockPos(1, 65, 0)));
         assertFalse(candidates.contains(new BlockPos(1, 64, 1)));
@@ -233,7 +235,7 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void invisibleLabelsKeepAConnectedVeinInOneStableOrder() {
+    public void invisibleLabelsKeepAConnectedVeinInOneNearestFirstOrder() {
         BlockPos seed = new BlockPos(10, 20, 30);
         OreVisualizer.CachedOre second = new OreVisualizer.CachedOre(
             seed.east(), OreType.IRON, 1.0);
@@ -252,6 +254,54 @@ public class AutoMinerTest {
         assertEquals(Integer.valueOf(3), labels.get(diagonal.pos()));
         assertFalse(labels.containsKey(otherType.pos()));
         assertFalse(labels.containsKey(detached.pos()));
+    }
+
+    @Test
+    public void directReachAllowsVisibleOreInAnyRelativeDirection() {
+        Vec3d eyes = new Vec3d(0.5, 65.62, 0.5);
+
+        assertTrue(AutoMiner.withinMiningReach(eyes, new BlockPos(0, 66, 0), 4.5));
+        assertTrue(AutoMiner.withinMiningReach(eyes, new BlockPos(1, 65, 1), 4.5));
+        assertFalse(AutoMiner.withinMiningReach(eyes, new BlockPos(0, 71, 0), 4.5));
+    }
+
+    @Test
+    public void scaffoldAssistOnlyRaisesAStablePlayerForAnOverheadOre() {
+        BlockPos feet = new BlockPos(0, 64, 0);
+
+        assertTrue(AutoMiner.scaffoldCandidate(feet, feet.up(3), true,
+            true, true, true, true));
+        assertTrue(AutoMiner.scaffoldCandidate(feet, feet.east().up(3), true,
+            true, true, true, true));
+        assertTrue(AutoMiner.scaffoldCandidate(feet, feet.up(2), true,
+            true, true, true, true));
+        assertFalse(AutoMiner.scaffoldCandidate(feet, feet.up(3), false,
+            true, true, true, true));
+        assertFalse(AutoMiner.scaffoldCandidate(feet, feet.up(3), true,
+            true, true, false, true));
+        assertFalse(AutoMiner.scaffoldCandidate(feet, feet.add(2, 3, 0), true,
+            true, true, true, true));
+    }
+
+    @Test
+    public void scaffoldAssistOnlyStartsWhenOneBlockOfHeightAddsReach() {
+        Vec3d eyes = new Vec3d(0.5, 65.62, 0.5);
+        BlockPos ore = new BlockPos(0, 70, 0);
+
+        assertTrue(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 4.0));
+        assertFalse(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 3.0));
+        assertFalse(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 4.5));
+    }
+
+    @Test
+    public void scaffoldPlacementWaitsUntilThePlayerClearsTheNewBlock() {
+        assertFalse(AutoMiner.readyToPlaceScaffold(64.99, 64));
+        assertTrue(AutoMiner.readyToPlaceScaffold(65.0, 64));
+        assertFalse(AutoMiner.playerReachedScaffoldLevel(64.94, 64));
+        assertTrue(AutoMiner.playerReachedScaffoldLevel(64.95, 64));
+        assertTrue(AutoMiner.stableScaffoldBlock(true, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(false, false));
     }
 
     @Test

@@ -60,6 +60,7 @@ public class ModConfigTest {
         assertEquals(32, ModConfig.minePathRange);
         assertEquals(30, ModConfig.mineManualPauseTicks);
         assertTrue(ModConfig.mineVisualizePath);
+        assertFalse(ModConfig.mineScaffoldAssist);
         assertEquals(0, ModConfig.getMineTargetCount(OreType.COAL));
         assertEquals(0, ModConfig.getMineTargetCount(OreType.DIAMOND));
         assertEquals(0.95, ModConfig.bridgeLookahead, 0.001);
@@ -247,6 +248,7 @@ public class ModConfigTest {
         ModConfig.saveNumber(ModuleSetting.MINE_PATH_RANGE, 64.0);
         ModConfig.saveNumber(ModuleSetting.MINE_MANUAL_PAUSE, 55.0);
         ModConfig.toggle(ModuleSetting.MINE_VISUALIZE_PATH);
+        ModConfig.toggle(ModuleSetting.MINE_SCAFFOLD_ASSIST);
         ModConfig.saveNumber(ModuleSetting.MINE_COAL_COUNT, 12.0);
         ModConfig.saveNumber(ModuleSetting.MINE_DIAMOND_COUNT, 3.0);
         ModConfig.saveNumber(ModuleSetting.BRIDGE_LOOKAHEAD, 1.24);
@@ -261,6 +263,7 @@ public class ModConfigTest {
         assertEquals(64, ModConfig.minePathRange);
         assertEquals(55, ModConfig.mineManualPauseTicks);
         assertFalse(ModConfig.mineVisualizePath);
+        assertTrue(ModConfig.mineScaffoldAssist);
         assertEquals(12, ModConfig.getMineTargetCount(OreType.COAL));
         assertEquals(3, ModConfig.getMineTargetCount(OreType.DIAMOND));
         assertEquals(1.25, ModConfig.bridgeLookahead, 0.001);

@@ -33,6 +33,7 @@ public final class ModConfig {
     public static int minePathRange;
     public static int mineManualPauseTicks;
     public static boolean mineVisualizePath;
+    public static boolean mineScaffoldAssist;
     private static final EnumMap<OreType, Boolean> mineOreEnabled = new EnumMap<>(OreType.class);
     private static final EnumMap<OreType, Integer> mineTargetCounts = new EnumMap<>(OreType.class);
     public static double bridgeLookahead;
@@ -130,6 +131,8 @@ public final class ModConfig {
         minePathRange = configuration.getInt("pathRange", "autoMine", 32, 6, 96, "Maximum range for walking to selected ores.");
         mineManualPauseTicks = configuration.getInt("manualPauseTicks", "autoMine", 30, 0, 100, "Ticks to pause pathing after manual movement input.");
         mineVisualizePath = configuration.getBoolean("visualizePath", "autoMine", true, "Draw the current mining target and planned route.");
+        mineScaffoldAssist = configuration.getBoolean("scaffoldAssist", "autoMine", false,
+            "Place one stable block under the player when it safely brings an overhead ore into reach.");
         int legacyTargetCount = configuration.getInt("targetCount", "autoMine", 0, 0, 999,
             "Legacy global target count. New configs use per-ore target counts.");
         mineOreEnabled.clear();
@@ -374,6 +377,7 @@ public final class ModConfig {
             case BLINK_MULTI: return blinkMultiTarget;
             case BLINK_VISUALIZE: return blinkVisualize;
             case MINE_VISUALIZE_PATH: return mineVisualizePath;
+            case MINE_SCAFFOLD_ASSIST: return mineScaffoldAssist;
             case BRIDGE_AVOID_FEET: return bridgeAvoidFeet;
             case TARGET_SKELETON: return targetSkeleton;
             case TARGET_BOX: return targetBox;
@@ -419,6 +423,7 @@ public final class ModConfig {
             case BLINK_MULTI: blinkMultiTarget = value; saveBoolean("blinkStrike", "multiTarget", value); break;
             case BLINK_VISUALIZE: blinkVisualize = value; saveBoolean("blinkStrike", "visualizeTargets", value); break;
             case MINE_VISUALIZE_PATH: mineVisualizePath = value; saveBoolean("autoMine", "visualizePath", value); break;
+            case MINE_SCAFFOLD_ASSIST: mineScaffoldAssist = value; saveBoolean("autoMine", "scaffoldAssist", value); break;
             case BRIDGE_AVOID_FEET: bridgeAvoidFeet = value; saveBoolean("autoBridge", "avoidFeetCollision", value); break;
             case TARGET_SKELETON: targetSkeleton = value; saveBoolean("targetVisualizer", "skeleton", value); break;
             case TARGET_BOX: targetBox = value; saveBoolean("targetVisualizer", "box", value); break;

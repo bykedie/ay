@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.ToIntFunction;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockFalling;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -22,9 +24,13 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.inventory.ClickType;
+import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemPickaxe;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
@@ -50,6 +56,8 @@ public final class AutoMiner {
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final double ROUTE_NODE_REACH_DISTANCE_SQ = 0.04;
     private static final int ROUTE_RENDER_LIMIT = 220;
+    private static final int SCAFFOLD_TIMEOUT_TICKS = 40;
+    private static final int MAX_SCAFFOLD_ATTEMPTS = 5;
     private static final int[] PATH_VERTICAL_OFFSETS = {0, 1, -1};
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -84,6 +92,11 @@ public final class AutoMiner {
     private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
     private int stalledRouteTicks;
     private OreType targetLabelType;
+    private BlockPos scaffoldPos;
+    private BlockPos scaffoldOre;
+    private int scaffoldStartedTick;
+    private int scaffoldNextPlaceTick;
+    private int scaffoldAttempts;
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -129,8 +142,11 @@ public final class AutoMiner {
             return;
         }
         if (delay-- > 0) return;
+        if (continueScaffoldAssist()) return;
         if (continueClearingObstacle()) return;
         if (continueMiningTarget()) return;
+        if (tryMineCurrentOreDirectly()) return;
+        if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentOre, currentOreType)) return;
         if (hasActiveRoute()) {
             followPathToOre();
             return;
@@ -153,6 +169,7 @@ public final class AutoMiner {
             mine(visible);
             return;
         }
+        if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(candidates)) return;
         followPathToOre(candidates);
     }
 
@@ -209,6 +226,7 @@ public final class AutoMiner {
             miningPlayerFeet = null;
             miningEyes = null;
             miningReachDistance = 0.0;
+            clearScaffoldAssist();
         }
     }
 
@@ -286,6 +304,15 @@ public final class AutoMiner {
         return true;
     }
 
+    private boolean tryMineCurrentOreDirectly() {
+        if (currentOre == null) return false;
+        MineTarget target = visibleTarget(currentOre);
+        if (target == null) return false;
+        stopRouteMotion();
+        mine(target);
+        return true;
+    }
+
     private void prepareAndMineCurrentOre() {
         if (currentOre == null || targetType(currentOre) == null
                 || !stableMiningPosition(miningPlayerFeet, currentOre)
@@ -313,6 +340,187 @@ public final class AutoMiner {
         } else {
             abandonCurrentRoute();
         }
+    }
+
+    private boolean beginScaffoldAssist(List<OreVisualizer.CachedOre> candidates) {
+        if (candidates == null) return false;
+        int inspected = 0;
+        for (OreVisualizer.CachedOre candidate : candidates) {
+            if ((!targetLabels.isEmpty() && !targetLabels.containsKey(candidate.pos()))
+                    || quotaReached(candidate.type()) || temporarilyBlocked(candidate.pos(),
+                    blockedTargetsUntil, mc.player.ticksExisted)) continue;
+            if (beginScaffoldAssist(candidate.pos(), candidate.type())) {
+                ensureTargetLabels(candidate.pos(), candidate.type(), candidates);
+                return true;
+            }
+            if (++inspected >= MAX_VISIBLE_TARGETS) break;
+        }
+        return false;
+    }
+
+    private boolean beginScaffoldAssist(BlockPos ore, OreType type) {
+        if (scaffoldPos != null || ore == null || type == null || targetType(ore) != type
+                || !mc.player.onGround || mc.player.capabilities.isFlying
+                || mc.player.isInWater() || mc.player.isInLava()) return false;
+        if (!scaffoldCandidate(miningPlayerFeet, ore, true, isPassable(miningPlayerFeet),
+                isPassable(miningPlayerFeet.up()), isPassable(miningPlayerFeet.up(2)),
+                hasSolidSupport(miningPlayerFeet))
+                || !scaffoldRaisesIntoReach(miningEyes, ore, miningReachDistance)) return false;
+        Vec3d raisedEyes = new Vec3d(miningEyes.x, miningEyes.y + 1.0, miningEyes.z);
+        RayTraceResult hit = mc.world.rayTraceBlocks(raisedEyes, blockCenter(ore), false, true, false);
+        if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK || !ore.equals(hit.getBlockPos())
+                || scaffoldPlacementFor(miningPlayerFeet) == null
+                || findScaffoldBlock(miningPlayerFeet) < 0) return false;
+        currentOre = ore.toImmutable();
+        currentOreType = type;
+        path = java.util.Collections.emptyList();
+        pathIndex = 0;
+        scaffoldPos = miningPlayerFeet.toImmutable();
+        scaffoldOre = currentOre;
+        scaffoldStartedTick = mc.player.ticksExisted;
+        scaffoldNextPlaceTick = scaffoldStartedTick;
+        scaffoldAttempts = 0;
+        stopRouteMotion();
+        mc.player.jump();
+        return true;
+    }
+
+    private boolean continueScaffoldAssist() {
+        if (scaffoldPos == null || scaffoldOre == null) return false;
+        int tick = mc.player.ticksExisted;
+        if (!ModConfig.mineScaffoldAssist || targetType(scaffoldOre) == null
+                || tick - scaffoldStartedTick > SCAFFOLD_TIMEOUT_TICKS) {
+            failScaffoldAssist();
+            return false;
+        }
+        stopRouteMotion();
+        if (!isPassable(scaffoldPos)) {
+            if (playerReachedScaffoldLevel(mc.player.getEntityBoundingBox().minY, scaffoldPos.getY())) {
+                clearScaffoldAssist();
+                return false;
+            }
+            return true;
+        }
+        ScaffoldPlacement placement = scaffoldPlacementFor(scaffoldPos);
+        int slot = findScaffoldBlock(scaffoldPos);
+        if (placement == null || slot < 0) {
+            failScaffoldAssist();
+            return false;
+        }
+        if (!readyToPlaceScaffold(mc.player.getEntityBoundingBox().minY, scaffoldPos.getY())) {
+            if (mc.player.onGround) mc.player.jump();
+            return true;
+        }
+        if (tick < scaffoldNextPlaceTick) return true;
+        scaffoldAttempts++;
+        placeScaffold(scaffoldPos, placement, slot);
+        scaffoldNextPlaceTick = tick + AutoBridge.placementRetryDelay(scaffoldAttempts);
+        if (scaffoldAttempts >= MAX_SCAFFOLD_ATTEMPTS && isPassable(scaffoldPos)) {
+            failScaffoldAssist();
+            return false;
+        }
+        return true;
+    }
+
+    static boolean scaffoldCandidate(BlockPos feet, BlockPos ore, boolean onGround,
+            boolean feetClear, boolean headClear, boolean jumpClear, boolean supported) {
+        if (feet == null || ore == null || !onGround || !feetClear || !headClear
+                || !jumpClear || !supported) return false;
+        int dx = Math.abs(feet.getX() - ore.getX());
+        int dz = Math.abs(feet.getZ() - ore.getZ());
+        return dx + dz <= 1 && ore.getY() > feet.getY() + 1;
+    }
+
+    static boolean scaffoldRaisesIntoReach(Vec3d eyes, BlockPos ore, double reach) {
+        return eyes != null && ore != null && reach > 0.0
+            && !withinMiningReach(eyes, ore, reach)
+            && withinMiningReach(new Vec3d(eyes.x, eyes.y + 1.0, eyes.z), ore, reach);
+    }
+
+    static boolean readyToPlaceScaffold(double playerFeetY, int scaffoldY) {
+        return playerFeetY >= scaffoldY + 1.0;
+    }
+
+    static boolean playerReachedScaffoldLevel(double playerFeetY, int scaffoldY) {
+        return playerFeetY >= scaffoldY + 0.95;
+    }
+
+    private void placeScaffold(BlockPos pos, ScaffoldPlacement placement, int sourceSlot) {
+        int original = mc.player.inventory.currentItem;
+        boolean swapped = sourceSlot >= 9;
+        int inventorySlot = sourceSlot;
+        if (swapped) {
+            mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot,
+                original, ClickType.SWAP, mc.player);
+            sourceSlot = original;
+        }
+        try {
+            mc.player.inventory.currentItem = sourceSlot;
+            mc.playerController.updateController();
+            Vec3d hit = new Vec3d(placement.neighbor.getX() + 0.5,
+                placement.neighbor.getY() + 0.5, placement.neighbor.getZ() + 0.5);
+            EnumActionResult result = mc.playerController.processRightClickBlock(mc.player, mc.world,
+                placement.neighbor, placement.side, hit, EnumHand.MAIN_HAND);
+            if (result == EnumActionResult.SUCCESS) mc.player.swingArm(EnumHand.MAIN_HAND);
+        } finally {
+            mc.player.inventory.currentItem = original;
+            mc.playerController.updateController();
+            if (swapped) {
+                mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot,
+                    original, ClickType.SWAP, mc.player);
+            }
+        }
+    }
+
+    private ScaffoldPlacement scaffoldPlacementFor(BlockPos pos) {
+        for (EnumFacing side : EnumFacing.values()) {
+            BlockPos neighbor = pos.offset(side);
+            IBlockState state = mc.world.getBlockState(neighbor);
+            if (!state.getMaterial().isReplaceable() && state.getMaterial().blocksMovement()) {
+                Vec3d eyes = mc.player.getPositionEyes(1.0F);
+                Vec3d hit = blockCenter(neighbor);
+                double reach = mc.playerController.getBlockReachDistance() + 0.5;
+                if (eyes.squareDistanceTo(hit) <= reach * reach) {
+                    return new ScaffoldPlacement(neighbor, side.getOpposite());
+                }
+            }
+        }
+        return null;
+    }
+
+    private int findScaffoldBlock(BlockPos pos) {
+        for (int slot = 0; slot < 36; slot++) {
+            if (canScaffoldWith(mc.player.inventory.getStackInSlot(slot), pos)) return slot;
+        }
+        return -1;
+    }
+
+    private boolean canScaffoldWith(ItemStack stack, BlockPos pos) {
+        if (stack.isEmpty() || !(stack.getItem() instanceof ItemBlock)) return false;
+        Block block = ((ItemBlock) stack.getItem()).getBlock();
+        return block != null && stableScaffoldBlock(block.getDefaultState().getMaterial().isSolid(),
+            block instanceof BlockFalling) && block.canPlaceBlockAt(mc.world, pos);
+    }
+
+    static boolean stableScaffoldBlock(boolean solid, boolean falling) {
+        return solid && !falling;
+    }
+
+    private void clearScaffoldAssist() {
+        scaffoldPos = null;
+        scaffoldOre = null;
+        scaffoldStartedTick = 0;
+        scaffoldNextPlaceTick = 0;
+        scaffoldAttempts = 0;
+    }
+
+    private void failScaffoldAssist() {
+        if (scaffoldOre != null) {
+            blockedTargetsUntil.put(scaffoldOre.toImmutable(),
+                mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
+        }
+        clearScaffoldAssist();
+        clearPath();
     }
 
     private boolean continueClearingObstacle() {
@@ -753,6 +961,7 @@ public final class AutoMiner {
             for (int dy = -2; dy <= 1; dy++) result.add(side.add(0, dy, 0));
         }
         result.add(ore.up());
+        result.add(ore.down(2));
         return result;
     }
 
@@ -974,6 +1183,7 @@ public final class AutoMiner {
         miningType = null;
         clearingPos = null;
         pathIndex = 0;
+        clearScaffoldAssist();
         resetRouteProgress();
     }
 
@@ -1119,24 +1329,30 @@ public final class AutoMiner {
         Map<BlockPos, Integer> labels = new HashMap<>();
         if (seed == null || type == null || candidates == null) return labels;
         Set<BlockPos> available = new HashSet<>();
+        Map<BlockPos, Double> distances = new HashMap<>();
         for (OreVisualizer.CachedOre candidate : candidates) {
-            if (candidate.type() == type) available.add(candidate.pos().toImmutable());
+            if (candidate.type() == type) {
+                BlockPos pos = candidate.pos().toImmutable();
+                available.add(pos);
+                distances.put(pos, candidate.distanceSq());
+            }
         }
         available.add(seed.toImmutable());
         Deque<BlockPos> queue = new ArrayDeque<>();
         queue.add(seed.toImmutable());
-        int label = 1;
+        List<BlockPos> connected = new ArrayList<>();
+        Set<BlockPos> visited = new HashSet<>();
         while (!queue.isEmpty()) {
             BlockPos current = queue.removeFirst();
-            if (labels.containsKey(current) || !available.contains(current)) continue;
-            labels.put(current, label++);
+            if (!available.contains(current) || !visited.add(current)) continue;
+            connected.add(current);
             List<BlockPos> neighbors = new ArrayList<>();
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         if (dx == 0 && dy == 0 && dz == 0) continue;
                         BlockPos neighbor = current.add(dx, dy, dz);
-                        if (available.contains(neighbor) && !labels.containsKey(neighbor)) {
+                        if (available.contains(neighbor) && !visited.contains(neighbor)) {
                             neighbors.add(neighbor);
                         }
                     }
@@ -1145,7 +1361,19 @@ public final class AutoMiner {
             neighbors.sort(AutoMiner::compareBlockPositions);
             queue.addAll(neighbors);
         }
+        connected.sort((left, right) -> compareVeinLabelOrder(left, right, seed, distances));
+        for (int index = 0; index < connected.size(); index++) {
+            labels.put(connected.get(index), index + 1);
+        }
         return labels;
+    }
+
+    static int compareVeinLabelOrder(BlockPos left, BlockPos right, BlockPos seed,
+            Map<BlockPos, Double> distances) {
+        if (left.equals(seed) != right.equals(seed)) return left.equals(seed) ? -1 : 1;
+        int distance = Double.compare(distances.getOrDefault(left, Double.POSITIVE_INFINITY),
+            distances.getOrDefault(right, Double.POSITIVE_INFINITY));
+        return distance != 0 ? distance : compareBlockPositions(left, right);
     }
 
     private static int compareBlockPositions(BlockPos left, BlockPos right) {
@@ -1170,9 +1398,6 @@ public final class AutoMiner {
     private MineTarget visibleTarget(BlockPos pos, boolean allowLabeledBlocker) {
         OreType type = targetType(pos);
         if (type == null || !visibilityContextReady(miningPlayerFeet, miningEyes, miningReachDistance)) return null;
-        if (!stableMiningPosition(miningPlayerFeet, pos)) return null;
-        if (!miningWorkAreaReady(isPassable(miningPlayerFeet),
-                isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet))) return null;
         if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         Vec3d center = blockCenter(pos);
         RayTraceResult hit = mc.world.rayTraceBlocks(miningEyes, center, false, true, false);
@@ -1183,11 +1408,8 @@ public final class AutoMiner {
                     targetType(hitPos), targetLabels)) return null;
             pos = hitPos;
             type = targetType(hitPos);
-            if (!stableMiningPosition(miningPlayerFeet, pos)
-                    || !withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
+            if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         }
-        BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, pos);
-        if (faceNeighbor == null || !isPassable(faceNeighbor)) return null;
         return new MineTarget(pos.toImmutable(), type, hit.sideHit);
     }
 
@@ -1214,7 +1436,7 @@ public final class AutoMiner {
         int dx = Math.abs(playerFeet.getX() - ore.getX());
         int dy = ore.getY() - playerFeet.getY();
         int dz = Math.abs(playerFeet.getZ() - ore.getZ());
-        if (dx == 0 && dz == 0) return dy == -1;
+        if (dx == 0 && dz == 0) return dy == -1 || dy == 2;
         return dx + dz == 1 && dy >= -1 && dy <= 2;
     }
 
@@ -1338,6 +1560,16 @@ public final class AutoMiner {
         private MineTarget(BlockPos pos, OreType type, EnumFacing side) {
             this.pos = pos;
             this.type = type;
+            this.side = side;
+        }
+    }
+
+    private static final class ScaffoldPlacement {
+        private final BlockPos neighbor;
+        private final EnumFacing side;
+
+        private ScaffoldPlacement(BlockPos neighbor, EnumFacing side) {
+            this.neighbor = neighbor;
             this.side = side;
         }
     }

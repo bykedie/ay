@@ -15,6 +15,7 @@ public enum ModuleSetting {
     MINE_PATH_RANGE(ModuleId.AUTO_MINE, "寻路范围", Type.NUMBER, 6.0, 96.0, 1.0, " 格"),
     MINE_MANUAL_PAUSE(ModuleId.AUTO_MINE, "手动让权", Type.NUMBER, 0.0, 100.0, 5.0, " tick"),
     MINE_VISUALIZE_PATH(ModuleId.AUTO_MINE, "显示目标路线", Type.TOGGLE),
+    MINE_SCAFFOLD_ASSIST(ModuleId.AUTO_MINE, "辅助垫方块", Type.TOGGLE),
     MINE_COAL(ModuleId.AUTO_MINE, "挖煤矿", Type.TOGGLE),
     MINE_COAL_COUNT(ModuleId.AUTO_MINE, "煤矿预定数量", Type.NUMBER, 0.0, 999.0, 1.0, " 个"),
     MINE_IRON(ModuleId.AUTO_MINE, "挖铁矿", Type.TOGGLE),
@@ -185,6 +186,7 @@ public enum ModuleSetting {
             case MINE_PATH_RANGE: return "自动挖矿可主动找路的最大范围。只会在客户端已加载区块内寻找指定矿石。";
             case MINE_MANUAL_PAUSE: return "检测到你自己按移动、跳跃或潜行后，自动寻路暂停的时间。0 表示不让权。";
             case MINE_VISUALIZE_PATH: return "开启后高亮当前挖掘目标，并用细线显示计划行走路线。";
+            case MINE_SCAFFOLD_ASSIST: return "开启后，头顶矿物只差一格高度才能触及时，会安全起跳并在脚下放置稳定实体方块；默认关闭。";
             case BRIDGE_LOOKAHEAD: return "按当前移动方向提前检测并补方块的距离；跳跃搭路通常需要稍大一点。";
             case BRIDGE_DOWN_SCAN: return "从脚下向下搜索可放置位置的高度，用于跳起或下落时补桥。";
             case BRIDGE_DELAY: return "两次自动搭路放置之间至少等待的 tick 数。数值低更跟手，数值高更稳。";
