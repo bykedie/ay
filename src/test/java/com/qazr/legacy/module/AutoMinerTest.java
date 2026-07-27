@@ -544,9 +544,16 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.completionAbsenceConfirmed(false, 3));
         assertFalse(AutoMiner.completionRolledBack(0));
         assertTrue(AutoMiner.completionRolledBack(1));
-        assertTrue(AutoMiner.quotaReservationAfterBlockObservation(false, true));
-        assertTrue(AutoMiner.quotaReservationAfterBlockObservation(true, false));
-        assertFalse(AutoMiner.quotaReservationAfterBlockObservation(false, false));
+        boolean reserved = true;
+        reserved = AutoMiner.pendingQuotaReservationAfter(reserved,
+            AutoMiner.PendingQuotaEvent.VISIBILITY_LOST);
+        assertFalse(reserved);
+        reserved = AutoMiner.pendingQuotaReservationAfter(reserved,
+            AutoMiner.PendingQuotaEvent.BLOCK_MISSING);
+        assertTrue(reserved);
+        reserved = AutoMiner.pendingQuotaReservationAfter(false,
+            AutoMiner.PendingQuotaEvent.RETRY);
+        assertTrue(reserved);
         BlockPos oldOre = new BlockPos(1, 20, 0);
         BlockPos newOre = new BlockPos(2, 20, 0);
         assertTrue(AutoMiner.completionOwnsCurrentWork(oldOre, oldOre));

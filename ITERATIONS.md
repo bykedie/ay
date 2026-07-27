@@ -115,3 +115,11 @@
 - Iteration 3: removed the redundant pre-sort used while seeding loaded chunks, retained the final distance-priority ordering, and rejected newly loaded chunks outside the active range.
 - Iteration 4: bounded invalid validation-task visits per pass and restored direct visibility checks for the seventeenth and later blocks of a large connected vein.
 - Iteration 5: revalidated ore enablement and quota state across visible, scaffold and path candidates so an in-progress snapshot immediately respects control-panel changes.
+
+## Version 1.10.46 Auto Mining Cache Reconciliation Update
+
+- Iteration 1: replaced the split validation map and stale-task deque with one insertion-ordered validation table, so chunk eviction removes validation work immediately while preserving fair rotation.
+- Iteration 2: expressed pending-completion quota changes as explicit retry, visibility-loss and missing-block events, with sequential state-transition coverage.
+- Iteration 3: restored an ore marker when the server rolls back a client-predicted block break, preventing the last ore from disappearing permanently after a rejected completion.
+- Iteration 4: made marker restoration collapse duplicate entries and refuse to recreate markers for chunks already evicted from the active cache.
+- Iteration 5: reconciled cached ore-type changes in direct, vein, labeled, scaffold, path and background-validation flows instead of dropping the replacement ore until a chunk reload.

@@ -76,6 +76,14 @@ public class OreVisualizerTest {
         assertEquals(0, OreVisualizer.validationTaskVisitLimit(500, 0));
         assertTrue(OreVisualizer.reuseVisibleOreCount(20, 20));
         assertTrue(!OreVisualizer.reuseVisibleOreCount(20, 21));
+        assertTrue(OreVisualizer.markerRestoreNeeded(OreType.IRON, 0, 0));
+        assertTrue(OreVisualizer.markerRestoreNeeded(OreType.IRON, 0, 1));
+        assertTrue(OreVisualizer.markerRestoreNeeded(OreType.IRON, 2, 2));
+        assertTrue(!OreVisualizer.markerRestoreNeeded(OreType.IRON, 1, 1));
+        assertTrue(OreVisualizer.markerCacheOwnsChunk(true, false, false));
+        assertTrue(OreVisualizer.markerCacheOwnsChunk(false, true, false));
+        assertTrue(OreVisualizer.markerCacheOwnsChunk(false, false, true));
+        assertTrue(!OreVisualizer.markerCacheOwnsChunk(false, false, false));
     }
 
     @Test

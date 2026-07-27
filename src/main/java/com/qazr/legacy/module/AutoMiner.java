@@ -294,6 +294,7 @@ public final class AutoMiner {
             if (remainingType == pending.type) {
                 if (completionRolledBack(pending.missingTicks)) {
                     iterator.remove();
+                    oreVisualizer.restoreMarker(pending.pos, pending.type);
                     rejectedTargetsUntil.put(pending.pos,
                         mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
                     if (mc.playerController != null) mc.playerController.resetBlockRemoving();
@@ -306,8 +307,8 @@ public final class AutoMiner {
                 }
                 continue;
             }
-            pending.reservesQuota = quotaReservationAfterBlockObservation(
-                pending.reservesQuota, true);
+            pending.reservesQuota = pendingQuotaReservationAfter(
+                pending.reservesQuota, PendingQuotaEvent.BLOCK_MISSING);
             pending.missingTicks++;
             if (!completionAbsenceConfirmed(true, pending.missingTicks)) continue;
             iterator.remove();
@@ -466,7 +467,7 @@ public final class AutoMiner {
                     || targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
-                oreVisualizer.removeMarker(candidate.pos());
+                oreVisualizer.reconcileMarker(candidate.pos(), actual);
                 continue;
             }
             if (beginScaffoldAssist(candidate.pos(), candidate.type())) {
@@ -942,7 +943,7 @@ public final class AutoMiner {
                 OreType currentType = OreType.fromBlock(
                     mc.world.getBlockState(candidate.pos()).getBlock());
                 if (currentType != candidate.type()) {
-                    oreVisualizer.removeMarker(candidate.pos());
+                    oreVisualizer.reconcileMarker(candidate.pos(), currentType);
                     pathCandidateOffset++;
                     continue;
                 } else {
@@ -1519,7 +1520,8 @@ public final class AutoMiner {
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world == mc.world && pending.pos.equals(pos) && pending.type == type) {
                 pending.untilTick = untilTick;
-                pending.reservesQuota = true;
+                pending.reservesQuota = pendingQuotaReservationAfter(
+                    pending.reservesQuota, PendingQuotaEvent.RETRY);
                 return;
             }
         }
@@ -1537,7 +1539,10 @@ public final class AutoMiner {
 
     private void releasePendingQuotaReservation(BlockPos pos) {
         for (PendingCompletion pending : pendingCompletions) {
-            if (pending.world == mc.world && pending.pos.equals(pos)) pending.reservesQuota = false;
+            if (pending.world == mc.world && pending.pos.equals(pos)) {
+                pending.reservesQuota = pendingQuotaReservationAfter(
+                    pending.reservesQuota, PendingQuotaEvent.VISIBILITY_LOST);
+            }
         }
     }
 
@@ -1576,9 +1581,17 @@ public final class AutoMiner {
         return consecutiveMissingTicks > 0;
     }
 
-    static boolean quotaReservationAfterBlockObservation(boolean currentlyReserved,
-            boolean blockMissing) {
-        return currentlyReserved || blockMissing;
+    static boolean pendingQuotaReservationAfter(boolean currentlyReserved, PendingQuotaEvent event) {
+        if (event == PendingQuotaEvent.VISIBILITY_LOST) return false;
+        return event == PendingQuotaEvent.RETRY
+            || event == PendingQuotaEvent.BLOCK_MISSING
+            || currentlyReserved;
+    }
+
+    enum PendingQuotaEvent {
+        RETRY,
+        VISIBILITY_LOST,
+        BLOCK_MISSING
     }
 
     static boolean completionOwnsCurrentWork(BlockPos completed, BlockPos current) {
@@ -1653,7 +1666,7 @@ public final class AutoMiner {
             if (targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
-                oreVisualizer.removeMarker(candidate.pos());
+                oreVisualizer.reconcileMarker(candidate.pos(), actual);
                 continue;
             }
             if (!candidateTypeAvailable(
@@ -1715,7 +1728,7 @@ public final class AutoMiner {
             if (targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
-                oreVisualizer.removeMarker(candidate.pos());
+                oreVisualizer.reconcileMarker(candidate.pos(), actual);
                 continue;
             }
             if (!candidateTypeAvailable(
@@ -1738,7 +1751,7 @@ public final class AutoMiner {
             if (targetTemporarilyUnavailable(candidate.pos())) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
-                oreVisualizer.removeMarker(candidate.pos());
+                oreVisualizer.reconcileMarker(candidate.pos(), actual);
                 continue;
             }
             if (!candidateTypeAvailable(

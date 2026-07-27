@@ -12,6 +12,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -50,8 +51,7 @@ public final class OreVisualizer {
     private final Set<Long> scannedChunks = new HashSet<>();
     private final Deque<ScanTask> scanQueue = new ArrayDeque<>();
     private final Set<Long> queuedChunks = new HashSet<>();
-    private final Deque<ValidationTask> validationQueue = new ArrayDeque<>();
-    private final Map<Long, ValidationTask> validationTasks = new HashMap<>();
+    private final Map<Long, ValidationTask> validationTasks = new LinkedHashMap<>();
     private int validationDelay;
     private World seededWorld;
     private int seededRadiusChunks;
@@ -114,7 +114,6 @@ public final class OreVisualizer {
         scannedChunks.clear();
         scanQueue.clear();
         queuedChunks.clear();
-        validationQueue.clear();
         validationTasks.clear();
         validationDelay = 0;
         seededWorld = null;
@@ -295,6 +294,54 @@ public final class OreVisualizer {
         }
     }
 
+    public void restoreMarker(BlockPos pos, OreType type) {
+        if (pos == null || type == null) return;
+        long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
+        if (!markerCacheOwnsChunk(key)) return;
+        List<OreMarker> markers = markersByChunk.computeIfAbsent(key, ignored -> new ArrayList<>());
+        int markersAtPosition = 0;
+        int matchingMarkers = 0;
+        for (OreMarker marker : markers) {
+            if (!marker.pos.equals(pos)) continue;
+            markersAtPosition++;
+            if (marker.type == type) matchingMarkers++;
+        }
+        if (!markerRestoreNeeded(type, matchingMarkers, markersAtPosition)) return;
+        Iterator<OreMarker> iterator = markers.iterator();
+        while (iterator.hasNext()) {
+            OreMarker marker = iterator.next();
+            if (!marker.pos.equals(pos)) continue;
+            iterator.remove();
+            removeTypeMarker(marker);
+        }
+        OreMarker restored = new OreMarker(pos.toImmutable(), type);
+        markers.add(restored);
+        addTypeMarker(restored);
+        queueValidation(key);
+        invalidateVisibleOreCount();
+    }
+
+    public void reconcileMarker(BlockPos pos, OreType actualType) {
+        if (actualType == null) {
+            removeMarker(pos);
+        } else {
+            restoreMarker(pos, actualType);
+        }
+    }
+
+    static boolean markerRestoreNeeded(OreType expected, int matchingMarkers, int markersAtPosition) {
+        return expected != null && (matchingMarkers != 1 || markersAtPosition != 1);
+    }
+
+    private boolean markerCacheOwnsChunk(long key) {
+        return markerCacheOwnsChunk(scannedChunks.contains(key), queuedChunks.contains(key),
+            markersByChunk.containsKey(key));
+    }
+
+    static boolean markerCacheOwnsChunk(boolean scanned, boolean queued, boolean hasMarkers) {
+        return scanned || queued || hasMarkers;
+    }
+
     private boolean cacheNeeded() {
         return modules.isEnabled(ModuleId.ORE_VISUALIZER) || modules.isEnabled(ModuleId.AUTO_MINE);
     }
@@ -365,7 +412,6 @@ public final class OreVisualizer {
         scannedChunks.clear();
         scanQueue.clear();
         queuedChunks.clear();
-        validationQueue.clear();
         validationTasks.clear();
         validationDelay = 0;
         seededWorld = null;
@@ -501,21 +547,19 @@ public final class OreVisualizer {
 
     private void queueValidation(long key) {
         if (validationTasks.containsKey(key)) return;
-        ValidationTask task = new ValidationTask(key);
-        validationTasks.put(key, task);
-        validationQueue.addLast(task);
+        validationTasks.put(key, new ValidationTask(key));
     }
 
     private void validateCachedMarkers(int markerBudget) {
-        int tasksRemaining = validationTaskVisitLimit(validationQueue.size(), markerBudget);
-        while (markerBudget > 0 && tasksRemaining-- > 0 && !validationQueue.isEmpty()) {
-            ValidationTask task = validationQueue.removeFirst();
-            if (validationTasks.get(task.key) != task) continue;
+        int tasksRemaining = validationTaskVisitLimit(validationTasks.size(), markerBudget);
+        while (markerBudget > 0 && tasksRemaining-- > 0 && !validationTasks.isEmpty()) {
+            Iterator<Map.Entry<Long, ValidationTask>> iterator =
+                validationTasks.entrySet().iterator();
+            Map.Entry<Long, ValidationTask> entry = iterator.next();
+            ValidationTask task = entry.getValue();
+            iterator.remove();
             List<OreMarker> markers = markersByChunk.get(task.key);
-            if (markers == null || markers.isEmpty()) {
-                validationTasks.remove(task.key);
-                continue;
-            }
+            if (markers == null || markers.isEmpty()) continue;
             if (task.markerIndex >= markers.size()) task.markerIndex = 0;
             int checks = validationChecksForSlice(markers.size(), task.markerIndex, markerBudget);
             int checked = 0;
@@ -523,8 +567,16 @@ public final class OreVisualizer {
             while (checked < checks && task.markerIndex < markers.size()) {
                 OreMarker marker = markers.get(task.markerIndex);
                 IBlockState state = mc.world.getBlockState(marker.pos);
-                if (OreType.fromBlock(state.getBlock()) == marker.type) {
+                OreType actual = OreType.fromBlock(state.getBlock());
+                if (actual == marker.type) {
                     task.markerIndex++;
+                } else if (actual != null) {
+                    removeTypeMarker(marker);
+                    OreMarker replacement = new OreMarker(marker.pos, actual);
+                    markers.set(task.markerIndex, replacement);
+                    addTypeMarker(replacement);
+                    task.markerIndex++;
+                    removed = true;
                 } else {
                     markers.remove(task.markerIndex);
                     removeTypeMarker(marker);
@@ -536,10 +588,9 @@ public final class OreVisualizer {
             if (removed) invalidateVisibleOreCount();
             if (markers.isEmpty()) {
                 markersByChunk.remove(task.key);
-                validationTasks.remove(task.key);
             } else {
                 if (task.markerIndex >= markers.size()) task.markerIndex = 0;
-                validationQueue.addLast(task);
+                validationTasks.put(task.key, task);
             }
         }
     }
