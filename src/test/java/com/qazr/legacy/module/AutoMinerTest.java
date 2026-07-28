@@ -158,6 +158,49 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void completedRouteValidationIsSlicedAndFollowsTransitionOrder() {
+        BlockPos start = new BlockPos(0, 64, 0);
+        BlockPos horizontal = start.east();
+        BlockPos ascending = horizontal.east().up();
+        BlockPos descending = ascending.east().down();
+        AutoMiner.SuccessPathValidation validation = new AutoMiner.SuccessPathValidation(start,
+            Arrays.asList(horizontal, ascending, descending));
+        List<BlockPos> checks = new java.util.ArrayList<>();
+        List<Boolean> traversal = new java.util.ArrayList<>();
+
+        while (validation.hasNext()) {
+            checks.add(validation.currentPos());
+            traversal.add(validation.currentUsesTraversalCost());
+            validation.advance();
+        }
+
+        assertEquals(Arrays.asList(horizontal, ascending, horizontal.up(2), descending), checks);
+        assertEquals(Arrays.asList(true, true, false, true), traversal);
+        assertEquals(0, AutoMiner.pathValidationSliceBudget(-1));
+        assertEquals(32, AutoMiner.pathValidationSliceBudget(32));
+        assertEquals(64, AutoMiner.pathValidationSliceBudget(100));
+        assertTrue(AutoMiner.pathValidationRequiresAnotherPass(1));
+        assertFalse(AutoMiner.pathValidationRequiresAnotherPass(2));
+        validation.reset();
+        assertTrue(validation.hasNext());
+        assertEquals(horizontal, validation.currentPos());
+    }
+
+    @Test
+    public void routeReconstructionPreservesForwardOrderWithoutFrontInsertion() {
+        BlockPos start = new BlockPos(0, 64, 0);
+        BlockPos first = start.east();
+        BlockPos second = first.east();
+        Map<BlockPos, BlockPos> previous = new HashMap<>();
+        previous.put(start, null);
+        previous.put(first, start);
+        previous.put(second, first);
+
+        assertEquals(Arrays.asList(first, second), AutoMiner.reconstruct(previous, second));
+        assertTrue(AutoMiner.reconstruct(previous, start).isEmpty());
+    }
+
+    @Test
     public void corridorCellsKeepHeadAndFeetObstaclesInRouteOrder() {
         List<BlockPos> cells = AutoMiner.corridorCells(Arrays.asList(
             new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), 0, 10);

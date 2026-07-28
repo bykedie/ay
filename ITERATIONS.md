@@ -179,3 +179,11 @@
 - Iteration 3: reset the visibility cursor and current candidate cache whenever labels are created, pruned, cleared, removed or reordered, making confirmed mining transitions visible in the same tick.
 - Iteration 4: generated the center and six face ray samples by index inside the hot visibility loop, preserving the seven exact points without allocating a temporary list for every inspected ore.
 - Iteration 5: invalidated the current candidate cache as soon as a route or destruction target cooldown expires, allowing the target to re-enter selection immediately instead of waiting for the next four-tick cache bucket.
+
+## Version 1.10.54 Auto Mining Successful Route Validation Update
+
+- Iteration 1: converted successful-route world-state validation from one unbounded loop into a persistent cursor limited to 64 traversal or clearance checks per client tick.
+- Iteration 2: validated route nodes and only their distinct transition clearances in movement order, retaining ascent headroom checks without rechecking same-column descent support twice.
+- Iteration 3: required two stable successful-route validation passes and checked the current mining stand set before and after every pass, preventing a world change during sliced validation from activating an old route.
+- Iteration 4: rebuilt completed A* routes by collecting predecessor nodes once and reversing the list, replacing quadratic front insertion on long paths.
+- Iteration 5: released the completed search queue, predecessor map and total-cost map before sliced validation, and applied the same bounded validation-budget helper to both successful and failed searches.
