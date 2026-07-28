@@ -366,6 +366,9 @@ public class AutoMinerTest {
         assertEquals(new Vec3d(3.5, 64.999, 7.5), samples.get(4));
         assertEquals(new Vec3d(3.5, 64.5, 7.001), samples.get(5));
         assertEquals(new Vec3d(3.5, 64.5, 7.999), samples.get(6));
+        for (int index = 0; index < samples.size(); index++) {
+            assertEquals(samples.get(index), AutoMiner.blockVisibilitySample(ore, index));
+        }
     }
 
     @Test
@@ -537,6 +540,10 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.temporarilyBlocked(failed, blocked, 99));
         assertFalse(AutoMiner.temporarilyBlocked(failed, blocked, 100));
         assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), blocked, 0));
+        assertFalse(AutoMiner.pruneExpiredTargets(blocked, 99));
+        assertTrue(AutoMiner.pruneExpiredTargets(blocked, 100));
+        assertTrue(blocked.isEmpty());
+        assertFalse(AutoMiner.pruneExpiredTargets(null, 100));
     }
 
     @Test
@@ -740,6 +747,35 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.candidateTypeAvailable(true, false));
         assertFalse(AutoMiner.candidateTypeAvailable(false, false));
         assertFalse(AutoMiner.candidateTypeAvailable(true, true));
+    }
+
+    @Test
+    public void labeledVisibilityKeepsTheNearestHalfAndRotatesAcrossTheVeinTail() {
+        int candidateCount = 20;
+        int limit = 16;
+        int fixed = 8;
+        Set<Integer> inspected = new HashSet<>();
+        int cursor = 0;
+
+        for (int tick = 0; tick < 2; tick++) {
+            int count = AutoMiner.labeledVisibilityInspectionCount(candidateCount, limit);
+            int fixedCount = AutoMiner.fixedLabeledVisibilityInspections(
+                candidateCount, limit, fixed);
+            for (int inspection = 0; inspection < count; inspection++) {
+                int index = AutoMiner.labeledVisibilityIndex(inspection, candidateCount,
+                    limit, fixed, cursor);
+                inspected.add(index);
+                if (inspection < fixedCount) assertEquals(inspection, index);
+            }
+            cursor = AutoMiner.advanceLabeledVisibilityCursor(cursor,
+                candidateCount - fixedCount, count - fixedCount);
+        }
+
+        assertEquals(20, inspected.size());
+        assertEquals(0, AutoMiner.labeledVisibilityInspectionCount(-1, limit));
+        assertEquals(4, AutoMiner.labeledVisibilityInspectionCount(20, 4));
+        assertEquals(-1, AutoMiner.labeledVisibilityIndex(16, candidateCount, limit, fixed, 0));
+        assertEquals(0, AutoMiner.advanceLabeledVisibilityCursor(8, 0, 8));
     }
 
     @Test

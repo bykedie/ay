@@ -171,3 +171,11 @@
 - Iteration 3: applied failed-candidate cooldowns before the four-candidate early return, preventing a low-label impossible ore from immediately competing again after the selected route completes.
 - Iteration 4: stopped charging and validating the same support block twice for a same-column descent, while retaining the explicit pre-drop excavation step during movement.
 - Iteration 5: limited jump waiting to genuine upward route transitions and cached the active route corridor by path, index and start cell, avoiding false jumps on slabs and repeated corridor allocations while clearing one obstacle.
+
+## Version 1.10.53 Auto Mining Large Vein Visibility Update
+
+- Iteration 1: split labeled direct-mining checks into eight fixed high-priority slots and eight rotating slots, so a visible block beyond the first sixteen entries of a large vein cannot starve indefinitely.
+- Iteration 2: explicitly sorted the reusable labeled visibility buffer by stable vein label before inspection, preserving nearest-first ownership even when the shared ore cache was built under an older label order.
+- Iteration 3: reset the visibility cursor and current candidate cache whenever labels are created, pruned, cleared, removed or reordered, making confirmed mining transitions visible in the same tick.
+- Iteration 4: generated the center and six face ray samples by index inside the hot visibility loop, preserving the seven exact points without allocating a temporary list for every inspected ore.
+- Iteration 5: invalidated the current candidate cache as soon as a route or destruction target cooldown expires, allowing the target to re-enter selection immediately instead of waiting for the next four-tick cache bucket.

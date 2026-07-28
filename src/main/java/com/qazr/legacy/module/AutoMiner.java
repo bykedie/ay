@@ -59,6 +59,8 @@ public final class AutoMiner {
     private static final int FAILED_ROUTE_RETRY_TICKS = 100;
     private static final double ROUTE_SPEED = 0.18;
     private static final int MAX_VISIBLE_TARGETS = 16;
+    private static final int FIXED_LABELED_VISIBILITY_INSPECTIONS = 8;
+    private static final int BLOCK_VISIBILITY_SAMPLE_COUNT = 7;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final double ROUTE_NODE_REACH_DISTANCE_SQ = 0.04;
@@ -86,6 +88,8 @@ public final class AutoMiner {
     private final Map<BlockPos, Integer> blockedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedObstaclesUntil = new HashMap<>();
+    private final List<OreVisualizer.CachedOre> labeledVisibilityCandidates =
+        new ArrayList<>(MAX_CACHED_TARGETS);
     private List<BlockPos> path = java.util.Collections.emptyList();
     private BlockPos currentOre;
     private OreType currentOreType;
@@ -122,6 +126,7 @@ public final class AutoMiner {
     private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
     private int stalledRouteTicks;
     private OreType targetLabelType;
+    private int labeledVisibilityCursor;
     private BlockPos scaffoldPos;
     private BlockPos scaffoldOre;
     private int scaffoldStartedTick;
@@ -345,7 +350,7 @@ public final class AutoMiner {
             lastMinedOre = pending.pos;
             lastMinedType = pending.type;
             oreVisualizer.removeMarker(pending.pos);
-            targetLabels.remove(pending.pos);
+            if (targetLabels.remove(pending.pos) != null) targetLabelsChanged();
             boolean ownsCurrentWork = completionOwnsCurrentWork(pending.pos, currentOre);
             if (ownsCurrentWork) reorderRemainingTargetLabels();
             if (targetLabels.isEmpty()) targetLabelType = null;
@@ -1734,12 +1739,18 @@ public final class AutoMiner {
     }
 
     private void pruneBlockedTargets(int currentTick) {
-        blockedTargetsUntil.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
+        if (pruneExpiredTargets(blockedTargetsUntil, currentTick)) invalidateCurrentCandidateCache();
     }
 
     private void pruneRejectedBlocks(int currentTick) {
-        rejectedTargetsUntil.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
-        rejectedObstaclesUntil.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
+        boolean targetsChanged = pruneExpiredTargets(rejectedTargetsUntil, currentTick);
+        pruneExpiredTargets(rejectedObstaclesUntil, currentTick);
+        if (targetsChanged) invalidateCurrentCandidateCache();
+    }
+
+    static boolean pruneExpiredTargets(Map<BlockPos, Integer> targets, int currentTick) {
+        return targets != null
+            && targets.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
     }
 
     private boolean targetTemporarilyUnavailable(BlockPos target) {
@@ -2092,13 +2103,27 @@ public final class AutoMiner {
 
     private MineTarget findVisibleLabeledTarget(List<OreVisualizer.CachedOre> candidates) {
         if (targetLabels.isEmpty()) return null;
-        MineTarget best = null;
-        int bestLabel = Integer.MAX_VALUE;
-        int inspected = 0;
+        labeledVisibilityCandidates.clear();
         for (OreVisualizer.CachedOre candidate : candidates) {
             int label = targetLabels.getOrDefault(candidate.pos(), Integer.MAX_VALUE);
-            if (label == Integer.MAX_VALUE || label >= bestLabel) continue;
-            if (targetTemporarilyUnavailable(candidate.pos())) continue;
+            if (label != Integer.MAX_VALUE && !targetTemporarilyUnavailable(candidate.pos())) {
+                labeledVisibilityCandidates.add(candidate);
+            }
+        }
+        labeledVisibilityCandidates.sort((left, right) -> {
+            int label = Integer.compare(targetLabels.getOrDefault(left.pos(), Integer.MAX_VALUE),
+                targetLabels.getOrDefault(right.pos(), Integer.MAX_VALUE));
+            return label != 0 ? label : OreVisualizer.compareCachedOres(left, right);
+        });
+        int candidateCount = labeledVisibilityCandidates.size();
+        int inspections = labeledVisibilityInspectionCount(candidateCount, MAX_VISIBLE_TARGETS);
+        int fixed = fixedLabeledVisibilityInspections(candidateCount, MAX_VISIBLE_TARGETS,
+            FIXED_LABELED_VISIBILITY_INSPECTIONS);
+        int rotatingInspections = Math.max(0, inspections - fixed);
+        for (int inspection = 0; inspection < inspections; inspection++) {
+            int index = labeledVisibilityIndex(inspection, candidateCount, MAX_VISIBLE_TARGETS,
+                FIXED_LABELED_VISIBILITY_INSPECTIONS, labeledVisibilityCursor);
+            OreVisualizer.CachedOre candidate = labeledVisibilityCandidates.get(index);
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
                 oreVisualizer.reconcileMarker(candidate.pos(), actual);
@@ -2107,13 +2132,36 @@ public final class AutoMiner {
             if (!candidateTypeAvailable(
                     ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
             MineTarget visible = visibleTarget(candidate.pos());
-            if (visible != null) {
-                best = visible;
-                bestLabel = label;
-            }
-            if (++inspected >= MAX_VISIBLE_TARGETS) break;
+            if (visible != null) return visible;
         }
-        return best;
+        labeledVisibilityCursor = advanceLabeledVisibilityCursor(labeledVisibilityCursor,
+            Math.max(0, candidateCount - fixed), rotatingInspections);
+        return null;
+    }
+
+    static int labeledVisibilityInspectionCount(int candidateCount, int inspectionLimit) {
+        return Math.min(Math.max(0, candidateCount), Math.max(0, inspectionLimit));
+    }
+
+    static int fixedLabeledVisibilityInspections(int candidateCount, int inspectionLimit,
+            int fixedCount) {
+        return Math.min(labeledVisibilityInspectionCount(candidateCount, inspectionLimit),
+            Math.max(0, fixedCount));
+    }
+
+    static int labeledVisibilityIndex(int inspection, int candidateCount, int inspectionLimit,
+            int fixedCount, int cursor) {
+        int inspections = labeledVisibilityInspectionCount(candidateCount, inspectionLimit);
+        if (inspection < 0 || inspection >= inspections) return -1;
+        int fixed = fixedLabeledVisibilityInspections(candidateCount, inspectionLimit, fixedCount);
+        if (inspection < fixed) return inspection;
+        int rotatingCount = candidateCount - fixed;
+        return fixed + Math.floorMod(cursor + inspection - fixed, rotatingCount);
+    }
+
+    static int advanceLabeledVisibilityCursor(int cursor, int rotatingCount, int inspected) {
+        if (rotatingCount <= 0 || inspected <= 0) return 0;
+        return Math.floorMod(cursor + inspected, rotatingCount);
     }
 
     static boolean cachedOreStillPresent(OreType cached, OreType actual) {
@@ -2127,14 +2175,16 @@ public final class AutoMiner {
         targetLabels.clear();
         targetLabels.putAll(labelConnectedVein(seed, type, candidates));
         targetLabelType = targetLabels.isEmpty() ? null : type;
+        targetLabelsChanged();
     }
 
     private void pruneTargetLabels() {
         if (targetLabels.isEmpty()) return;
-        targetLabels.entrySet().removeIf(entry -> !labelOreStillPresent(
+        boolean changed = targetLabels.entrySet().removeIf(entry -> !labelOreStillPresent(
             targetLabelType, OreType.fromBlock(mc.world.getBlockState(entry.getKey()).getBlock()),
             targetLabelType != null && ModConfig.isMineOreEnabled(targetLabelType)));
         if (targetLabels.isEmpty()) targetLabelType = null;
+        if (changed) targetLabelsChanged();
     }
 
     static boolean labelOreStillPresent(OreType expected, OreType actual, boolean configured) {
@@ -2142,8 +2192,16 @@ public final class AutoMiner {
     }
 
     private void clearTargetLabels() {
+        boolean changed = !targetLabels.isEmpty() || targetLabelType != null;
         targetLabels.clear();
         targetLabelType = null;
+        if (changed) targetLabelsChanged();
+    }
+
+    private void targetLabelsChanged() {
+        labeledVisibilityCursor = 0;
+        labeledVisibilityCandidates.clear();
+        invalidateCurrentCandidateCache();
     }
 
     private void reorderRemainingTargetLabels() {
@@ -2155,6 +2213,7 @@ public final class AutoMiner {
         Map<BlockPos, Integer> reordered = relabelRemainingTargets(targetLabels, distances);
         targetLabels.clear();
         targetLabels.putAll(reordered);
+        targetLabelsChanged();
     }
 
     static Map<BlockPos, Integer> relabelRemainingTargets(Map<BlockPos, Integer> labels,
@@ -2268,7 +2327,8 @@ public final class AutoMiner {
     private RayTraceResult rayTraceTarget(Vec3d eyes, BlockPos pos, OreType type,
             boolean allowLabeledBlocker) {
         RayTraceResult labeledBlocker = null;
-        for (Vec3d sample : blockVisibilitySamples(pos)) {
+        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+            Vec3d sample = blockVisibilitySample(pos, sampleIndex);
             RayTraceResult hit = mc.world.rayTraceBlocks(eyes, sample, false, true, false);
             if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
                     && pos.equals(hit.getBlockPos())) return hit;
@@ -2302,20 +2362,29 @@ public final class AutoMiner {
     }
 
     static List<Vec3d> blockVisibilitySamples(BlockPos pos) {
+        List<Vec3d> samples = new ArrayList<>(BLOCK_VISIBILITY_SAMPLE_COUNT);
+        for (int index = 0; index < BLOCK_VISIBILITY_SAMPLE_COUNT; index++) {
+            samples.add(blockVisibilitySample(pos, index));
+        }
+        return samples;
+    }
+
+    static Vec3d blockVisibilitySample(BlockPos pos, int index) {
         double x = pos.getX();
         double y = pos.getY();
         double z = pos.getZ();
         double near = 0.001;
         double far = 0.999;
-        List<Vec3d> samples = new ArrayList<>(7);
-        samples.add(new Vec3d(x + 0.5, y + 0.5, z + 0.5));
-        samples.add(new Vec3d(x + near, y + 0.5, z + 0.5));
-        samples.add(new Vec3d(x + far, y + 0.5, z + 0.5));
-        samples.add(new Vec3d(x + 0.5, y + near, z + 0.5));
-        samples.add(new Vec3d(x + 0.5, y + far, z + 0.5));
-        samples.add(new Vec3d(x + 0.5, y + 0.5, z + near));
-        samples.add(new Vec3d(x + 0.5, y + 0.5, z + far));
-        return samples;
+        switch (index) {
+            case 0: return new Vec3d(x + 0.5, y + 0.5, z + 0.5);
+            case 1: return new Vec3d(x + near, y + 0.5, z + 0.5);
+            case 2: return new Vec3d(x + far, y + 0.5, z + 0.5);
+            case 3: return new Vec3d(x + 0.5, y + near, z + 0.5);
+            case 4: return new Vec3d(x + 0.5, y + far, z + 0.5);
+            case 5: return new Vec3d(x + 0.5, y + 0.5, z + near);
+            case 6: return new Vec3d(x + 0.5, y + 0.5, z + far);
+            default: throw new IndexOutOfBoundsException("visibility sample " + index);
+        }
     }
 
     static boolean stableMiningPosition(BlockPos playerFeet, BlockPos ore) {
