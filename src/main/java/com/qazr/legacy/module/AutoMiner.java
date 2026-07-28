@@ -103,6 +103,7 @@ public final class AutoMiner {
     private int clearingAttempts;
     private int clearingAttemptBudget;
     private int clearingDeadlineTick;
+    private int clearingMissingTicks;
     private final Deque<PendingCompletion> pendingCompletions = new ArrayDeque<>();
     private BlockPos lastMinedOre;
     private OreType lastMinedType;
@@ -204,6 +205,7 @@ public final class AutoMiner {
             manualPause--;
             return;
         }
+        if (continueClearingConfirmation()) return;
         if (delay-- > 0) return;
         if (continueScaffoldAssist()) return;
         if (currentRouteAwaitingCompletion()) {
@@ -740,10 +742,7 @@ public final class AutoMiner {
 
     private boolean continueClearingObstacle() {
         if (clearingPos == null) return false;
-        if (isPassable(clearingPos)) {
-            clearClearingTarget();
-            return false;
-        }
+        if (!mc.world.isBlockLoaded(clearingPos) || isPassable(clearingPos)) return true;
         if (destructionWorkExhausted(clearingAttempts, clearingAttemptBudget,
                 mc.player.ticksExisted, clearingDeadlineTick)) {
             rejectedObstaclesUntil.put(clearingPos.toImmutable(),
@@ -760,6 +759,34 @@ public final class AutoMiner {
         }
         delay = ModConfig.mineDelayTicks;
         return true;
+    }
+
+    private boolean continueClearingConfirmation() {
+        if (clearingPos == null) return false;
+        boolean loaded = mc.world.isBlockLoaded(clearingPos);
+        boolean passable = loaded && isPassable(clearingPos);
+        clearingMissingTicks = nextClearingMissingTicks(
+            loaded, passable, clearingMissingTicks);
+        if (completionAbsenceConfirmed(loaded, clearingMissingTicks)) {
+            clearClearingTarget();
+            delay = 0;
+            return false;
+        }
+        if (loaded && !passable) return false;
+        stopRouteMotion();
+        if (delay > 0) delay--;
+        if (completionConfirmationExpired(mc.player.ticksExisted, clearingDeadlineTick)) {
+            rejectedObstaclesUntil.put(clearingPos.toImmutable(),
+                mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
+            clearPath();
+            delay = 2;
+        }
+        return true;
+    }
+
+    static int nextClearingMissingTicks(boolean loaded, boolean passable, int previous) {
+        if (!loaded || !passable) return 0;
+        return Math.min(REQUIRED_MISSING_CONFIRM_TICKS, Math.max(0, previous) + 1);
     }
 
     private boolean hasActiveRoute() {
@@ -1641,11 +1668,10 @@ public final class AutoMiner {
 
     private boolean clearCorridorCell(BlockPos desired, BlockPos permittedLower) {
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        Vec3d point = new Vec3d(desired.getX() + 0.5, desired.getY() + 0.5, desired.getZ() + 0.5);
-        RayTraceResult hit = mc.world.rayTraceBlocks(eyes, point, false, true, false);
-        if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK) return false;
+        RayTraceResult hit = rayTraceCorridorObstacle(
+            eyes, desired, permittedLower, currentCorridorCells());
+        if (hit == null) return false;
         BlockPos obstacle = hit.getBlockPos();
-        if (!corridorObstacleAllowed(obstacle, desired, permittedLower, currentCorridorCells())) return false;
         if (temporarilyBlocked(obstacle, rejectedObstaclesUntil, mc.player.ticksExisted)) return false;
         OreType ore = targetType(obstacle);
         if (ore != null) {
@@ -1663,8 +1689,9 @@ public final class AutoMiner {
                     mc.player, mc.world, obstacle));
             clearingDeadlineTick = destructionDeadlineTick(mc.player.ticksExisted,
                 clearingAttemptBudget, ModConfig.mineDelayTicks);
+            clearingMissingTicks = 0;
         }
-        if (!damageCorridorBlock(obstacle)) {
+        if (!damageCorridorBlock(obstacle, hit)) {
             clearClearingTarget();
             return false;
         }
@@ -1696,12 +1723,37 @@ public final class AutoMiner {
             || corridor != null && corridor.contains(obstacle));
     }
 
+    private RayTraceResult rayTraceCorridorObstacle(Vec3d eyes, BlockPos desired,
+            BlockPos permittedLower, List<BlockPos> corridor) {
+        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+            RayTraceResult hit = mc.world.rayTraceBlocks(
+                eyes, blockVisibilitySample(desired, sampleIndex), false, true, false);
+            if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
+                    && corridorObstacleAllowed(
+                        hit.getBlockPos(), desired, permittedLower, corridor)) return hit;
+        }
+        return null;
+    }
+
+    private RayTraceResult rayTraceExactBlock(Vec3d eyes, BlockPos target) {
+        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+            RayTraceResult hit = mc.world.rayTraceBlocks(
+                eyes, blockVisibilitySample(target, sampleIndex), false, true, false);
+            if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
+                    && target.equals(hit.getBlockPos())) return hit;
+        }
+        return null;
+    }
+
     private boolean damageCorridorBlock(BlockPos obstacle) {
+        return damageCorridorBlock(obstacle, rayTraceExactBlock(
+            mc.player.getPositionEyes(1.0F), obstacle));
+    }
+
+    private boolean damageCorridorBlock(BlockPos obstacle, RayTraceResult hit) {
         if (!isBreakableBlock(obstacle)) return false;
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
         if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
-        Vec3d point = blockCenter(obstacle);
-        RayTraceResult hit = mc.world.rayTraceBlocks(eyes, point, false, true, false);
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
                 || !obstacle.equals(hit.getBlockPos())) return false;
         selectBestPickaxe(obstacle);
@@ -1872,6 +1924,7 @@ public final class AutoMiner {
         clearingAttempts = 0;
         clearingAttemptBudget = 0;
         clearingDeadlineTick = 0;
+        clearingMissingTicks = 0;
     }
 
     private void clearMiningTarget() {

@@ -720,6 +720,12 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.completionAbsenceConfirmed(true, 2));
         assertTrue(AutoMiner.completionAbsenceConfirmed(true, 3));
         assertFalse(AutoMiner.completionAbsenceConfirmed(false, 3));
+        assertEquals(1, AutoMiner.nextClearingMissingTicks(true, true, 0));
+        assertEquals(2, AutoMiner.nextClearingMissingTicks(true, true, 1));
+        assertEquals(3, AutoMiner.nextClearingMissingTicks(true, true, 2));
+        assertEquals(3, AutoMiner.nextClearingMissingTicks(true, true, 20));
+        assertEquals(0, AutoMiner.nextClearingMissingTicks(true, false, 2));
+        assertEquals(0, AutoMiner.nextClearingMissingTicks(false, true, 2));
         assertFalse(AutoMiner.completionRolledBack(0));
         assertTrue(AutoMiner.completionRolledBack(1));
         boolean reserved = true;

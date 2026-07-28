@@ -211,3 +211,11 @@
 - Iteration 3: consolidated batch-size, snapshot-end and comparison-timeout exits into one atomic finalizer that applies only completed failures, labels the selected vein and resets every batch timer.
 - Iteration 4: revalidated the selected ore type and target cooldown immediately before route activation, preventing a route found several ticks earlier from starting against stale world state.
 - Iteration 5: requested a next-tick candidate snapshot refresh when the selected route target becomes unavailable during comparison, avoiding the normal 20-tick empty-search delay.
+
+## Version 1.10.58 Auto Mining Corridor Confirmation Update
+
+- Iteration 1: moved ordinary corridor-block confirmation ahead of the mining-delay gate, counting disappearance on every client tick instead of stretching a three-tick check across action delays.
+- Iteration 2: required three consecutive loaded-world passable observations before releasing a cleared ordinary obstacle, matching ore confirmation and rejecting one-tick client prediction flicker.
+- Iteration 3: stopped route motion while an obstacle is predicted absent or its chunk is unavailable, preventing the player from entering a block before the server accepts its removal.
+- Iteration 4: reset the missing counter and resumed the same destruction budget when an obstacle reappears before confirmation, avoiding premature route abandonment after a rollback.
+- Iteration 5: replaced center-only corridor damage rays with a bounded center-plus-six-face search for both initial obstacle discovery and continued breaking of partially exposed blocks.
