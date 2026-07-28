@@ -163,3 +163,11 @@
 - Iteration 3: kept descending nodes active until the player is grounded or within the final landing tolerance, preventing a falling player from consuming the node and steering toward the following segment too early.
 - Iteration 4: modeled same-column descent as explicit support removal, charged and revalidated its excavation cost during incremental A*, then stopped movement and mined the underfoot block before allowing the controlled one-block drop.
 - Iteration 5: allowed a labeled ore that physically blocks the queued vein target to remain mineable during continued, routed and scaffold-assisted work, so exposing the final ore no longer releases the active vein and idles.
+
+## Version 1.10.52 Auto Mining Target Ownership And Route Cost Update
+
+- Iteration 1: reordered only the remaining connected-vein labels after the server confirms the currently owned ore is gone, using the player's new position while leaving in-progress planning and movement stable.
+- Iteration 2: retained cooldowns for every candidate already proven unreachable even when another candidate in the same search batch has a valid route, and preserved the active vein labels when such a route exists.
+- Iteration 3: applied failed-candidate cooldowns before the four-candidate early return, preventing a low-label impossible ore from immediately competing again after the selected route completes.
+- Iteration 4: stopped charging and validating the same support block twice for a same-column descent, while retaining the explicit pre-drop excavation step during movement.
+- Iteration 5: limited jump waiting to genuine upward route transitions and cached the active route corridor by path, index and start cell, avoiding false jumps on slabs and repeated corridor allocations while clearing one obstacle.

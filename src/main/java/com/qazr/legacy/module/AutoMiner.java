@@ -131,6 +131,10 @@ public final class AutoMiner {
     private List<BlockPos> plannedObstacleCachePath = java.util.Collections.emptyList();
     private int plannedObstacleCacheTick = Integer.MIN_VALUE;
     private int plannedObstacleCacheIndex = -1;
+    private List<BlockPos> routeCorridorCache = java.util.Collections.emptyList();
+    private List<BlockPos> routeCorridorCachePath = java.util.Collections.emptyList();
+    private int routeCorridorCacheIndex = -1;
+    private BlockPos routeCorridorCacheStart;
     private List<OreVisualizer.CachedOre> currentCandidateCache = java.util.Collections.emptyList();
     private long currentCandidateMarkerRevision = Long.MIN_VALUE;
     private int currentCandidateTickBucket = Integer.MIN_VALUE;
@@ -342,8 +346,10 @@ public final class AutoMiner {
             lastMinedType = pending.type;
             oreVisualizer.removeMarker(pending.pos);
             targetLabels.remove(pending.pos);
+            boolean ownsCurrentWork = completionOwnsCurrentWork(pending.pos, currentOre);
+            if (ownsCurrentWork) reorderRemainingTargetLabels();
             if (targetLabels.isEmpty()) targetLabelType = null;
-            if (completionOwnsCurrentWork(pending.pos, currentOre)) clearPath();
+            if (ownsCurrentWork) clearPath();
         }
     }
 
@@ -855,7 +861,7 @@ public final class AutoMiner {
             abandonCurrentRoute();
             return;
         }
-        if (waitingForAscendingClearance(next.getY(), physicalFeetY)) {
+        if (waitingForAscendingClearance(from.getY(), next.getY(), physicalFeetY)) {
             mc.player.motionX = routeMotionComponent(dx, distanceSq);
             mc.player.motionZ = routeMotionComponent(dz, distanceSq);
             if (mc.player.onGround) mc.player.jump();
@@ -995,8 +1001,8 @@ public final class AutoMiner {
         return missingTicks > 0 && missingTicks < REQUIRED_MISSING_CONFIRM_TICKS;
     }
 
-    static boolean waitingForAscendingClearance(int nextY, double feetY) {
-        return feetY + 0.01 < nextY;
+    static boolean waitingForAscendingClearance(int fromY, int nextY, double feetY) {
+        return nextY > fromY && feetY + 0.01 < nextY;
     }
 
     private void stopRouteMotion() {
@@ -1101,6 +1107,10 @@ public final class AutoMiner {
             if (pathCandidateOffset % PATH_CANDIDATE_BATCH_SIZE == 0
                     && pendingPathTarget != null) {
                 PathTarget best = pendingPathTarget;
+                Set<BlockPos> failedTargets = failedPathTargetsToBlock(pendingFailedPathTargets);
+                if (!failedTargets.isEmpty()) {
+                    blockTargets(failedTargets, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
+                }
                 if (best != null) ensureTargetLabels(best.ore, best.type, pathCandidateBatch);
                 resetPathCandidateBatch();
                 return best;
@@ -1109,11 +1119,11 @@ public final class AutoMiner {
         }
         PathTarget best = pendingPathTarget;
         if (best != null) ensureTargetLabels(best.ore, best.type, pathCandidateBatch);
-        Set<BlockPos> failedTargets = failedPathTargetsToBlock(pendingFailedPathTargets, best != null);
+        Set<BlockPos> failedTargets = failedPathTargetsToBlock(pendingFailedPathTargets);
         if (!failedTargets.isEmpty()) {
             blockTargets(failedTargets, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
-            clearTargetLabels();
         }
+        if (best == null) clearTargetLabels();
         resetPathCandidateBatch();
         return best;
     }
@@ -1151,8 +1161,8 @@ public final class AutoMiner {
         return until != null && currentTick < until;
     }
 
-    static Set<BlockPos> failedPathTargetsToBlock(Set<BlockPos> failedTargets, boolean routeFound) {
-        if (routeFound || failedTargets == null || failedTargets.isEmpty()) {
+    static Set<BlockPos> failedPathTargetsToBlock(Set<BlockPos> failedTargets) {
+        if (failedTargets == null || failedTargets.isEmpty()) {
             return java.util.Collections.emptySet();
         }
         return new HashSet<>(failedTargets);
@@ -1264,8 +1274,9 @@ public final class AutoMiner {
         for (BlockPos point : route.points) {
             if (cachedPathStateChanged(search.traversalCosts, point, traversalCost(point))) return true;
             BlockPos clearance = routeTransitionClearance(from, point);
-            if (clearance != null && cachedPathStateChanged(search.jumpClearanceCosts, clearance,
-                    jumpClearanceCostAt(clearance))) return true;
+            if (transitionNeedsSeparateClearance(clearance, point)
+                    && cachedPathStateChanged(search.jumpClearanceCosts, clearance,
+                        jumpClearanceCostAt(clearance))) return true;
             from = point;
         }
         return false;
@@ -1348,7 +1359,7 @@ public final class AutoMiner {
         int stepCost = cachedPathCost(traversalCosts, next, this::traversalCost);
         if (stepCost < 0) return;
         BlockPos clearance = routeTransitionClearance(from, next);
-        int jumpExcavation = clearance == null ? 0
+        int jumpExcavation = !transitionNeedsSeparateClearance(clearance, next) ? 0
             : cachedPathCost(jumpClearanceCosts, clearance, this::jumpClearanceCostAt);
         if (jumpExcavation < 0) return;
         int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
@@ -1489,6 +1500,10 @@ public final class AutoMiner {
         return breakable ? 1 : -1;
     }
 
+    static boolean transitionNeedsSeparateClearance(BlockPos clearance, BlockPos destination) {
+        return clearance != null && !clearance.equals(destination);
+    }
+
     private int jumpClearanceCostAt(BlockPos pos) {
         boolean clear = isPassable(pos);
         return clear ? 0 : jumpClearanceCost(false, canClearForCorridor(pos));
@@ -1584,7 +1599,19 @@ public final class AutoMiner {
         if (path.isEmpty()) return java.util.Collections.emptyList();
         int start = Math.max(0, pathIndex - 1);
         BlockPos routeStart = start > 0 ? path.get(start - 1) : miningPlayerFeet;
-        return corridorCells(path, start, ROUTE_RENDER_LIMIT, routeStart);
+        if (reuseRouteCorridorCache(routeCorridorCachePath == path, routeCorridorCacheIndex,
+                pathIndex, routeCorridorCacheStart, routeStart)) return routeCorridorCache;
+        routeCorridorCache = corridorCells(path, start, ROUTE_RENDER_LIMIT, routeStart);
+        routeCorridorCachePath = path;
+        routeCorridorCacheIndex = pathIndex;
+        routeCorridorCacheStart = routeStart == null ? null : routeStart.toImmutable();
+        return routeCorridorCache;
+    }
+
+    static boolean reuseRouteCorridorCache(boolean samePath, int cachedIndex, int currentIndex,
+            BlockPos cachedStart, BlockPos currentStart) {
+        return samePath && cachedIndex == currentIndex
+            && java.util.Objects.equals(cachedStart, currentStart);
     }
 
     static boolean corridorObstacleAllowed(BlockPos obstacle, BlockPos desired,
@@ -1745,6 +1772,10 @@ public final class AutoMiner {
         plannedObstacleCachePath = java.util.Collections.emptyList();
         plannedObstacleCacheTick = Integer.MIN_VALUE;
         plannedObstacleCacheIndex = -1;
+        routeCorridorCache = java.util.Collections.emptyList();
+        routeCorridorCachePath = java.util.Collections.emptyList();
+        routeCorridorCacheIndex = -1;
+        routeCorridorCacheStart = null;
     }
 
     private void stopAutomatedWork(boolean stopMotion) {
@@ -2113,6 +2144,38 @@ public final class AutoMiner {
     private void clearTargetLabels() {
         targetLabels.clear();
         targetLabelType = null;
+    }
+
+    private void reorderRemainingTargetLabels() {
+        if (targetLabels.size() < 2 || mc.player == null) return;
+        Map<BlockPos, Double> distances = new HashMap<>();
+        for (BlockPos pos : targetLabels.keySet()) {
+            distances.put(pos, mc.player.getDistanceSqToCenter(pos));
+        }
+        Map<BlockPos, Integer> reordered = relabelRemainingTargets(targetLabels, distances);
+        targetLabels.clear();
+        targetLabels.putAll(reordered);
+    }
+
+    static Map<BlockPos, Integer> relabelRemainingTargets(Map<BlockPos, Integer> labels,
+            Map<BlockPos, Double> distances) {
+        Map<BlockPos, Integer> result = new HashMap<>();
+        if (labels == null || labels.isEmpty()) return result;
+        List<BlockPos> positions = new ArrayList<>(labels.keySet());
+        positions.sort((left, right) -> {
+            int distance = Double.compare(distances == null ? Double.POSITIVE_INFINITY
+                    : distances.getOrDefault(left, Double.POSITIVE_INFINITY),
+                distances == null ? Double.POSITIVE_INFINITY
+                    : distances.getOrDefault(right, Double.POSITIVE_INFINITY));
+            if (distance != 0) return distance;
+            int oldLabel = Integer.compare(labels.getOrDefault(left, Integer.MAX_VALUE),
+                labels.getOrDefault(right, Integer.MAX_VALUE));
+            return oldLabel != 0 ? oldLabel : compareBlockPositions(left, right);
+        });
+        for (int index = 0; index < positions.size(); index++) {
+            result.put(positions.get(index), index + 1);
+        }
+        return result;
     }
 
     static Map<BlockPos, Integer> labelConnectedVein(BlockPos seed, OreType type,

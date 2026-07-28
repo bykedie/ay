@@ -112,10 +112,11 @@ public class AutoMinerTest {
 
     @Test
     public void ascendingRouteWaitsUntilThePlayersFeetClearTheLandingSupport() {
-        assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.0));
-        assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.98));
-        assertFalse(AutoMiner.waitingForAscendingClearance(65, 64.99));
-        assertFalse(AutoMiner.waitingForAscendingClearance(65, 65.0));
+        assertTrue(AutoMiner.waitingForAscendingClearance(64, 65, 64.0));
+        assertTrue(AutoMiner.waitingForAscendingClearance(64, 65, 64.98));
+        assertFalse(AutoMiner.waitingForAscendingClearance(64, 65, 64.99));
+        assertFalse(AutoMiner.waitingForAscendingClearance(64, 65, 65.0));
+        assertFalse(AutoMiner.waitingForAscendingClearance(65, 65, 64.5));
     }
 
     @Test
@@ -163,6 +164,11 @@ public class AutoMinerTest {
 
         assertEquals(Arrays.asList(
             new BlockPos(1, 64, 0), new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), cells);
+        BlockPos start = new BlockPos(0, 64, 0);
+        assertTrue(AutoMiner.reuseRouteCorridorCache(true, 2, 2, start, start));
+        assertFalse(AutoMiner.reuseRouteCorridorCache(false, 2, 2, start, start));
+        assertFalse(AutoMiner.reuseRouteCorridorCache(true, 1, 2, start, start));
+        assertFalse(AutoMiner.reuseRouteCorridorCache(true, 2, 2, start, start.east()));
     }
 
     @Test
@@ -182,6 +188,10 @@ public class AutoMinerTest {
         assertEquals(0, AutoMiner.jumpClearanceCost(true, false));
         assertEquals(1, AutoMiner.jumpClearanceCost(false, true));
         assertEquals(-1, AutoMiner.jumpClearanceCost(false, false));
+        BlockPos origin = new BlockPos(0, 64, 0);
+        assertTrue(AutoMiner.transitionNeedsSeparateClearance(origin.up(2), origin.up().east()));
+        assertFalse(AutoMiner.transitionNeedsSeparateClearance(origin.down(), origin.down()));
+        assertFalse(AutoMiner.transitionNeedsSeparateClearance(null, origin.east()));
     }
 
     @Test
@@ -309,6 +319,29 @@ public class AutoMinerTest {
         assertEquals(Integer.valueOf(3), labels.get(diagonal.pos()));
         assertFalse(labels.containsKey(otherType.pos()));
         assertFalse(labels.containsKey(detached.pos()));
+    }
+
+    @Test
+    public void confirmedOreReordersOnlyTheRemainingVeinByCurrentDistance() {
+        BlockPos lower = new BlockPos(0, 20, 0);
+        BlockPos nearby = new BlockPos(1, 21, 0);
+        BlockPos upper = new BlockPos(0, 23, 0);
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(lower, 1);
+        labels.put(upper, 2);
+        labels.put(nearby, 3);
+        Map<BlockPos, Double> distances = new HashMap<>();
+        distances.put(lower, 9.0);
+        distances.put(upper, 16.0);
+        distances.put(nearby, 1.0);
+
+        Map<BlockPos, Integer> reordered = AutoMiner.relabelRemainingTargets(labels, distances);
+
+        assertEquals(Integer.valueOf(1), reordered.get(nearby));
+        assertEquals(Integer.valueOf(2), reordered.get(lower));
+        assertEquals(Integer.valueOf(3), reordered.get(upper));
+        assertTrue(AutoMiner.relabelRemainingTargets(java.util.Collections.emptyMap(),
+            distances).isEmpty());
     }
 
     @Test
@@ -513,11 +546,11 @@ public class AutoMinerTest {
         Set<BlockPos> failures = new java.util.HashSet<>();
         failures.add(failed);
 
-        Set<BlockPos> blocked = AutoMiner.failedPathTargetsToBlock(failures, false);
+        Set<BlockPos> blocked = AutoMiner.failedPathTargetsToBlock(failures);
 
         assertTrue(blocked.contains(failed));
         assertFalse(blocked.contains(untouched));
-        assertTrue(AutoMiner.failedPathTargetsToBlock(failures, true).isEmpty());
+        assertTrue(AutoMiner.failedPathTargetsToBlock(java.util.Collections.emptySet()).isEmpty());
     }
 
     @Test
