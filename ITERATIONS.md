@@ -155,3 +155,11 @@
 - Iteration 3: retried scaffold ascent at a bounded four-tick interval after a delayed server placement confirmation, with the existing 40-tick total timeout still enforcing a finite recovery window.
 - Iteration 4: aligned scaffold completion with the navigation feet-cell threshold so the raised mining attempt starts only after the player actually occupies the upper block cell.
 - Iteration 5: required the final ray-traced ore block to be in a stable adjacent, overhead or underfoot mining position, preventing vanilla reach from stopping the route four to five blocks away or enabling unstable diagonal mining.
+
+## Version 1.10.51 Auto Mining Descent And Support Update
+
+- Iteration 1: replaced material-only route support checks with collision-shape validation, keeping slabs and stairs usable while excluding open gates, fences and walls that cannot hold the planned feet cell; the temporary collision list is reused during A* expansion.
+- Iteration 2: aligned grounded foot-cell normalization with the same collision-aware support test, stopped horizontal momentum whenever a route is abandoned, and rejected stale route steps that cross more than one vertical block or two horizontal axes.
+- Iteration 3: kept descending nodes active until the player is grounded or within the final landing tolerance, preventing a falling player from consuming the node and steering toward the following segment too early.
+- Iteration 4: modeled same-column descent as explicit support removal, charged and revalidated its excavation cost during incremental A*, then stopped movement and mined the underfoot block before allowing the controlled one-block drop.
+- Iteration 5: allowed a labeled ore that physically blocks the queued vein target to remain mineable during continued, routed and scaffold-assisted work, so exposing the final ore no longer releases the active vein and idles.

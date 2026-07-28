@@ -88,6 +88,29 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void descentRouteStepsStayCardinalAndWaitForAControlledLanding() {
+        BlockPos origin = new BlockPos(0, 64, 0);
+
+        assertTrue(AutoMiner.routeTransitionIsControlled(origin, origin.east()));
+        assertTrue(AutoMiner.routeTransitionIsControlled(origin, origin.down()));
+        assertTrue(AutoMiner.routeTransitionIsControlled(origin, origin.up()));
+        assertFalse(AutoMiner.routeTransitionIsControlled(origin, origin.down(2)));
+        assertFalse(AutoMiner.routeTransitionIsControlled(origin, origin.add(1, -1, 1)));
+        assertFalse(AutoMiner.routeTransitionIsControlled(null, origin));
+        assertTrue(AutoMiner.routeRequiresSupportRemoval(origin, origin.down()));
+        assertFalse(AutoMiner.routeRequiresSupportRemoval(origin, origin.east().down()));
+        assertFalse(AutoMiner.routeRequiresSupportRemoval(origin, origin.up()));
+        assertEquals(origin.down(), AutoMiner.routeTransitionClearance(origin, origin.down()));
+        assertEquals(origin.up(2), AutoMiner.routeTransitionClearance(origin, origin.up()));
+        assertEquals(null, AutoMiner.routeTransitionClearance(origin, origin.east()));
+
+        assertTrue(AutoMiner.routeLandingConfirmed(false, false, -0.8));
+        assertTrue(AutoMiner.routeLandingConfirmed(true, true, -0.8));
+        assertTrue(AutoMiner.routeLandingConfirmed(true, false, -0.05));
+        assertFalse(AutoMiner.routeLandingConfirmed(true, false, -0.06));
+    }
+
+    @Test
     public void ascendingRouteWaitsUntilThePlayersFeetClearTheLandingSupport() {
         assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.0));
         assertTrue(AutoMiner.waitingForAscendingClearance(65, 64.98));
@@ -211,6 +234,11 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, false, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, true, false));
+        assertTrue(AutoMiner.routeSupportShapeUsable(true, true, false, false));
+        assertTrue(AutoMiner.routeSupportShapeUsable(true, false, true, false));
+        assertFalse(AutoMiner.routeSupportShapeUsable(true, false, true, true));
+        assertFalse(AutoMiner.routeSupportShapeUsable(true, false, false, false));
+        assertFalse(AutoMiner.routeSupportShapeUsable(false, true, true, false));
     }
 
     @Test

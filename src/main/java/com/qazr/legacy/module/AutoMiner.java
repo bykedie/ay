@@ -67,6 +67,7 @@ public final class AutoMiner {
     private static final int SCAFFOLD_TIMEOUT_TICKS = 40;
     private static final int SCAFFOLD_ASCENT_RETRY_TICKS = 4;
     private static final int MAX_SCAFFOLD_ATTEMPTS = 5;
+    private static final int MAX_ROUTE_VERTICAL_STEP = 1;
     private static final int MIN_DESTRUCTION_ATTEMPTS = 12;
     private static final int MAX_DESTRUCTION_ATTEMPTS = 240;
     private static final int DESTRUCTION_ATTEMPT_GRACE = 8;
@@ -80,6 +81,7 @@ public final class AutoMiner {
     private final ModuleManager modules;
     private final OreVisualizer oreVisualizer;
     private final EnumMap<OreType, Integer> minedCounts = new EnumMap<>(OreType.class);
+    private final List<AxisAlignedBB> supportCollisionBoxes = new ArrayList<>(4);
     private final Map<BlockPos, Integer> targetLabels = new HashMap<>();
     private final Map<BlockPos, Integer> blockedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
@@ -293,6 +295,7 @@ public final class AutoMiner {
             invalidateCurrentCandidateCache();
             clearScaffoldAssist();
             clearPendingCompletion();
+            supportCollisionBoxes.clear();
         }
     }
 
@@ -421,7 +424,7 @@ public final class AutoMiner {
             clearMiningTarget();
             return true;
         }
-        MineTarget target = visibleExactTarget(miningPos);
+        MineTarget target = visibleTarget(miningPos);
         if (target == null) {
             releasePendingQuotaReservation(miningPos);
             miningPos = null;
@@ -471,7 +474,7 @@ public final class AutoMiner {
             delay = ModConfig.mineDelayTicks;
             return;
         }
-        MineTarget routedTarget = visibleExactTarget(currentOre);
+        MineTarget routedTarget = visibleTarget(currentOre);
         if (routedTarget != null) {
             mine(routedTarget);
         } else {
@@ -545,7 +548,7 @@ public final class AutoMiner {
         if (!isPassable(scaffoldPos)) {
             double playerFeetY = mc.player.getEntityBoundingBox().minY;
             if (playerReachedScaffoldLevel(playerFeetY, scaffoldPos.getY())) {
-                MineTarget target = visibleExactTarget(scaffoldOre);
+                MineTarget target = visibleTarget(scaffoldOre);
                 if (target == null) {
                     failScaffoldAssist();
                     return false;
@@ -785,9 +788,23 @@ public final class AutoMiner {
         BlockPos from = pathIndex == 0
             ? standPos(actualFeet)
             : path.get(pathIndex - 1);
+        if (!routeTransitionIsControlled(from, next)) {
+            stopRouteMotion();
+            restartRouteFromCurrentPosition();
+            return;
+        }
         if (!routeTransitionContains(actualFeet, from, next)) {
             stopRouteMotion();
             restartRouteFromCurrentPosition();
+            return;
+        }
+        if (routeRequiresSupportRemoval(from, next) && !isPassable(from.down())) {
+            stopRouteMotion();
+            if (!clearCorridorCell(from.down(), from.down())) {
+                abandonCurrentRoute();
+                return;
+            }
+            delay = ModConfig.mineDelayTicks;
             return;
         }
         BlockPos jumpStart = actualFeet.equals(next) ? from : actualFeet;
@@ -818,7 +835,9 @@ public final class AutoMiner {
         double verticalDistance = next.getY() - navigationFeetY;
         BlockPos following = pathIndex + 1 < path.size() ? path.get(pathIndex + 1) : null;
         double reachDistanceSq = routeNodeReachDistanceSq(from, next, following);
-        if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance, reachDistanceSq)) {
+        boolean descending = next.getY() < from.getY();
+        if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance, reachDistanceSq)
+                && routeLandingConfirmed(descending, mc.player.onGround, verticalDistance)) {
             pathIndex++;
             resetRouteProgress();
             if (pathIndex < path.size()) {
@@ -906,7 +925,7 @@ public final class AutoMiner {
 
     private boolean standingSurfaceSupportsNavigation(double feetY) {
         BlockPos surface = new BlockPos(mc.player.posX, feetY - 0.01, mc.player.posZ);
-        return mc.world.getBlockState(surface).getMaterial().blocksMovement();
+        return hasSolidSupport(surface.up());
     }
 
     static boolean reachedPathNode(BlockPos actualFeet, BlockPos expectedFeet,
@@ -920,6 +939,30 @@ public final class AutoMiner {
         return actualFeet != null && actualFeet.equals(expectedFeet)
             && horizontalDistanceSq < Math.max(0.0, reachDistanceSq)
             && verticalDistance <= 0.05 && verticalDistance > -0.35;
+    }
+
+    static boolean routeLandingConfirmed(boolean descending, boolean onGround,
+            double verticalDistance) {
+        return !descending || onGround || verticalDistance >= -0.05;
+    }
+
+    static boolean routeTransitionIsControlled(BlockPos from, BlockPos next) {
+        if (from == null || next == null) return false;
+        int horizontalStep = Math.abs(next.getX() - from.getX())
+            + Math.abs(next.getZ() - from.getZ());
+        int verticalStep = Math.abs(next.getY() - from.getY());
+        return horizontalStep <= 1 && verticalStep <= MAX_ROUTE_VERTICAL_STEP;
+    }
+
+    static boolean routeRequiresSupportRemoval(BlockPos from, BlockPos next) {
+        return from != null && next != null && next.getY() < from.getY()
+            && next.getX() == from.getX() && next.getZ() == from.getZ();
+    }
+
+    static BlockPos routeTransitionClearance(BlockPos from, BlockPos next) {
+        if (from == null || next == null) return null;
+        if (next.getY() > from.getY()) return from.up(2);
+        return routeRequiresSupportRemoval(from, next) ? from.down() : null;
     }
 
     static double routeNodeReachDistanceSq(BlockPos from, BlockPos node, BlockPos following) {
@@ -1220,9 +1263,9 @@ public final class AutoMiner {
         BlockPos from = search.start;
         for (BlockPos point : route.points) {
             if (cachedPathStateChanged(search.traversalCosts, point, traversalCost(point))) return true;
-            if (point.getY() > from.getY()
-                    && cachedPathStateChanged(search.jumpClearanceCosts, from.up(2),
-                        jumpClearanceCostAt(from.up(2)))) return true;
+            BlockPos clearance = routeTransitionClearance(from, point);
+            if (clearance != null && cachedPathStateChanged(search.jumpClearanceCosts, clearance,
+                    jumpClearanceCostAt(clearance))) return true;
             from = point;
         }
         return false;
@@ -1298,15 +1341,15 @@ public final class AutoMiner {
             Map<BlockPos, Integer> costs, Map<BlockPos, Integer> traversalCosts,
             Map<BlockPos, Integer> jumpClearanceCosts, BlockPos start, List<BlockPos> goals,
             double maxDistanceSq, BlockPos from, int currentCost, BlockPos next, int verticalPenalty) {
+        if (!routeTransitionIsControlled(from, next)) return;
         if (start.distanceSq(next) > maxDistanceSq) return;
         Integer known = costs.get(next);
         if (knownPathCostCannotImprove(known, currentCost, verticalPenalty)) return;
         int stepCost = cachedPathCost(traversalCosts, next, this::traversalCost);
         if (stepCost < 0) return;
-        int jumpExcavation = next.getY() > from.getY()
-            ? cachedPathCost(jumpClearanceCosts, from.up(2),
-                this::jumpClearanceCostAt)
-            : 0;
+        BlockPos clearance = routeTransitionClearance(from, next);
+        int jumpExcavation = clearance == null ? 0
+            : cachedPathCost(jumpClearanceCosts, clearance, this::jumpClearanceCostAt);
         if (jumpExcavation < 0) return;
         int nextCost = currentCost + stepCost + jumpExcavation * 5 + verticalPenalty;
         if (known != null && known <= nextCost) return;
@@ -1413,7 +1456,7 @@ public final class AutoMiner {
     }
 
     private boolean isStandable(BlockPos feet) {
-        if (mc.world.getBlockState(feet.down()).getMaterial().isReplaceable()) return false;
+        if (!hasSolidSupport(feet)) return false;
         AxisAlignedBB box = new AxisAlignedBB(feet.getX() + 0.1, feet.getY(), feet.getZ() + 0.1,
             feet.getX() + 0.9, feet.getY() + 1.8, feet.getZ() + 0.9);
         return mc.world.getCollisionBoxes(mc.player, box).isEmpty();
@@ -1452,8 +1495,29 @@ public final class AutoMiner {
     }
 
     private boolean hasSolidSupport(BlockPos feet) {
-        IBlockState support = mc.world.getBlockState(feet.down());
-        return !support.getMaterial().isReplaceable() && support.getMaterial().blocksMovement();
+        BlockPos supportPos = feet.down();
+        IBlockState support = mc.world.getBlockState(supportPos);
+        boolean materialSupport = !support.getMaterial().isReplaceable()
+            && support.getMaterial().blocksMovement();
+        if (!materialSupport || support.isFullCube()) return materialSupport;
+        double feetY = feet.getY();
+        AxisAlignedBB column = new AxisAlignedBB(feet.getX() + 0.1, feetY - 0.999,
+            feet.getZ() + 0.1, feet.getX() + 0.9, feetY + 1.8, feet.getZ() + 0.9);
+        supportCollisionBoxes.clear();
+        support.getBlock().addCollisionBoxToList(
+            support, mc.world, supportPos, column, supportCollisionBoxes, mc.player, false);
+        boolean collisionBelow = false;
+        boolean intrudesAbove = false;
+        for (AxisAlignedBB box : supportCollisionBoxes) {
+            if (box.maxY > feetY - 0.999 && box.minY < feetY - 0.001) collisionBelow = true;
+            if (box.maxY > feetY + 0.001) intrudesAbove = true;
+        }
+        return routeSupportShapeUsable(materialSupport, false, collisionBelow, intrudesAbove);
+    }
+
+    static boolean routeSupportShapeUsable(boolean materialSupport, boolean fullCube,
+            boolean collisionBelow, boolean intrudesAbove) {
+        return materialSupport && (fullCube || collisionBelow && !intrudesAbove);
     }
 
     private boolean isPassable(BlockPos pos) {
@@ -1612,6 +1676,7 @@ public final class AutoMiner {
     }
 
     private void abandonCurrentRoute() {
+        if (mc.player != null) stopRouteMotion();
         if (currentOre != null) {
             blockedTargetsUntil.put(currentOre.toImmutable(),
                 mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
