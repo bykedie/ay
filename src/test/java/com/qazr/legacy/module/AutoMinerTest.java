@@ -731,10 +731,26 @@ public class AutoMinerTest {
             oldOre, OreType.IRON, newOre, OreType.IRON));
         assertFalse(AutoMiner.completionOwnsWork(
             oldOre, null, oldOre, OreType.IRON));
-        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(true, false, true));
-        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(false, true, true));
-        assertFalse(AutoMiner.completionInvalidatesCurrentRoute(false, true, false));
-        assertFalse(AutoMiner.completionInvalidatesCurrentRoute(false, false, true));
+        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(true, false));
+        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(false, true));
+        assertFalse(AutoMiner.completionInvalidatesCurrentRoute(false, false));
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(oldOre, 1);
+        labels.put(newOre, 2);
+        assertTrue(AutoMiner.preserveQueuedVeinTarget(
+            oldOre, OreType.IRON, newOre, OreType.IRON, labels));
+        assertFalse(AutoMiner.preserveQueuedVeinTarget(
+            oldOre, OreType.GOLD, newOre, OreType.IRON, labels));
+        assertFalse(AutoMiner.preserveQueuedVeinTarget(
+            oldOre, OreType.IRON, oldOre, OreType.IRON, labels));
+        assertTrue(AutoMiner.completionAwaitsRoute(
+            newOre, OreType.IRON, newOre, OreType.IRON, 1));
+        assertTrue(AutoMiner.completionAwaitsRoute(
+            newOre, OreType.IRON, newOre, OreType.IRON, 2));
+        assertFalse(AutoMiner.completionAwaitsRoute(
+            newOre, OreType.IRON, newOre, OreType.IRON, 3));
+        assertFalse(AutoMiner.completionAwaitsRoute(
+            oldOre, OreType.IRON, newOre, OreType.IRON, 1));
         assertTrue(AutoMiner.quotaSatisfied(2, 1, 1));
         assertFalse(AutoMiner.quotaSatisfied(2, 1, 0));
         assertFalse(AutoMiner.quotaSatisfied(0, 99, 1));

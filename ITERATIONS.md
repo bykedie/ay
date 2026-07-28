@@ -195,3 +195,11 @@
 - Iteration 3: reconciled the marker at a confirmed position with its current ore type instead of always deleting it, preserving a server-side ore replacement for immediate future selection.
 - Iteration 4: treated a rolled-back blocker as a recoverable route change and replanned from the player's current feet cell without assigning the real queued target an unreachable cooldown.
 - Iteration 5: replaced unconditional oldest-first completion eviction with priority eviction that removes expired, foreign-world, unreserved and non-current entries before protected current quota work.
+
+## Version 1.10.56 Auto Mining Blocker Confirmation Update
+
+- Iteration 1: checked route-bound pending confirmations before continued mining or corridor clearing, holding movement and aim through the first two client-predicted missing ticks.
+- Iteration 2: retained the real queued vein target when direct ray tracing selects a labeled ore blocker after the route reaches its final stand position.
+- Iteration 3: recorded the queued route position and ore type on every pending completion, so a blocker can wait for confirmation without replacing the target it was exposing.
+- Iteration 4: released or replanned only when the pending completion is still bound to the current route, preventing a delayed old confirmation from freezing or cancelling a later target.
+- Iteration 5: included bound-route ownership in completion-queue eviction priority, keeping the blocker confirmation that currently gates movement ahead of unrelated historical entries.

@@ -204,12 +204,12 @@ public final class AutoMiner {
         }
         if (delay-- > 0) return;
         if (continueScaffoldAssist()) return;
-        if (continueClearingObstacle()) return;
-        if (continueMiningTarget()) return;
-        if (currentTargetAwaitingCompletion()) {
+        if (currentRouteAwaitingCompletion()) {
             stopRouteMotion();
             return;
         }
+        if (continueClearingObstacle()) return;
+        if (continueMiningTarget()) return;
         if (tryMineCurrentOreDirectly()) return;
         if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentOre, currentOreType)) return;
         if (hasActiveRoute()) {
@@ -336,8 +336,11 @@ public final class AutoMiner {
                         currentOre, currentOreType);
                     boolean ownsMiningWork = completionOwnsWork(pending.pos, pending.type,
                         miningPos, miningType);
-                    if (completionInvalidatesCurrentRoute(ownsCurrentWork, ownsMiningWork,
-                            currentOre != null)) restartRouteFromCurrentPosition();
+                    boolean ownsBoundRoute = completionOwnsWork(pending.routeOre, pending.routeType,
+                        currentOre, currentOreType);
+                    if (completionInvalidatesCurrentRoute(ownsCurrentWork, ownsBoundRoute)) {
+                        restartRouteFromCurrentPosition();
+                    }
                     else if (ownsMiningWork) clearMiningTarget();
                     continue;
                 }
@@ -431,11 +434,12 @@ public final class AutoMiner {
         miningPos = target.pos;
         miningType = target.type;
         miningAttempts++;
-        rememberPendingCompletion(target.pos, target.type);
-        if (!hasActiveRoute()) {
+        if (!hasActiveRoute() && !preserveQueuedVeinTarget(
+                target.pos, target.type, currentOre, currentOreType, targetLabels)) {
             currentOre = target.pos;
             currentOreType = target.type;
         }
+        rememberPendingCompletion(target.pos, target.type);
         delay = ModConfig.mineDelayTicks;
     }
 
@@ -1858,12 +1862,12 @@ public final class AutoMiner {
         pendingCompletions.clear();
     }
 
-    private boolean currentTargetAwaitingCompletion() {
+    private boolean currentRouteAwaitingCompletion() {
         if (currentOre == null) return false;
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world == mc.world
-                    && completionOwnsWork(pending.pos, pending.type, currentOre, currentOreType)
-                    && completionAwaitingConfirmation(pending.missingTicks)) return true;
+                    && completionAwaitsRoute(pending.routeOre, pending.routeType, currentOre,
+                        currentOreType, pending.missingTicks)) return true;
         }
         return false;
     }
@@ -1875,12 +1879,14 @@ public final class AutoMiner {
                 pending.untilTick = untilTick;
                 pending.reservesQuota = pendingQuotaReservationAfter(
                     pending.reservesQuota, PendingQuotaEvent.RETRY);
+                pending.routeOre = currentOre == null ? null : currentOre.toImmutable();
+                pending.routeType = currentOreType;
                 return;
             }
         }
         while (pendingCompletions.size() >= MAX_PENDING_COMPLETIONS) evictPendingCompletion();
-        pendingCompletions.addLast(new PendingCompletion(
-            mc.world, pos.toImmutable(), type, untilTick));
+        pendingCompletions.addLast(new PendingCompletion(mc.world, pos.toImmutable(), type,
+            untilTick, currentOre == null ? null : currentOre.toImmutable(), currentOreType));
     }
 
     private void evictPendingCompletion() {
@@ -1890,7 +1896,9 @@ public final class AutoMiner {
         for (PendingCompletion pending : pendingCompletions) {
             boolean ownsWork = completionOwnsWork(pending.pos, pending.type,
                     currentOre, currentOreType)
-                || completionOwnsWork(pending.pos, pending.type, miningPos, miningType);
+                || completionOwnsWork(pending.pos, pending.type, miningPos, miningType)
+                || completionOwnsWork(pending.routeOre, pending.routeType,
+                    currentOre, currentOreType);
             int priority = pendingCompletionEvictionPriority(pending.world == mc.world,
                 completionConfirmationExpired(currentTick, pending.untilTick),
                 pending.reservesQuota, ownsWork);
@@ -1970,9 +1978,22 @@ public final class AutoMiner {
             && completedType != null && completedType == currentType;
     }
 
+    static boolean preserveQueuedVeinTarget(BlockPos mined, OreType minedType,
+            BlockPos queued, OreType queuedType, Map<BlockPos, Integer> labels) {
+        return mined != null && queued != null && !mined.equals(queued)
+            && minedType != null && minedType == queuedType && labels != null
+            && labels.containsKey(mined) && labels.containsKey(queued);
+    }
+
+    static boolean completionAwaitsRoute(BlockPos routeOre, OreType routeType,
+            BlockPos currentOre, OreType currentType, int missingTicks) {
+        return completionOwnsWork(routeOre, routeType, currentOre, currentType)
+            && completionAwaitingConfirmation(missingTicks);
+    }
+
     static boolean completionInvalidatesCurrentRoute(boolean ownsCurrentWork,
-            boolean ownsMiningWork, boolean routeTargetExists) {
-        return ownsCurrentWork || ownsMiningWork && routeTargetExists;
+            boolean ownsBoundRoute) {
+        return ownsCurrentWork || ownsBoundRoute;
     }
 
     static int pendingCompletionEvictionPriority(boolean sameWorld, boolean expired,
@@ -2602,12 +2623,17 @@ public final class AutoMiner {
         private int untilTick;
         private int missingTicks;
         private boolean reservesQuota = true;
+        private BlockPos routeOre;
+        private OreType routeType;
 
-        private PendingCompletion(World world, BlockPos pos, OreType type, int untilTick) {
+        private PendingCompletion(World world, BlockPos pos, OreType type, int untilTick,
+                BlockPos routeOre, OreType routeType) {
             this.world = world;
             this.pos = pos;
             this.type = type;
             this.untilTick = untilTick;
+            this.routeOre = routeOre;
+            this.routeType = routeType;
         }
     }
 
