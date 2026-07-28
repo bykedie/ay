@@ -147,3 +147,11 @@
 - Iteration 3: capped failed-search world validation at 128 relevant states and stopped counting as soon as truncation is known, keeping both world checks and cache inspection bounded.
 - Iteration 4: forced the one permitted full search restart when a failed-state sample is truncated, so unchecked stale nodes are never accepted as proof that the ore is permanently unreachable.
 - Iteration 5: allowed an immediately visible unlabeled ore to yield ahead of a hidden labeled vein target while preserving the original vein labels, avoiding idle time without reintroducing distant target thrashing.
+
+## Version 1.10.50 Auto Mining Movement Update
+
+- Iteration 1: required turn, vertical-transition and final route nodes to reach within 0.1 blocks of center while retaining the wider straight-line threshold, reducing corner clipping without slowing long corridors.
+- Iteration 2: reset route-stall progress whenever a real corridor-clearing action is issued, preventing a hard side obstacle from exhausting the 30-tick movement-stall budget while it is still being mined.
+- Iteration 3: retried scaffold ascent at a bounded four-tick interval after a delayed server placement confirmation, with the existing 40-tick total timeout still enforcing a finite recovery window.
+- Iteration 4: aligned scaffold completion with the navigation feet-cell threshold so the raised mining attempt starts only after the player actually occupies the upper block cell.
+- Iteration 5: required the final ray-traced ore block to be in a stable adjacent, overhead or underfoot mining position, preventing vanilla reach from stopping the route four to five blocks away or enabling unstable diagonal mining.

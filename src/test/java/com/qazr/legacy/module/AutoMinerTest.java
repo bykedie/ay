@@ -47,6 +47,17 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.reachedPathNode(expected, expected, 0.0, 0.04));
         assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.05, 0.0));
         assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.0, 0.20));
+        assertTrue(AutoMiner.reachedPathNode(expected, expected, 0.009, 0.0, 0.01));
+        assertFalse(AutoMiner.reachedPathNode(expected, expected, 0.011, 0.0, 0.01));
+        BlockPos from = new BlockPos(0, 64, 0);
+        BlockPos node = new BlockPos(1, 64, 0);
+        assertEquals(0.04, AutoMiner.routeNodeReachDistanceSq(
+            from, node, new BlockPos(2, 64, 0)), 0.0);
+        assertEquals(0.01, AutoMiner.routeNodeReachDistanceSq(
+            from, node, new BlockPos(1, 64, 1)), 0.0);
+        assertEquals(0.01, AutoMiner.routeNodeReachDistanceSq(
+            from, node, new BlockPos(2, 65, 0)), 0.0);
+        assertEquals(0.01, AutoMiner.routeNodeReachDistanceSq(from, node, null), 0.0);
     }
 
     @Test
@@ -328,8 +339,13 @@ public class AutoMinerTest {
     public void scaffoldPlacementWaitsUntilThePlayerClearsTheNewBlock() {
         assertFalse(AutoMiner.readyToPlaceScaffold(64.99, 64));
         assertTrue(AutoMiner.readyToPlaceScaffold(65.0, 64));
-        assertFalse(AutoMiner.playerReachedScaffoldLevel(64.94, 64));
-        assertTrue(AutoMiner.playerReachedScaffoldLevel(64.95, 64));
+        assertFalse(AutoMiner.playerReachedScaffoldLevel(64.98, 64));
+        assertTrue(AutoMiner.playerReachedScaffoldLevel(64.99, 64));
+        assertTrue(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.2, 64, -0.1, false));
+        assertTrue(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.2, 64, 0.1, true));
+        assertFalse(AutoMiner.shouldRetryScaffoldAscent(19, 20, 64.2, 64, -0.1, false));
+        assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.99, 64, -0.1, true));
+        assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.2, 64, 0.1, false));
         assertTrue(AutoMiner.stableScaffoldBlock(true, false));
         assertFalse(AutoMiner.stableScaffoldBlock(true, true));
         assertFalse(AutoMiner.stableScaffoldBlock(false, false));

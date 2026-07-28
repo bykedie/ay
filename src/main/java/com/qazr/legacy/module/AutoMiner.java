@@ -62,8 +62,10 @@ public final class AutoMiner {
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final double ROUTE_NODE_REACH_DISTANCE_SQ = 0.04;
+    private static final double PRECISE_ROUTE_NODE_REACH_DISTANCE_SQ = 0.01;
     private static final int ROUTE_RENDER_LIMIT = 220;
     private static final int SCAFFOLD_TIMEOUT_TICKS = 40;
+    private static final int SCAFFOLD_ASCENT_RETRY_TICKS = 4;
     private static final int MAX_SCAFFOLD_ATTEMPTS = 5;
     private static final int MIN_DESTRUCTION_ATTEMPTS = 12;
     private static final int MAX_DESTRUCTION_ATTEMPTS = 240;
@@ -541,7 +543,8 @@ public final class AutoMiner {
         }
         stopRouteMotion();
         if (!isPassable(scaffoldPos)) {
-            if (playerReachedScaffoldLevel(mc.player.getEntityBoundingBox().minY, scaffoldPos.getY())) {
+            double playerFeetY = mc.player.getEntityBoundingBox().minY;
+            if (playerReachedScaffoldLevel(playerFeetY, scaffoldPos.getY())) {
                 MineTarget target = visibleExactTarget(scaffoldOre);
                 if (target == null) {
                     failScaffoldAssist();
@@ -550,6 +553,12 @@ public final class AutoMiner {
                 clearScaffoldAssist();
                 mine(target);
                 return true;
+            }
+            if (shouldRetryScaffoldAscent(tick, scaffoldNextPlaceTick, playerFeetY,
+                    scaffoldPos.getY(), mc.player.motionY, mc.player.onGround)) {
+                mc.player.motionY = Math.max(mc.player.motionY, 0.42D);
+                mc.player.fallDistance = 0.0F;
+                scaffoldNextPlaceTick = tick + SCAFFOLD_ASCENT_RETRY_TICKS;
             }
             return true;
         }
@@ -606,7 +615,13 @@ public final class AutoMiner {
     }
 
     static boolean playerReachedScaffoldLevel(double playerFeetY, int scaffoldY) {
-        return playerFeetY >= scaffoldY + 0.95;
+        return playerFeetY >= scaffoldY + 0.99;
+    }
+
+    static boolean shouldRetryScaffoldAscent(int currentTick, int nextRetryTick,
+            double playerFeetY, int scaffoldY, double motionY, boolean onGround) {
+        return currentTick >= nextRetryTick && !playerReachedScaffoldLevel(playerFeetY, scaffoldY)
+            && (onGround || motionY <= 0.0);
     }
 
     private void placeScaffold(BlockPos pos, ScaffoldPlacement placement, int sourceSlot) {
@@ -801,7 +816,9 @@ public final class AutoMiner {
             return;
         }
         double verticalDistance = next.getY() - navigationFeetY;
-        if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance)) {
+        BlockPos following = pathIndex + 1 < path.size() ? path.get(pathIndex + 1) : null;
+        double reachDistanceSq = routeNodeReachDistanceSq(from, next, following);
+        if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance, reachDistanceSq)) {
             pathIndex++;
             resetRouteProgress();
             if (pathIndex < path.size()) {
@@ -831,7 +848,11 @@ public final class AutoMiner {
             double motionZ = routeMotionComponent(dz, distanceSq);
             if (!routeStepClear(motionX, motionZ)) {
                 stopRouteMotion();
-                if (!clearRouteStepObstacle(motionX, motionZ)) abandonCurrentRoute();
+                if (clearRouteStepObstacle(motionX, motionZ)) {
+                    resetRouteProgress();
+                } else {
+                    abandonCurrentRoute();
+                }
                 return;
             }
             mc.player.motionX = motionX;
@@ -890,9 +911,31 @@ public final class AutoMiner {
 
     static boolean reachedPathNode(BlockPos actualFeet, BlockPos expectedFeet,
             double horizontalDistanceSq, double verticalDistance) {
+        return reachedPathNode(actualFeet, expectedFeet, horizontalDistanceSq,
+            verticalDistance, ROUTE_NODE_REACH_DISTANCE_SQ);
+    }
+
+    static boolean reachedPathNode(BlockPos actualFeet, BlockPos expectedFeet,
+            double horizontalDistanceSq, double verticalDistance, double reachDistanceSq) {
         return actualFeet != null && actualFeet.equals(expectedFeet)
-            && horizontalDistanceSq < ROUTE_NODE_REACH_DISTANCE_SQ
+            && horizontalDistanceSq < Math.max(0.0, reachDistanceSq)
             && verticalDistance <= 0.05 && verticalDistance > -0.35;
+    }
+
+    static double routeNodeReachDistanceSq(BlockPos from, BlockPos node, BlockPos following) {
+        if (from == null || node == null || following == null) {
+            return PRECISE_ROUTE_NODE_REACH_DISTANCE_SQ;
+        }
+        int firstX = Integer.signum(node.getX() - from.getX());
+        int firstY = Integer.signum(node.getY() - from.getY());
+        int firstZ = Integer.signum(node.getZ() - from.getZ());
+        int nextX = Integer.signum(following.getX() - node.getX());
+        int nextY = Integer.signum(following.getY() - node.getY());
+        int nextZ = Integer.signum(following.getZ() - node.getZ());
+        boolean vertical = firstY != 0 || nextY != 0;
+        boolean changesDirection = firstX != nextX || firstY != nextY || firstZ != nextZ;
+        return vertical || changesDirection
+            ? PRECISE_ROUTE_NODE_REACH_DISTANCE_SQ : ROUTE_NODE_REACH_DISTANCE_SQ;
     }
 
     static boolean routeTransitionContains(BlockPos actualFeet, BlockPos from, BlockPos next) {
@@ -1451,7 +1494,8 @@ public final class AutoMiner {
         if (temporarilyBlocked(obstacle, rejectedObstaclesUntil, mc.player.ticksExisted)) return false;
         OreType ore = targetType(obstacle);
         if (ore != null) {
-            if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
+            if (!stableMiningPosition(miningPlayerFeet, obstacle)
+                    || !withinMiningReach(eyes, obstacle, miningReach())) return false;
             mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit));
             return true;
         }
@@ -2089,6 +2133,7 @@ public final class AutoMiner {
             type = targetType(hitPos);
             if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         }
+        if (!stableMiningPosition(miningPlayerFeet, pos)) return null;
         return new MineTarget(pos.toImmutable(), type, hit.sideHit);
     }
 
