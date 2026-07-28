@@ -53,6 +53,7 @@ public final class AutoMiner {
     private static final int MAX_PATH_SEARCH_RESTARTS = 1;
     private static final int REQUIRED_STABLE_PATH_VALIDATION_PASSES = 2;
     private static final int PATH_CANDIDATE_BATCH_SIZE = 4;
+    private static final int MAX_ROUTE_COMPARISON_TICKS = 4;
     private static final int MAX_FAILED_CANDIDATES_PER_SNAPSHOT = 8;
     private static final int MAX_CACHED_TARGETS = 96;
     private static final int PATH_RETRY_TICKS = 20;
@@ -117,6 +118,7 @@ public final class AutoMiner {
     private int pendingPathTargetScore = Integer.MAX_VALUE;
     private boolean pendingPathTargetSameVein;
     private int pendingPathTargetLabel = Integer.MAX_VALUE;
+    private int pendingPathComparisonTicks;
     private PathSearch pendingPathSearch;
     private boolean pathSnapshotRefreshRequested;
     private boolean observedEnabled;
@@ -1076,6 +1078,12 @@ public final class AutoMiner {
             pathCandidateBatch = snapshotPathCandidates(candidates, MAX_CACHED_TARGETS);
             pathCandidateOffset = 0;
         }
+        if (pendingPathTarget != null) {
+            if (routeComparisonExpired(pendingPathComparisonTicks)) {
+                return finishPathCandidateBatch();
+            }
+            pendingPathComparisonTicks++;
+        }
         while (pathCandidateOffset < pathCandidateBatch.size()) {
             OreVisualizer.CachedOre candidate = pathCandidateBatch.get(pathCandidateOffset);
             if ((!targetLabels.isEmpty() && !targetLabels.containsKey(candidate.pos()))
@@ -1103,6 +1111,7 @@ public final class AutoMiner {
                         int label = targetLabels.getOrDefault(candidate.pos(), Integer.MAX_VALUE);
                         if (betterLabeledPathTarget(label, score, sameVein, pendingPathTargetLabel,
                                 pendingPathTargetScore, pendingPathTargetSameVein)) {
+                            if (pendingPathTarget == null) pendingPathComparisonTicks = 0;
                             pendingPathTargetLabel = label;
                             pendingPathTargetScore = score;
                             pendingPathTargetSameVein = sameVein;
@@ -1125,18 +1134,19 @@ public final class AutoMiner {
             }
             if (pathCandidateOffset % PATH_CANDIDATE_BATCH_SIZE == 0
                     && pendingPathTarget != null) {
-                PathTarget best = pendingPathTarget;
-                Set<BlockPos> failedTargets = failedPathTargetsToBlock(pendingFailedPathTargets);
-                if (!failedTargets.isEmpty()) {
-                    blockTargets(failedTargets, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
-                }
-                if (best != null) ensureTargetLabels(best.ore, best.type, pathCandidateBatch);
-                resetPathCandidateBatch();
-                return best;
+                return finishPathCandidateBatch();
             }
             return null;
         }
+        return finishPathCandidateBatch();
+    }
+
+    private PathTarget finishPathCandidateBatch() {
         PathTarget best = pendingPathTarget;
+        boolean bestAvailable = best != null && pathTargetAvailable(best.type, targetType(best.ore),
+            targetTemporarilyUnavailable(best.ore));
+        boolean refreshSnapshot = pathTargetRefreshNeeded(best != null, bestAvailable);
+        if (!bestAvailable) best = null;
         if (best != null) ensureTargetLabels(best.ore, best.type, pathCandidateBatch);
         Set<BlockPos> failedTargets = failedPathTargetsToBlock(pendingFailedPathTargets);
         if (!failedTargets.isEmpty()) {
@@ -1144,7 +1154,21 @@ public final class AutoMiner {
         }
         if (best == null) clearTargetLabels();
         resetPathCandidateBatch();
+        if (refreshSnapshot) pathSnapshotRefreshRequested = true;
         return best;
+    }
+
+    static boolean routeComparisonExpired(int elapsedTicks) {
+        return elapsedTicks >= MAX_ROUTE_COMPARISON_TICKS;
+    }
+
+    static boolean pathTargetAvailable(OreType expected, OreType actual,
+            boolean temporarilyUnavailable) {
+        return expected != null && expected == actual && !temporarilyUnavailable;
+    }
+
+    static boolean pathTargetRefreshNeeded(boolean targetFound, boolean targetAvailable) {
+        return targetFound && !targetAvailable;
     }
 
     static List<OreVisualizer.CachedOre> snapshotPathCandidates(
@@ -2011,6 +2035,7 @@ public final class AutoMiner {
         pendingPathTargetScore = Integer.MAX_VALUE;
         pendingPathTargetSameVein = false;
         pendingPathTargetLabel = Integer.MAX_VALUE;
+        pendingPathComparisonTicks = 0;
         pendingPathSearch = null;
         pendingFailedPathTargets.clear();
         pathSnapshotRefreshRequested = false;

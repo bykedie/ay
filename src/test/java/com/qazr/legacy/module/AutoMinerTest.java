@@ -655,6 +655,17 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.continuePathRetryDelay(20, 4L, 4L));
         assertFalse(AutoMiner.continuePathRetryDelay(20, 4L, 5L));
         assertFalse(AutoMiner.continuePathRetryDelay(0, 4L, 4L));
+        assertFalse(AutoMiner.routeComparisonExpired(0));
+        assertFalse(AutoMiner.routeComparisonExpired(3));
+        assertTrue(AutoMiner.routeComparisonExpired(4));
+        assertTrue(AutoMiner.routeComparisonExpired(8));
+        assertTrue(AutoMiner.pathTargetAvailable(OreType.IRON, OreType.IRON, false));
+        assertFalse(AutoMiner.pathTargetAvailable(OreType.IRON, OreType.GOLD, false));
+        assertFalse(AutoMiner.pathTargetAvailable(OreType.IRON, OreType.IRON, true));
+        assertFalse(AutoMiner.pathTargetAvailable(null, OreType.IRON, false));
+        assertTrue(AutoMiner.pathTargetRefreshNeeded(true, false));
+        assertFalse(AutoMiner.pathTargetRefreshNeeded(true, true));
+        assertFalse(AutoMiner.pathTargetRefreshNeeded(false, false));
     }
 
     @Test

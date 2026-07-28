@@ -203,3 +203,11 @@
 - Iteration 3: recorded the queued route position and ore type on every pending completion, so a blocker can wait for confirmation without replacing the target it was exposing.
 - Iteration 4: released or replanned only when the pending completion is still bound to the current route, preventing a delayed old confirmation from freezing or cancelling a later target.
 - Iteration 5: included bound-route ownership in completion-queue eviction priority, keeping the blocker confirmation that currently gates movement ahead of unrelated historical entries.
+
+## Version 1.10.57 Auto Mining Route Start Latency Update
+
+- Iteration 1: started a four-tick comparison budget when the first valid path target is found, preventing later hard candidates from delaying an already usable route indefinitely.
+- Iteration 2: discarded a still-pending comparison search at the budget boundary without classifying that unproven candidate as unreachable or adding a retry cooldown.
+- Iteration 3: consolidated batch-size, snapshot-end and comparison-timeout exits into one atomic finalizer that applies only completed failures, labels the selected vein and resets every batch timer.
+- Iteration 4: revalidated the selected ore type and target cooldown immediately before route activation, preventing a route found several ticks earlier from starting against stale world state.
+- Iteration 5: requested a next-tick candidate snapshot refresh when the selected route target becomes unavailable during comparison, avoiding the normal 20-tick empty-search delay.
