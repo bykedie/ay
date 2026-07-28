@@ -313,6 +313,7 @@ public final class AutoMiner {
     }
 
     private void updateMinedCount() {
+        boolean quotaAvailabilityChanged = false;
         Iterator<PendingCompletion> iterator = pendingCompletions.iterator();
         while (iterator.hasNext()) {
             PendingCompletion pending = iterator.next();
@@ -323,6 +324,7 @@ public final class AutoMiner {
             if (!mc.world.isBlockLoaded(pending.pos)) {
                 pending.missingTicks = 0;
                 if (completionConfirmationExpired(mc.player.ticksExisted, pending.untilTick)) {
+                    quotaAvailabilityChanged |= pending.reservesQuota;
                     iterator.remove();
                 }
                 continue;
@@ -331,6 +333,7 @@ public final class AutoMiner {
                 mc.world.getBlockState(pending.pos).getBlock());
             if (remainingType == pending.type) {
                 if (completionRolledBack(pending.missingTicks)) {
+                    quotaAvailabilityChanged |= pending.reservesQuota;
                     iterator.remove();
                     oreVisualizer.restoreMarker(pending.pos, pending.type);
                     rejectedTargetsUntil.put(pending.pos,
@@ -350,14 +353,18 @@ public final class AutoMiner {
                 }
                 pending.missingTicks = 0;
                 if (completionConfirmationExpired(mc.player.ticksExisted, pending.untilTick)) {
+                    quotaAvailabilityChanged |= pending.reservesQuota;
                     iterator.remove();
                 }
                 continue;
             }
+            boolean previouslyReserved = pending.reservesQuota;
             pending.reservesQuota = pendingQuotaReservationAfter(
                 pending.reservesQuota, PendingQuotaEvent.BLOCK_MISSING);
+            quotaAvailabilityChanged |= previouslyReserved != pending.reservesQuota;
             pending.missingTicks++;
             if (!completionAbsenceConfirmed(true, pending.missingTicks)) continue;
+            quotaAvailabilityChanged |= pending.reservesQuota;
             iterator.remove();
             minedCounts.put(pending.type, minedCount(pending.type) + 1);
             lastMinedOre = pending.pos;
@@ -373,6 +380,7 @@ public final class AutoMiner {
             if (ownsCurrentWork) clearPath();
             else if (ownsMiningWork) clearMiningTarget();
         }
+        if (quotaAvailabilityChanged) invalidateCurrentCandidateCache();
     }
 
     private boolean allFiniteQuotasReached() {
@@ -429,7 +437,7 @@ public final class AutoMiner {
         }
         if (destructionWorkExhausted(miningAttempts, miningAttemptBudget,
                 mc.player.ticksExisted, miningDeadlineTick)) {
-            rejectMiningTarget(target.pos);
+            rejectMiningTarget(target.pos, target.type);
             return;
         }
         face(target.pos);
@@ -455,19 +463,17 @@ public final class AutoMiner {
         }
         MineTarget target = visibleTarget(miningPos);
         if (target == null) {
-            releasePendingQuotaReservation(miningPos);
-            miningPos = null;
-            miningType = null;
+            clearMiningTarget();
             return false;
         }
         mine(target);
         return true;
     }
 
-    private void rejectMiningTarget(BlockPos target) {
+    private void rejectMiningTarget(BlockPos target, OreType type) {
         rejectedTargetsUntil.put(target.toImmutable(),
             mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
-        forgetPendingCompletion(target);
+        forgetPendingCompletion(target, type);
         mc.playerController.resetBlockRemoving();
         clearPath();
         delay = 2;
@@ -1928,6 +1934,7 @@ public final class AutoMiner {
     }
 
     private void clearMiningTarget() {
+        releasePendingQuotaReservation(miningPos, miningType);
         miningPos = null;
         miningType = null;
         miningAttempts = 0;
@@ -1936,7 +1943,12 @@ public final class AutoMiner {
     }
 
     private void clearPendingCompletion() {
+        boolean quotaAvailabilityChanged = false;
+        for (PendingCompletion pending : pendingCompletions) {
+            quotaAvailabilityChanged |= pending.world == mc.world && pending.reservesQuota;
+        }
         pendingCompletions.clear();
+        if (quotaAvailabilityChanged) invalidateCurrentCandidateCache();
     }
 
     private boolean currentRouteAwaitingCompletion() {
@@ -1954,8 +1966,12 @@ public final class AutoMiner {
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world == mc.world && pending.pos.equals(pos) && pending.type == type) {
                 pending.untilTick = untilTick;
+                boolean previouslyReserved = pending.reservesQuota;
                 pending.reservesQuota = pendingQuotaReservationAfter(
                     pending.reservesQuota, PendingQuotaEvent.RETRY);
+                if (previouslyReserved != pending.reservesQuota) {
+                    invalidateCurrentCandidateCache();
+                }
                 pending.routeOre = currentOre == null ? null : currentOre.toImmutable();
                 pending.routeType = currentOreType;
                 return;
@@ -1964,6 +1980,7 @@ public final class AutoMiner {
         while (pendingCompletions.size() >= MAX_PENDING_COMPLETIONS) evictPendingCompletion();
         pendingCompletions.addLast(new PendingCompletion(mc.world, pos.toImmutable(), type,
             untilTick, currentOre == null ? null : currentOre.toImmutable(), currentOreType));
+        invalidateCurrentCandidateCache();
     }
 
     private void evictPendingCompletion() {
@@ -1984,21 +2001,40 @@ public final class AutoMiner {
                 selectedPriority = priority;
             }
         }
-        if (selected != null) pendingCompletions.remove(selected);
-    }
-
-    private void forgetPendingCompletion(BlockPos pos) {
-        pendingCompletions.removeIf(pending ->
-            pending.world == mc.world && pending.pos.equals(pos));
-    }
-
-    private void releasePendingQuotaReservation(BlockPos pos) {
-        for (PendingCompletion pending : pendingCompletions) {
-            if (pending.world == mc.world && pending.pos.equals(pos)) {
-                pending.reservesQuota = pendingQuotaReservationAfter(
-                    pending.reservesQuota, PendingQuotaEvent.VISIBILITY_LOST);
+        if (selected != null) {
+            pendingCompletions.remove(selected);
+            if (selected.world == mc.world && selected.reservesQuota) {
+                invalidateCurrentCandidateCache();
             }
         }
+    }
+
+    private void forgetPendingCompletion(BlockPos pos, OreType type) {
+        boolean quotaAvailabilityChanged = false;
+        Iterator<PendingCompletion> iterator = pendingCompletions.iterator();
+        while (iterator.hasNext()) {
+            PendingCompletion pending = iterator.next();
+            if (pending.world != mc.world || !pending.pos.equals(pos) || pending.type != type) {
+                continue;
+            }
+            quotaAvailabilityChanged |= pending.reservesQuota;
+            iterator.remove();
+        }
+        if (quotaAvailabilityChanged) invalidateCurrentCandidateCache();
+    }
+
+    private void releasePendingQuotaReservation(BlockPos pos, OreType type) {
+        if (pos == null || type == null) return;
+        boolean quotaAvailabilityChanged = false;
+        for (PendingCompletion pending : pendingCompletions) {
+            if (pending.world != mc.world || !pending.pos.equals(pos) || pending.type != type
+                    || !pendingReservationMayRelease(pending.missingTicks)) continue;
+            boolean previouslyReserved = pending.reservesQuota;
+            pending.reservesQuota = pendingQuotaReservationAfter(
+                pending.reservesQuota, PendingQuotaEvent.VISIBILITY_LOST);
+            quotaAvailabilityChanged |= previouslyReserved != pending.reservesQuota;
+        }
+        if (quotaAvailabilityChanged) invalidateCurrentCandidateCache();
     }
 
     static int destructionAttemptBudget(float relativeHardness) {
@@ -2041,6 +2077,10 @@ public final class AutoMiner {
         return event == PendingQuotaEvent.RETRY
             || event == PendingQuotaEvent.BLOCK_MISSING
             || currentlyReserved;
+    }
+
+    static boolean pendingReservationMayRelease(int missingTicks) {
+        return missingTicks == 0;
     }
 
     enum PendingQuotaEvent {

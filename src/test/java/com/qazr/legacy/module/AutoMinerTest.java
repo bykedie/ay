@@ -738,6 +738,9 @@ public class AutoMinerTest {
         reserved = AutoMiner.pendingQuotaReservationAfter(false,
             AutoMiner.PendingQuotaEvent.RETRY);
         assertTrue(reserved);
+        assertTrue(AutoMiner.pendingReservationMayRelease(0));
+        assertFalse(AutoMiner.pendingReservationMayRelease(1));
+        assertFalse(AutoMiner.pendingReservationMayRelease(2));
         BlockPos oldOre = new BlockPos(1, 20, 0);
         BlockPos newOre = new BlockPos(2, 20, 0);
         assertTrue(AutoMiner.completionOwnsWork(

@@ -219,3 +219,11 @@
 - Iteration 3: stopped route motion while an obstacle is predicted absent or its chunk is unavailable, preventing the player from entering a block before the server accepts its removal.
 - Iteration 4: reset the missing counter and resumed the same destruction budget when an obstacle reappears before confirmation, avoiding premature route abandonment after a rollback.
 - Iteration 5: replaced center-only corridor damage rays with a bounded center-plus-six-face search for both initial obstacle discovery and continued breaking of partially exposed blocks.
+
+## Version 1.10.59 Auto Mining Quota Reservation Update
+
+- Iteration 1: released an unconfirmed mining target's quota reservation whenever manual control, an open screen or route cancellation clears the active breaking state, preventing a cancelled ore from hiding its entire type for the remaining confirmation timeout.
+- Iteration 2: retained the reservation after the client has observed the block missing, so cancellation cannot start another limited-count ore while server destruction confirmation is still in progress.
+- Iteration 3: matched pending-completion release and rejection by world, block position and ore type, preventing a delayed entry at a reused position from changing the replacement ore's quota ownership.
+- Iteration 4: routed visibility-loss cleanup through the shared mining-target reset, covering every cancellation path without duplicating partial state resets.
+- Iteration 5: invalidated the four-tick candidate cache only when a reservation is added, released, retried or removed, making quota changes visible immediately without restoring per-tick ore-cache rebuilds.
