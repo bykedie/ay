@@ -332,7 +332,13 @@ public final class AutoMiner {
                     rejectedTargetsUntil.put(pending.pos,
                         mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
                     if (mc.playerController != null) mc.playerController.resetBlockRemoving();
-                    if (completionOwnsCurrentWork(pending.pos, currentOre)) clearPath();
+                    boolean ownsCurrentWork = completionOwnsWork(pending.pos, pending.type,
+                        currentOre, currentOreType);
+                    boolean ownsMiningWork = completionOwnsWork(pending.pos, pending.type,
+                        miningPos, miningType);
+                    if (completionInvalidatesCurrentRoute(ownsCurrentWork, ownsMiningWork,
+                            currentOre != null)) restartRouteFromCurrentPosition();
+                    else if (ownsMiningWork) clearMiningTarget();
                     continue;
                 }
                 pending.missingTicks = 0;
@@ -349,12 +355,16 @@ public final class AutoMiner {
             minedCounts.put(pending.type, minedCount(pending.type) + 1);
             lastMinedOre = pending.pos;
             lastMinedType = pending.type;
-            oreVisualizer.removeMarker(pending.pos);
+            oreVisualizer.reconcileMarker(pending.pos, remainingType);
             if (targetLabels.remove(pending.pos) != null) targetLabelsChanged();
-            boolean ownsCurrentWork = completionOwnsCurrentWork(pending.pos, currentOre);
+            boolean ownsCurrentWork = completionOwnsWork(pending.pos, pending.type,
+                currentOre, currentOreType);
+            boolean ownsMiningWork = completionOwnsWork(pending.pos, pending.type,
+                miningPos, miningType);
             if (ownsCurrentWork) reorderRemainingTargetLabels();
             if (targetLabels.isEmpty()) targetLabelType = null;
             if (ownsCurrentWork) clearPath();
+            else if (ownsMiningWork) clearMiningTarget();
         }
     }
 
@@ -1851,7 +1861,8 @@ public final class AutoMiner {
     private boolean currentTargetAwaitingCompletion() {
         if (currentOre == null) return false;
         for (PendingCompletion pending : pendingCompletions) {
-            if (pending.world == mc.world && pending.pos.equals(currentOre)
+            if (pending.world == mc.world
+                    && completionOwnsWork(pending.pos, pending.type, currentOre, currentOreType)
                     && completionAwaitingConfirmation(pending.missingTicks)) return true;
         }
         return false;
@@ -1867,11 +1878,28 @@ public final class AutoMiner {
                 return;
             }
         }
-        while (pendingCompletions.size() >= MAX_PENDING_COMPLETIONS) {
-            pendingCompletions.removeFirst();
-        }
+        while (pendingCompletions.size() >= MAX_PENDING_COMPLETIONS) evictPendingCompletion();
         pendingCompletions.addLast(new PendingCompletion(
             mc.world, pos.toImmutable(), type, untilTick));
+    }
+
+    private void evictPendingCompletion() {
+        PendingCompletion selected = null;
+        int selectedPriority = Integer.MAX_VALUE;
+        int currentTick = mc.player == null ? 0 : mc.player.ticksExisted;
+        for (PendingCompletion pending : pendingCompletions) {
+            boolean ownsWork = completionOwnsWork(pending.pos, pending.type,
+                    currentOre, currentOreType)
+                || completionOwnsWork(pending.pos, pending.type, miningPos, miningType);
+            int priority = pendingCompletionEvictionPriority(pending.world == mc.world,
+                completionConfirmationExpired(currentTick, pending.untilTick),
+                pending.reservesQuota, ownsWork);
+            if (priority < selectedPriority) {
+                selected = pending;
+                selectedPriority = priority;
+            }
+        }
+        if (selected != null) pendingCompletions.remove(selected);
     }
 
     private void forgetPendingCompletion(BlockPos pos) {
@@ -1936,8 +1964,23 @@ public final class AutoMiner {
         BLOCK_MISSING
     }
 
-    static boolean completionOwnsCurrentWork(BlockPos completed, BlockPos current) {
-        return completed != null && completed.equals(current);
+    static boolean completionOwnsWork(BlockPos completed, OreType completedType,
+            BlockPos current, OreType currentType) {
+        return completed != null && completed.equals(current)
+            && completedType != null && completedType == currentType;
+    }
+
+    static boolean completionInvalidatesCurrentRoute(boolean ownsCurrentWork,
+            boolean ownsMiningWork, boolean routeTargetExists) {
+        return ownsCurrentWork || ownsMiningWork && routeTargetExists;
+    }
+
+    static int pendingCompletionEvictionPriority(boolean sameWorld, boolean expired,
+            boolean reservesQuota, boolean ownsWork) {
+        if (!sameWorld || expired) return 0;
+        if (!ownsWork && !reservesQuota) return 1;
+        if (!ownsWork) return 2;
+        return reservesQuota ? 4 : 3;
     }
 
     private void resetPathCandidateBatch() {

@@ -187,3 +187,11 @@
 - Iteration 3: required two stable successful-route validation passes and checked the current mining stand set before and after every pass, preventing a world change during sliced validation from activating an old route.
 - Iteration 4: rebuilt completed A* routes by collecting predecessor nodes once and reversing the list, replacing quadratic front insertion on long paths.
 - Iteration 5: released the completed search queue, predecessor map and total-cost map before sliced validation, and applied the same bounded validation-budget helper to both successful and failed searches.
+
+## Version 1.10.55 Auto Mining Completion Ownership Update
+
+- Iteration 1: bound pending completion ownership to both block position and ore type, preventing a delayed confirmation at a reused position from cancelling work on a replacement ore.
+- Iteration 2: cleared completed blocker-only mining state immediately while retaining the queued vein target, allowing the newly exposed ore to be reconsidered later in the same client tick.
+- Iteration 3: reconciled the marker at a confirmed position with its current ore type instead of always deleting it, preserving a server-side ore replacement for immediate future selection.
+- Iteration 4: treated a rolled-back blocker as a recoverable route change and replanned from the player's current feet cell without assigning the real queued target an unreachable cooldown.
+- Iteration 5: replaced unconditional oldest-first completion eviction with priority eviction that removes expired, foreign-world, unreserved and non-current entries before protected current quota work.

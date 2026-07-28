@@ -723,13 +723,39 @@ public class AutoMinerTest {
         assertTrue(reserved);
         BlockPos oldOre = new BlockPos(1, 20, 0);
         BlockPos newOre = new BlockPos(2, 20, 0);
-        assertTrue(AutoMiner.completionOwnsCurrentWork(oldOre, oldOre));
-        assertFalse(AutoMiner.completionOwnsCurrentWork(oldOre, newOre));
+        assertTrue(AutoMiner.completionOwnsWork(
+            oldOre, OreType.IRON, oldOre, OreType.IRON));
+        assertFalse(AutoMiner.completionOwnsWork(
+            oldOre, OreType.IRON, oldOre, OreType.GOLD));
+        assertFalse(AutoMiner.completionOwnsWork(
+            oldOre, OreType.IRON, newOre, OreType.IRON));
+        assertFalse(AutoMiner.completionOwnsWork(
+            oldOre, null, oldOre, OreType.IRON));
+        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(true, false, true));
+        assertTrue(AutoMiner.completionInvalidatesCurrentRoute(false, true, true));
+        assertFalse(AutoMiner.completionInvalidatesCurrentRoute(false, true, false));
+        assertFalse(AutoMiner.completionInvalidatesCurrentRoute(false, false, true));
         assertTrue(AutoMiner.quotaSatisfied(2, 1, 1));
         assertFalse(AutoMiner.quotaSatisfied(2, 1, 0));
         assertFalse(AutoMiner.quotaSatisfied(0, 99, 1));
         assertFalse(AutoMiner.quotaBlocksTarget(true, true));
         assertTrue(AutoMiner.quotaBlocksTarget(true, false));
+    }
+
+    @Test
+    public void pendingCompletionEvictionProtectsCurrentReservedWork() {
+        assertEquals(0, AutoMiner.pendingCompletionEvictionPriority(
+            false, false, true, true));
+        assertEquals(0, AutoMiner.pendingCompletionEvictionPriority(
+            true, true, true, true));
+        assertEquals(1, AutoMiner.pendingCompletionEvictionPriority(
+            true, false, false, false));
+        assertEquals(2, AutoMiner.pendingCompletionEvictionPriority(
+            true, false, true, false));
+        assertEquals(3, AutoMiner.pendingCompletionEvictionPriority(
+            true, false, false, true));
+        assertEquals(4, AutoMiner.pendingCompletionEvictionPriority(
+            true, false, true, true));
     }
 
     @Test
