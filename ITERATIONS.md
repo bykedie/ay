@@ -355,3 +355,11 @@
 - Iteration 3: retained the existing exclusion for gravity-affected sand and gravel.
 - Iteration 4: retained normal block placement validation at the exact player column after the material-shape check.
 - Iteration 5: covered solid, falling, partial-height and non-solid combinations independently.
+
+## Version 1.10.76 Auto Mining Boundary Scan Fairness Update
+
+- Iteration 1: replaced chunk-grid ordering with the exact horizontal lower-bound distance from the player to each chunk's block centers.
+- Iteration 2: allowed queued chunks physically within two blocks of a resumed scan task to receive their current-height section before that task monopolizes all vertical sections.
+- Iteration 3: covered cardinal and diagonal boundary cases through the same physical-distance ordering instead of special-casing chunk coordinates.
+- Iteration 4: retained the existing 4096-block auto-mining budget, so the latency improvement does not increase worst-case per-tick block reads.
+- Iteration 5: continued ordering truly farther chunks behind the resumed nearer task once the two-block fairness window is exceeded.

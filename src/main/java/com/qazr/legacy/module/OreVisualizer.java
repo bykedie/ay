@@ -45,6 +45,7 @@ public final class OreVisualizer {
     private static final int VISUALIZER_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT * 4;
     private static final int AUTO_MINE_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT;
     private static final int VALIDATION_MARKERS_PER_PASS = 128;
+    private static final double RESUMED_SCAN_NEARBY_DISTANCE_SQ = 4.0D;
     private static final double BOX_INSET = 0.002;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -96,8 +97,7 @@ public final class OreVisualizer {
                 modules.isEnabled(ModuleId.ORE_VISUALIZER), ModConfig.oreVisualizerRange,
                 modules.isEnabled(ModuleId.AUTO_MINE), ModConfig.minePathRange);
             if (!chunkCouldEnterRange(key, centerChunkX, centerChunkZ, cacheRange)) return;
-            requeueScanTask(task, MathHelper.floor(mc.player.posX) >> 4,
-                MathHelper.floor(mc.player.posZ) >> 4);
+            requeueScanTask(task, mc.player.posX, mc.player.posZ);
         }
     }
 
@@ -155,7 +155,7 @@ public final class OreVisualizer {
             if (task.isComplete()) {
                 scannedChunks.add(task.key);
             } else {
-                requeueScanTask(task, seededCenterChunkX, seededCenterChunkZ);
+                requeueScanTask(task, mc.player.posX, mc.player.posZ);
             }
         }
         if (validationDelay-- <= 0) {
@@ -381,7 +381,7 @@ public final class OreVisualizer {
                 if (chunk != null) queueCachedChunk(mc.world, chunk, centerSection);
             }
         }
-        prioritizeQueue(centerChunkX, centerChunkZ);
+        prioritizeQueue(mc.player.posX, mc.player.posZ);
         seededWorld = mc.world;
         seededRadiusChunks = radiusChunks;
         seededRange = cacheRange;
@@ -462,22 +462,22 @@ public final class OreVisualizer {
         return order;
     }
 
-    private void prioritizeQueue(int centerChunkX, int centerChunkZ) {
+    private void prioritizeQueue(double playerX, double playerZ) {
         List<ScanTask> tasks = new ArrayList<>(scanQueue);
-        tasks.sort(Comparator.comparingInt(task -> task.distanceSq(centerChunkX, centerChunkZ)));
+        tasks.sort(Comparator.comparingDouble(task -> task.distanceSq(playerX, playerZ)));
         scanQueue.clear();
         scanQueue.addAll(tasks);
     }
 
-    private void requeueScanTask(ScanTask task, int centerChunkX, int centerChunkZ) {
+    private void requeueScanTask(ScanTask task, double playerX, double playerZ) {
         if (!queuedChunks.add(task.key)) return;
-        int taskDistanceSq = task.distanceSq(centerChunkX, centerChunkZ);
+        double taskDistanceSq = task.distanceSq(playerX, playerZ);
         int queued = scanQueue.size();
         boolean inserted = false;
         for (int i = 0; i < queued; i++) {
             ScanTask next = scanQueue.removeFirst();
             if (!inserted && !scanTaskPrecedesResumed(
-                    next.distanceSq(centerChunkX, centerChunkZ), taskDistanceSq)) {
+                    next.distanceSq(playerX, playerZ), taskDistanceSq)) {
                 scanQueue.addLast(task);
                 inserted = true;
             }
@@ -486,8 +486,8 @@ public final class OreVisualizer {
         if (!inserted) scanQueue.addLast(task);
     }
 
-    static boolean scanTaskPrecedesResumed(int queuedDistanceSq, int resumedDistanceSq) {
-        return queuedDistanceSq <= resumedDistanceSq;
+    static boolean scanTaskPrecedesResumed(double queuedDistanceSq, double resumedDistanceSq) {
+        return queuedDistanceSq <= resumedDistanceSq + RESUMED_SCAN_NEARBY_DISTANCE_SQ;
     }
 
     private void pruneQueue(int centerChunkX, int centerChunkZ, double range) {
@@ -871,10 +871,8 @@ public final class OreVisualizer {
             return sectionCursor >= sectionOrder.length;
         }
 
-        private int distanceSq(int centerChunkX, int centerChunkZ) {
-            int dx = chunk.x - centerChunkX;
-            int dz = chunk.z - centerChunkZ;
-            return dx * dx + dz * dz;
+        private double distanceSq(double playerX, double playerZ) {
+            return chunkHorizontalDistanceSq(key, playerX, playerZ);
         }
     }
 
