@@ -451,3 +451,11 @@
 - Iteration 3: kept independent retry cooldowns for the exact candidates already proven unreachable.
 - Iteration 4: retained vein ownership when a selected route becomes stale immediately before activation and requests a fresh snapshot.
 - Iteration 5: released the vein only after the complete candidate snapshot is exhausted without an available route.
+
+## Version 1.10.88 Auto Mining Scan Queue Update
+
+- Iteration 1: replaced resumed scan-task queue rotation with direct positional insertion.
+- Iteration 2: traversed only the nearby queue prefix required by the existing two-block fairness threshold.
+- Iteration 3: calculated the resumed-distance threshold once per insertion instead of once per queued task.
+- Iteration 4: retained the existing closest-chunk ordering and bounded per-tick block scan budget.
+- Iteration 5: covered zero, positive and clamped negative distance thresholds with focused tests.

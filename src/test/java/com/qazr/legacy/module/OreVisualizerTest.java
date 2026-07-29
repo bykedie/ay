@@ -80,6 +80,9 @@ public class OreVisualizerTest {
 
     @Test
     public void nearbyChunkSectionsStayAheadOfFartherScanTasks() {
+        assertEquals(4.0, OreVisualizer.resumedScanPrecedenceLimitSq(0.0), 0.0);
+        assertEquals(144.0, OreVisualizer.resumedScanPrecedenceLimitSq(100.0), 0.0);
+        assertEquals(4.0, OreVisualizer.resumedScanPrecedenceLimitSq(-1.0), 0.0);
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(0.25, 0.0));
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(4.0, 0.0));
         assertTrue(!OreVisualizer.scanTaskPrecedesResumed(4.01, 0.0));

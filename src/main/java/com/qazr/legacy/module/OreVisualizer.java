@@ -3,17 +3,17 @@ package com.qazr.legacy.module;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.config.OreType;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -53,7 +53,7 @@ public final class OreVisualizer {
     private final Map<Long, List<OreMarker>> markersByChunk = new HashMap<>();
     private final Map<OreType, Set<Long>> markerSetsByType = new EnumMap<>(OreType.class);
     private final Set<Long> scannedChunks = new HashSet<>();
-    private final Deque<ScanTask> scanQueue = new ArrayDeque<>();
+    private final LinkedList<ScanTask> scanQueue = new LinkedList<>();
     private final Set<Long> queuedChunks = new HashSet<>();
     private final Map<Long, ValidationTask> validationTasks = new LinkedHashMap<>();
     private int validationDelay;
@@ -519,25 +519,26 @@ public final class OreVisualizer {
     private void requeueScanTask(ScanTask task, double playerX, double playerZ) {
         if (!queuedChunks.add(task.key)) return;
         double taskDistanceSq = task.distanceSq(playerX, playerZ);
-        int queued = scanQueue.size();
-        boolean inserted = false;
-        for (int i = 0; i < queued; i++) {
-            ScanTask next = scanQueue.removeFirst();
-            if (!inserted && !scanTaskPrecedesResumed(
-                    next.distanceSq(playerX, playerZ), taskDistanceSq)) {
-                scanQueue.addLast(task);
-                inserted = true;
-            }
-            scanQueue.addLast(next);
+        double precedenceLimitSq = resumedScanPrecedenceLimitSq(taskDistanceSq);
+        ListIterator<ScanTask> iterator = scanQueue.listIterator();
+        while (iterator.hasNext()) {
+            ScanTask next = iterator.next();
+            if (next.distanceSq(playerX, playerZ) <= precedenceLimitSq) continue;
+            iterator.previous();
+            iterator.add(task);
+            return;
         }
-        if (!inserted) scanQueue.addLast(task);
+        scanQueue.addLast(task);
     }
 
     static boolean scanTaskPrecedesResumed(double queuedDistanceSq, double resumedDistanceSq) {
-        if (queuedDistanceSq <= resumedDistanceSq) return true;
+        return queuedDistanceSq <= resumedScanPrecedenceLimitSq(resumedDistanceSq);
+    }
+
+    static double resumedScanPrecedenceLimitSq(double resumedDistanceSq) {
         double resumedDistance = Math.sqrt(Math.max(0.0D, resumedDistanceSq));
         double nearbyDistance = resumedDistance + RESUMED_SCAN_NEARBY_DISTANCE;
-        return queuedDistanceSq <= nearbyDistance * nearbyDistance;
+        return nearbyDistance * nearbyDistance;
     }
 
     private void pruneQueue(int centerChunkX, int centerChunkZ, double range) {
