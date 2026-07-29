@@ -81,10 +81,6 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeTransitionContains(next, from, next));
         assertFalse(AutoMiner.routeTransitionContains(new BlockPos(0, 63, 0), from, next));
         assertFalse(AutoMiner.routeTransitionContains(new BlockPos(1, 65, 1), from, next));
-        assertFalse(AutoMiner.completionAwaitingConfirmation(0));
-        assertTrue(AutoMiner.completionAwaitingConfirmation(1));
-        assertTrue(AutoMiner.completionAwaitingConfirmation(2));
-        assertFalse(AutoMiner.completionAwaitingConfirmation(3));
     }
 
     @Test
@@ -578,15 +574,20 @@ public class AutoMinerTest {
     public void failedRouteIsSkippedOnlyDuringItsRetryWindow() {
         BlockPos failed = new BlockPos(4, 20, 7);
         Map<BlockPos, Integer> blocked = new HashMap<>();
-        blocked.put(failed, 100);
+        assertTrue(AutoMiner.extendTargetCooldown(blocked, failed, 100));
+        assertFalse(AutoMiner.extendTargetCooldown(blocked, failed, 90));
+        assertFalse(AutoMiner.extendTargetCooldown(blocked, failed, 100));
+        assertTrue(AutoMiner.extendTargetCooldown(blocked, failed, 120));
 
-        assertTrue(AutoMiner.temporarilyBlocked(failed, blocked, 99));
-        assertFalse(AutoMiner.temporarilyBlocked(failed, blocked, 100));
+        assertTrue(AutoMiner.temporarilyBlocked(failed, blocked, 119));
+        assertFalse(AutoMiner.temporarilyBlocked(failed, blocked, 120));
         assertFalse(AutoMiner.temporarilyBlocked(new BlockPos(5, 20, 7), blocked, 0));
-        assertFalse(AutoMiner.pruneExpiredTargets(blocked, 99));
-        assertTrue(AutoMiner.pruneExpiredTargets(blocked, 100));
+        assertFalse(AutoMiner.pruneExpiredTargets(blocked, 119));
+        assertTrue(AutoMiner.pruneExpiredTargets(blocked, 120));
         assertTrue(blocked.isEmpty());
         assertFalse(AutoMiner.pruneExpiredTargets(null, 100));
+        assertFalse(AutoMiner.extendTargetCooldown(null, failed, 100));
+        assertFalse(AutoMiner.extendTargetCooldown(blocked, null, 100));
     }
 
     @Test
@@ -726,8 +727,8 @@ public class AutoMinerTest {
         assertEquals(3, AutoMiner.nextClearingMissingTicks(true, true, 20));
         assertEquals(0, AutoMiner.nextClearingMissingTicks(true, false, 2));
         assertEquals(0, AutoMiner.nextClearingMissingTicks(false, true, 2));
-        assertFalse(AutoMiner.completionRolledBack(0));
-        assertTrue(AutoMiner.completionRolledBack(1));
+        assertFalse(AutoMiner.completionRolledBack(false));
+        assertTrue(AutoMiner.completionRolledBack(true));
         boolean reserved = true;
         reserved = AutoMiner.pendingQuotaReservationAfter(reserved,
             AutoMiner.PendingQuotaEvent.VISIBILITY_LOST);
@@ -738,9 +739,8 @@ public class AutoMinerTest {
         reserved = AutoMiner.pendingQuotaReservationAfter(false,
             AutoMiner.PendingQuotaEvent.RETRY);
         assertTrue(reserved);
-        assertTrue(AutoMiner.pendingReservationMayRelease(0));
-        assertFalse(AutoMiner.pendingReservationMayRelease(1));
-        assertFalse(AutoMiner.pendingReservationMayRelease(2));
+        assertTrue(AutoMiner.pendingReservationMayRelease(false));
+        assertFalse(AutoMiner.pendingReservationMayRelease(true));
         BlockPos oldOre = new BlockPos(1, 20, 0);
         BlockPos newOre = new BlockPos(2, 20, 0);
         assertTrue(AutoMiner.completionOwnsWork(
@@ -764,13 +764,13 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.preserveQueuedVeinTarget(
             oldOre, OreType.IRON, oldOre, OreType.IRON, labels));
         assertTrue(AutoMiner.completionAwaitsRoute(
-            newOre, OreType.IRON, newOre, OreType.IRON, 1));
+            newOre, OreType.IRON, newOre, OreType.IRON, true));
         assertTrue(AutoMiner.completionAwaitsRoute(
-            newOre, OreType.IRON, newOre, OreType.IRON, 2));
+            newOre, OreType.IRON, newOre, OreType.IRON, true));
         assertFalse(AutoMiner.completionAwaitsRoute(
-            newOre, OreType.IRON, newOre, OreType.IRON, 3));
+            newOre, OreType.IRON, newOre, OreType.IRON, false));
         assertFalse(AutoMiner.completionAwaitsRoute(
-            oldOre, OreType.IRON, newOre, OreType.IRON, 1));
+            oldOre, OreType.IRON, newOre, OreType.IRON, true));
         assertTrue(AutoMiner.quotaSatisfied(2, 1, 1));
         assertFalse(AutoMiner.quotaSatisfied(2, 1, 0));
         assertFalse(AutoMiner.quotaSatisfied(0, 99, 1));

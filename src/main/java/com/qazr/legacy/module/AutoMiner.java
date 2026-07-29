@@ -332,11 +332,11 @@ public final class AutoMiner {
             OreType remainingType = OreType.fromBlock(
                 mc.world.getBlockState(pending.pos).getBlock());
             if (remainingType == pending.type) {
-                if (completionRolledBack(pending.missingTicks)) {
+                if (completionRolledBack(pending.absenceObserved)) {
                     quotaAvailabilityChanged |= pending.reservesQuota;
                     iterator.remove();
                     oreVisualizer.restoreMarker(pending.pos, pending.type);
-                    rejectedTargetsUntil.put(pending.pos,
+                    coolDownCandidate(rejectedTargetsUntil, pending.pos,
                         mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
                     if (mc.playerController != null) mc.playerController.resetBlockRemoving();
                     boolean ownsCurrentWork = completionOwnsWork(pending.pos, pending.type,
@@ -362,6 +362,7 @@ public final class AutoMiner {
             pending.reservesQuota = pendingQuotaReservationAfter(
                 pending.reservesQuota, PendingQuotaEvent.BLOCK_MISSING);
             quotaAvailabilityChanged |= previouslyReserved != pending.reservesQuota;
+            pending.absenceObserved = true;
             pending.missingTicks++;
             if (!completionAbsenceConfirmed(true, pending.missingTicks)) continue;
             quotaAvailabilityChanged |= pending.reservesQuota;
@@ -471,7 +472,7 @@ public final class AutoMiner {
     }
 
     private void rejectMiningTarget(BlockPos target, OreType type) {
-        rejectedTargetsUntil.put(target.toImmutable(),
+        coolDownCandidate(rejectedTargetsUntil, target,
             mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
         forgetPendingCompletion(target, type);
         mc.playerController.resetBlockRemoving();
@@ -739,7 +740,7 @@ public final class AutoMiner {
 
     private void failScaffoldAssist() {
         if (scaffoldOre != null) {
-            blockedTargetsUntil.put(scaffoldOre.toImmutable(),
+            coolDownCandidate(blockedTargetsUntil, scaffoldOre,
                 mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
         }
         clearScaffoldAssist();
@@ -1049,10 +1050,6 @@ public final class AutoMiner {
             && actualFeet.getY() <= Math.max(from.getY(), next.getY())
             && actualFeet.getZ() >= Math.min(from.getZ(), next.getZ())
             && actualFeet.getZ() <= Math.max(from.getZ(), next.getZ());
-    }
-
-    static boolean completionAwaitingConfirmation(int missingTicks) {
-        return missingTicks > 0 && missingTicks < REQUIRED_MISSING_CONFIRM_TICKS;
     }
 
     static boolean waitingForAscendingClearance(int fromY, int nextY, double feetY) {
@@ -1839,7 +1836,7 @@ public final class AutoMiner {
     private void abandonCurrentRoute() {
         if (mc.player != null) stopRouteMotion();
         if (currentOre != null) {
-            blockedTargetsUntil.put(currentOre.toImmutable(),
+            coolDownCandidate(blockedTargetsUntil, currentOre,
                 mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
         }
         clearPath();
@@ -1889,9 +1886,24 @@ public final class AutoMiner {
     }
 
     private void blockTargets(Iterable<BlockPos> targets, int untilTick) {
+        boolean changed = false;
         for (BlockPos target : targets) {
-            blockedTargetsUntil.put(target.toImmutable(), untilTick);
+            changed |= extendTargetCooldown(blockedTargetsUntil, target, untilTick);
         }
+        if (changed) invalidateCurrentCandidateCache();
+    }
+
+    private void coolDownCandidate(Map<BlockPos, Integer> targets, BlockPos target, int untilTick) {
+        if (extendTargetCooldown(targets, target, untilTick)) invalidateCurrentCandidateCache();
+    }
+
+    static boolean extendTargetCooldown(Map<BlockPos, Integer> targets,
+            BlockPos target, int untilTick) {
+        if (targets == null || target == null) return false;
+        Integer previous = targets.get(target);
+        if (previous != null && previous >= untilTick) return false;
+        targets.put(target.toImmutable(), untilTick);
+        return true;
     }
 
     private void clearPath() {
@@ -1956,7 +1968,7 @@ public final class AutoMiner {
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world == mc.world
                     && completionAwaitsRoute(pending.routeOre, pending.routeType, currentOre,
-                        currentOreType, pending.missingTicks)) return true;
+                        currentOreType, pending.absenceObserved)) return true;
         }
         return false;
     }
@@ -2028,7 +2040,7 @@ public final class AutoMiner {
         boolean quotaAvailabilityChanged = false;
         for (PendingCompletion pending : pendingCompletions) {
             if (pending.world != mc.world || !pending.pos.equals(pos) || pending.type != type
-                    || !pendingReservationMayRelease(pending.missingTicks)) continue;
+                    || !pendingReservationMayRelease(pending.absenceObserved)) continue;
             boolean previouslyReserved = pending.reservesQuota;
             pending.reservesQuota = pendingQuotaReservationAfter(
                 pending.reservesQuota, PendingQuotaEvent.VISIBILITY_LOST);
@@ -2068,8 +2080,8 @@ public final class AutoMiner {
         return chunkLoaded && consecutiveMissingTicks >= REQUIRED_MISSING_CONFIRM_TICKS;
     }
 
-    static boolean completionRolledBack(int consecutiveMissingTicks) {
-        return consecutiveMissingTicks > 0;
+    static boolean completionRolledBack(boolean absenceObserved) {
+        return absenceObserved;
     }
 
     static boolean pendingQuotaReservationAfter(boolean currentlyReserved, PendingQuotaEvent event) {
@@ -2079,8 +2091,8 @@ public final class AutoMiner {
             || currentlyReserved;
     }
 
-    static boolean pendingReservationMayRelease(int missingTicks) {
-        return missingTicks == 0;
+    static boolean pendingReservationMayRelease(boolean absenceObserved) {
+        return !absenceObserved;
     }
 
     enum PendingQuotaEvent {
@@ -2103,9 +2115,9 @@ public final class AutoMiner {
     }
 
     static boolean completionAwaitsRoute(BlockPos routeOre, OreType routeType,
-            BlockPos currentOre, OreType currentType, int missingTicks) {
+            BlockPos currentOre, OreType currentType, boolean absenceObserved) {
         return completionOwnsWork(routeOre, routeType, currentOre, currentType)
-            && completionAwaitingConfirmation(missingTicks);
+            && absenceObserved;
     }
 
     static boolean completionInvalidatesCurrentRoute(boolean ownsCurrentWork,
@@ -2740,6 +2752,7 @@ public final class AutoMiner {
         private final OreType type;
         private int untilTick;
         private int missingTicks;
+        private boolean absenceObserved;
         private boolean reservesQuota = true;
         private BlockPos routeOre;
         private OreType routeType;

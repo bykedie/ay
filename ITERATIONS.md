@@ -227,3 +227,11 @@
 - Iteration 3: matched pending-completion release and rejection by world, block position and ore type, preventing a delayed entry at a reused position from changing the replacement ore's quota ownership.
 - Iteration 4: routed visibility-loss cleanup through the shared mining-target reset, covering every cancellation path without duplicating partial state resets.
 - Iteration 5: invalidated the four-tick candidate cache only when a reservation is added, released, retried or removed, making quota changes visible immediately without restoring per-tick ore-cache rebuilds.
+
+## Version 1.10.60 Auto Mining Completion Evidence And Cooldown Update
+
+- Iteration 1: separated consecutive missing ticks from persistent missing evidence, allowing unloaded chunks to reset confirmation continuity without erasing the fact that client-side destruction had already been observed.
+- Iteration 2: retained a route-bound completion wait across a temporary chunk-availability gap, preventing manual cancellation or route planning from releasing protected work before confirmation or rollback.
+- Iteration 3: restored the ore marker and restarted owned work when a previously missing ore reappears after a chunk gap, instead of treating the entry as an ordinary untouched timeout.
+- Iteration 4: centralized target cooldown writes so every new or extended mining, scaffold and failed-route cooldown immediately invalidates the bounded candidate cache.
+- Iteration 5: made cooldown updates monotonic and batched cache invalidation for failed candidate sets, preventing a shorter retry window from reviving a target early without adding repeated cache rebuilds.
