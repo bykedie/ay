@@ -912,8 +912,8 @@ public final class AutoMiner {
             }
             pathRetryDelay = 0;
             activatePathTarget(target);
-            if (path.isEmpty()) {
-                delay = 3;
+            if (routeEndedBeforeMining(currentOre, pathIndex, path.size())) {
+                prepareAndMineCurrentOre();
                 return;
             }
         }

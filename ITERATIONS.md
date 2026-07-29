@@ -523,3 +523,11 @@
 - Iteration 3: discarded the pending A* search, best route, failed targets, and comparison timer after a cell change.
 - Iteration 4: rebuilt candidate distance ordering from the new player position in the same selection cycle.
 - Iteration 5: retained active-route control and manual-takeover behavior while covering stable, moved, and empty snapshots.
+
+## Version 1.10.97 Auto Mining Empty Route Handoff Update
+
+- Iteration 1: reproduced the fixed three-tick idle when the selected mining stand was already the player's current cell.
+- Iteration 2: handed a zero-node route directly to the existing endpoint mining state instead of creating a separate wait.
+- Iteration 3: retained the endpoint checks for stable footing, head room, support, mining face, visibility, and exposure clearing.
+- Iteration 4: retained immediate replanning when the current cell is no longer a valid mining stand.
+- Iteration 5: covered zero-length, completed, active, and targetless route states with the focused auto-miner test suite.
