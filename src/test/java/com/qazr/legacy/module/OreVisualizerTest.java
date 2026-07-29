@@ -49,10 +49,27 @@ public class OreVisualizerTest {
 
     @Test
     public void unchangedSeedStateSkipsRepeatedQueueTraversal() {
-        assertTrue(OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
-        assertTrue(!OreVisualizer.sameSeedState(false, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
-        assertTrue(!OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 33.0, 10, -4));
-        assertTrue(!OreVisualizer.sameSeedState(true, 3, 32.0, 10, -4, 3, 32.0, 11, -4));
+        assertTrue(OreVisualizer.sameSeedState(
+            true, 3, 32.0, 10, -4, 4, 3, 32.0, 10, -4, 4));
+        assertTrue(!OreVisualizer.sameSeedState(
+            false, 3, 32.0, 10, -4, 4, 3, 32.0, 10, -4, 4));
+        assertTrue(!OreVisualizer.sameSeedState(
+            true, 3, 32.0, 10, -4, 4, 3, 33.0, 10, -4, 4));
+        assertTrue(!OreVisualizer.sameSeedState(
+            true, 3, 32.0, 10, -4, 4, 3, 32.0, 11, -4, 4));
+        assertTrue(!OreVisualizer.sameSeedState(
+            true, 3, 32.0, 10, -4, 4, 3, 32.0, 10, -4, 5));
+    }
+
+    @Test
+    public void verticalMovementReordersOnlyUnscannedSectionTails() {
+        int[] order = {4, 3, 5, 2, 6, 1, 7, 0};
+        OreVisualizer.prioritizeRemainingSections(order, 1, 200, 7);
+        assertArrayEquals(new int[] {4, 3, 7, 6, 5, 2, 1, 0}, order);
+
+        int[] untouchedCurrent = {4, 3, 5, 2, 6, 1, 7, 0};
+        OreVisualizer.prioritizeRemainingSections(untouchedCurrent, 1, 0, 7);
+        assertArrayEquals(new int[] {4, 7, 6, 5, 3, 2, 1, 0}, untouchedCurrent);
     }
 
     @Test

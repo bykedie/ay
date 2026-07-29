@@ -62,6 +62,7 @@ public final class OreVisualizer {
     private double seededRange = -1.0;
     private int seededCenterChunkX = Integer.MIN_VALUE;
     private int seededCenterChunkZ = Integer.MIN_VALUE;
+    private int seededCenterSection = Integer.MIN_VALUE;
     private boolean cacheActive;
     private int cachedVisibleOreCount;
     private int cachedVisibleOreCountTick = Integer.MIN_VALUE;
@@ -125,6 +126,7 @@ public final class OreVisualizer {
         seededRange = -1.0;
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
+        seededCenterSection = Integer.MIN_VALUE;
         cacheActive = false;
         invalidateVisibleOreCount();
     }
@@ -367,12 +369,12 @@ public final class OreVisualizer {
         ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
         int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
+        int centerSection = MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
         if (sameSeedState(seededWorld == mc.world, seededRadiusChunks, seededRange,
-                seededCenterChunkX, seededCenterChunkZ, radiusChunks, cacheRange,
-                centerChunkX, centerChunkZ)) return;
+                seededCenterChunkX, seededCenterChunkZ, seededCenterSection, radiusChunks,
+                cacheRange, centerChunkX, centerChunkZ, centerSection)) return;
         pruneQueue(centerChunkX, centerChunkZ, cacheRange);
         pruneScannedChunks(centerChunkX, centerChunkZ, cacheRange);
-        int centerSection = MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
         for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
             for (int dz = -radiusChunks; dz <= radiusChunks; dz++) {
                 long key = ChunkPos.asLong(centerChunkX + dx, centerChunkZ + dz);
@@ -381,12 +383,14 @@ public final class OreVisualizer {
                 if (chunk != null) queueCachedChunk(mc.world, chunk, centerSection);
             }
         }
+        prioritizeRemainingSections(centerSection);
         prioritizeQueue(mc.player.posX, mc.player.posZ);
         seededWorld = mc.world;
         seededRadiusChunks = radiusChunks;
         seededRange = cacheRange;
         seededCenterChunkX = centerChunkX;
         seededCenterChunkZ = centerChunkZ;
+        seededCenterSection = centerSection;
         validationDelay = 0;
     }
 
@@ -408,10 +412,11 @@ public final class OreVisualizer {
     }
 
     static boolean sameSeedState(boolean sameWorld, int previousRadius, double previousRange,
-            int previousChunkX, int previousChunkZ, int radius, double range,
-            int chunkX, int chunkZ) {
+            int previousChunkX, int previousChunkZ, int previousSection, int radius, double range,
+            int chunkX, int chunkZ, int section) {
         return sameWorld && previousRadius == radius && Double.compare(previousRange, range) == 0
-            && previousChunkX == chunkX && previousChunkZ == chunkZ;
+            && previousChunkX == chunkX && previousChunkZ == chunkZ
+            && previousSection == section;
     }
 
     static int chunkSearchRadius(double range) {
@@ -440,6 +445,7 @@ public final class OreVisualizer {
         seededRange = -1.0;
         seededCenterChunkX = Integer.MIN_VALUE;
         seededCenterChunkZ = Integer.MIN_VALUE;
+        seededCenterSection = Integer.MIN_VALUE;
         cacheActive = false;
         invalidateVisibleOreCount();
     }
@@ -460,6 +466,34 @@ public final class OreVisualizer {
             if (index < sectionCount && center + offset < sectionCount) order[index++] = center + offset;
         }
         return order;
+    }
+
+    private void prioritizeRemainingSections(int centerSection) {
+        for (ScanTask task : scanQueue) {
+            prioritizeRemainingSections(
+                task.sectionOrder, task.sectionCursor, task.blockCursor, centerSection);
+        }
+    }
+
+    static void prioritizeRemainingSections(int[] order, int sectionCursor, int blockCursor,
+            int centerSection) {
+        if (order == null || order.length < 2) return;
+        int from = MathHelper.clamp(sectionCursor + (blockCursor > 0 ? 1 : 0), 0, order.length);
+        for (int index = from; index < order.length - 1; index++) {
+            int best = index;
+            for (int candidate = index + 1; candidate < order.length; candidate++) {
+                int candidateDistance = Math.abs(order[candidate] - centerSection);
+                int bestDistance = Math.abs(order[best] - centerSection);
+                if (candidateDistance < bestDistance
+                        || candidateDistance == bestDistance && order[candidate] < order[best]) {
+                    best = candidate;
+                }
+            }
+            if (best == index) continue;
+            int section = order[index];
+            order[index] = order[best];
+            order[best] = section;
+        }
     }
 
     private void prioritizeQueue(double playerX, double playerZ) {

@@ -379,3 +379,11 @@
 - Iteration 3: squared the resulting threshold once for comparison, retaining the existing squared-distance queue representation.
 - Iteration 4: kept all tasks already nearer than the resumed task ahead without performing an unnecessary square root.
 - Iteration 5: covered both the origin boundary and a resumed task ten blocks away, where the old approximation was most visibly too strict.
+
+## Version 1.10.79 Auto Mining Vertical Scan Reprioritization Update
+
+- Iteration 1: added the player's current vertical section to the ore-cache seed state so same-chunk vertical movement can refresh scan priority.
+- Iteration 2: reordered only the unscanned tail of each queued chunk task around the new height.
+- Iteration 3: kept a partially scanned section fixed at the front, preventing duplicate block reads or lost cursor progress.
+- Iteration 4: used the original nearest-section ordering rule, preferring the lower section first when two heights are equally distant.
+- Iteration 5: retained fully scanned chunks and horizontal queue state while making nearby ores at the new height appear sooner.
