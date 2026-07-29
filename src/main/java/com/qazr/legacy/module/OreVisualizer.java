@@ -251,23 +251,35 @@ public final class OreVisualizer {
         if (mc.player == null || mc.world == null) return Collections.emptyList();
         if (limit <= 0) return Collections.emptyList();
         double rangeSq = range * range;
+        EnumMap<OreType, Boolean> eligibleTypes = new EnumMap<>(OreType.class);
+        for (OreType type : OreType.values()) {
+            eligibleTypes.put(type, mineTypeEligible(ModConfig.isMineOreEnabled(type),
+                typeFilter == null || typeFilter.test(type)));
+        }
         PriorityQueue<CachedOre> nearest = new PriorityQueue<>((left, right) ->
             compareCachedOres(right, left));
         for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
-            if (!chunkPossiblyInRange(entry.getKey(), mc.player.posX, mc.player.posZ, range)) continue;
+            double chunkDistanceSq = chunkHorizontalDistanceSq(
+                entry.getKey(), mc.player.posX, mc.player.posZ);
+            double farthestDistanceSq = nearest.isEmpty()
+                ? Double.POSITIVE_INFINITY : nearest.peek().distanceSq();
+            if (chunkCannotImproveNearest(chunkDistanceSq, rangeSq, nearest.size(), limit,
+                    farthestDistanceSq)) continue;
             List<OreMarker> markers = entry.getValue();
             for (OreMarker marker : markers) {
-                if (!mineTypeEligible(ModConfig.isMineOreEnabled(marker.type),
-                        typeFilter == null || typeFilter.test(marker.type))) continue;
-                if (positionFilter != null && !positionFilter.test(marker.pos)) continue;
+                if (!eligibleTypes.getOrDefault(marker.type, false)) continue;
                 double distanceSq = distanceSq(marker.pos);
                 if (distanceSq > rangeSq) continue;
-                CachedOre candidate = new CachedOre(marker.pos, marker.type, distanceSq);
+                double farthestCandidateDistanceSq = nearest.isEmpty()
+                    ? Double.POSITIVE_INFINITY : nearest.peek().distanceSq();
+                if (distanceCannotImproveNearest(distanceSq, nearest.size(), limit,
+                        farthestCandidateDistanceSq)) continue;
+                if (positionFilter != null && !positionFilter.test(marker.pos)) continue;
                 if (nearest.size() < limit) {
-                    nearest.add(candidate);
-                } else if (compareCachedOres(candidate, nearest.peek()) < 0) {
+                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
+                } else if (candidatePrecedesFarthest(distanceSq, marker.pos, nearest.peek())) {
                     nearest.remove();
-                    nearest.add(candidate);
+                    nearest.add(new CachedOre(marker.pos, marker.type, distanceSq));
                 }
             }
         }
@@ -283,6 +295,12 @@ public final class OreVisualizer {
     static int compareCachedOres(CachedOre left, CachedOre right) {
         int distance = Double.compare(left.distanceSq(), right.distanceSq());
         return distance != 0 ? distance : Long.compare(left.pos().toLong(), right.pos().toLong());
+    }
+
+    static boolean candidatePrecedesFarthest(double distanceSq, BlockPos pos, CachedOre farthest) {
+        int distance = Double.compare(distanceSq, farthest.distanceSq());
+        return distance != 0
+            ? distance < 0 : Long.compare(pos.toLong(), farthest.pos().toLong()) < 0;
     }
 
     public void removeMarker(BlockPos pos) {
@@ -518,6 +536,30 @@ public final class OreVisualizer {
         double dz = playerZ < minZ ? minZ - playerZ : playerZ > maxZ ? playerZ - maxZ : 0.0;
         double padded = range + 1.5;
         return dx * dx + dz * dz <= padded * padded;
+    }
+
+    static double chunkHorizontalDistanceSq(long key, double playerX, double playerZ) {
+        int chunkX = (int) key;
+        int chunkZ = (int) (key >> 32);
+        double minX = chunkX * 16.0 + 0.5;
+        double maxX = minX + 15.0;
+        double minZ = chunkZ * 16.0 + 0.5;
+        double maxZ = minZ + 15.0;
+        double dx = playerX < minX ? minX - playerX : playerX > maxX ? playerX - maxX : 0.0;
+        double dz = playerZ < minZ ? minZ - playerZ : playerZ > maxZ ? playerZ - maxZ : 0.0;
+        return dx * dx + dz * dz;
+    }
+
+    static boolean chunkCannotImproveNearest(double chunkDistanceSq, double rangeSq,
+            int candidateCount, int limit, double farthestDistanceSq) {
+        return chunkDistanceSq > rangeSq
+            || distanceCannotImproveNearest(
+                chunkDistanceSq, candidateCount, limit, farthestDistanceSq);
+    }
+
+    static boolean distanceCannotImproveNearest(double distanceSq, int candidateCount,
+            int limit, double farthestDistanceSq) {
+        return candidateCount >= limit && distanceSq > farthestDistanceSq;
     }
 
     private void appendChunkMarkers(long key, List<OreMarker> markers) {

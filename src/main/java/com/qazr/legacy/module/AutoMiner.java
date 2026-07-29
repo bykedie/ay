@@ -2184,11 +2184,9 @@ public final class AutoMiner {
     }
 
     private List<OreVisualizer.CachedOre> cachedMineCandidates() {
-        EnumMap<OreType, Boolean> availableTypes = new EnumMap<>(OreType.class);
-        for (OreType type : OreType.values()) availableTypes.put(type, !quotaReached(type));
         return prioritizeCurrentVein(oreVisualizer.cachedMineOres(
             ModConfig.minePathRange, MAX_CACHED_TARGETS,
-            type -> availableTypes.getOrDefault(type, false),
+            type -> !quotaReached(type),
             pos -> !targetTemporarilyUnavailable(pos)));
     }
 

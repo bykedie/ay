@@ -259,3 +259,11 @@
 - Iteration 3: invalidated the candidate snapshot as soon as its tick bucket expires, allowing newly scanned ore to wake path selection at the intended cache boundary.
 - Iteration 4: kept player feet-cell changes as an immediate refresh condition, so movement never waits for the old snapshot's remaining ticks.
 - Iteration 5: preserved planning-state motion damping during the deferred retry without consuming the longer empty-search delay or starting a duplicate path search.
+
+## Version 1.10.64 Auto Mining Nearest Candidate Query Update
+
+- Iteration 1: cached ore-type enablement and quota eligibility once per nearest-candidate query instead of re-evaluating them for every cached marker.
+- Iteration 2: added an exact horizontal lower bound based on possible ore block centers, skipping chunks that lie outside the configured three-dimensional search radius.
+- Iteration 3: skipped a full chunk once its nearest possible block center is strictly farther than the filled nearest-candidate heap, while retaining equal-distance chunks for stable coordinate tie-breaking.
+- Iteration 4: rejected individual markers that cannot improve a filled heap before consulting the target-cooldown predicate, reducing hot-map lookups in dense caches.
+- Iteration 5: constructed `CachedOre` objects only for candidates that actually enter the nearest heap, preserving the existing distance and coordinate ordering with less allocation pressure.

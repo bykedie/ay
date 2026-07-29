@@ -116,6 +116,10 @@ public class OreVisualizerTest {
         assertEquals(forward.get(0).pos(), reverse.get(0).pos());
         assertEquals(forward.get(1).pos(), reverse.get(1).pos());
         assertTrue(OreVisualizer.compareCachedOres(forward.get(0), forward.get(1)) < 0);
+        assertTrue(OreVisualizer.candidatePrecedesFarthest(24.0, second.pos(), first));
+        assertTrue(!OreVisualizer.candidatePrecedesFarthest(26.0, first.pos(), second));
+        assertEquals(OreVisualizer.compareCachedOres(first, second) < 0,
+            OreVisualizer.candidatePrecedesFarthest(first.distanceSq(), first.pos(), second));
     }
 
     @Test
@@ -153,6 +157,24 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(0, 0), 8.0, 8.0, 16.0));
         assertTrue(OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(1, 0), 8.0, 8.0, 16.0));
         assertTrue(!OreVisualizer.chunkPossiblyInRange(ChunkPos.asLong(4, 0), 8.0, 8.0, 16.0));
+        assertEquals(0.0,
+            OreVisualizer.chunkHorizontalDistanceSq(ChunkPos.asLong(0, 0), 8.0, 8.0), 0.0);
+        assertEquals(2.25,
+            OreVisualizer.chunkHorizontalDistanceSq(ChunkPos.asLong(0, 0), -1.0, 8.0), 0.0);
+        assertEquals(4.5,
+            OreVisualizer.chunkHorizontalDistanceSq(ChunkPos.asLong(0, 0), -1.0, -1.0), 0.0);
+        assertEquals(0.25,
+            OreVisualizer.chunkHorizontalDistanceSq(ChunkPos.asLong(-1, 0), 0.0, 8.0), 0.0);
+        assertTrue(OreVisualizer.chunkCannotImproveNearest(257.0, 256.0, 0, 96,
+            Double.POSITIVE_INFINITY));
+        assertTrue(!OreVisualizer.chunkCannotImproveNearest(256.0, 256.0, 0, 96,
+            Double.POSITIVE_INFINITY));
+        assertTrue(!OreVisualizer.chunkCannotImproveNearest(100.0, 256.0, 95, 96, 64.0));
+        assertTrue(OreVisualizer.chunkCannotImproveNearest(100.0, 256.0, 96, 96, 64.0));
+        assertTrue(!OreVisualizer.chunkCannotImproveNearest(64.0, 256.0, 96, 96, 64.0));
+        assertTrue(!OreVisualizer.distanceCannotImproveNearest(100.0, 95, 96, 64.0));
+        assertTrue(OreVisualizer.distanceCannotImproveNearest(100.0, 96, 96, 64.0));
+        assertTrue(!OreVisualizer.distanceCannotImproveNearest(64.0, 96, 96, 64.0));
     }
 
     private static int totalLines(Set<BlockPos> positions) {
