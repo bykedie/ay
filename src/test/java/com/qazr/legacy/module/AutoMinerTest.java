@@ -649,13 +649,15 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.reusePathCandidateSnapshot(Arrays.asList(
             new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0))));
         BlockPos feet = new BlockPos(1, 64, 1);
-        assertTrue(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 8, feet, feet));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 5L, 8, 8, feet, feet));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 9, feet, feet));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(4L, 4L, 8, 8, feet, feet.east()));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east()));
         assertTrue(AutoMiner.continuePathRetryDelay(20, 4L, 4L));
         assertFalse(AutoMiner.continuePathRetryDelay(20, 4L, 5L));
         assertFalse(AutoMiner.continuePathRetryDelay(0, 4L, 4L));
+        assertTrue(AutoMiner.pathRetryInterruptedByMarkerChange(20, 4L, 5L));
+        assertFalse(AutoMiner.pathRetryInterruptedByMarkerChange(20, 4L, 4L));
+        assertFalse(AutoMiner.pathRetryInterruptedByMarkerChange(0, 4L, 5L));
         assertFalse(AutoMiner.routeComparisonExpired(0));
         assertFalse(AutoMiner.routeComparisonExpired(3));
         assertTrue(AutoMiner.routeComparisonExpired(4));

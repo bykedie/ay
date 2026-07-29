@@ -243,3 +243,11 @@
 - Iteration 3: retained a separate 16384-block visualization budget, keeping four-section loading throughput when auto mining is disabled instead of applying the stricter mining budget globally.
 - Iteration 4: added an in-section block cursor so a future or reduced budget can resume at the exact next block without rescanning an earlier portion of the section.
 - Iteration 5: kept the existing task-visit bound alongside the block budget, so empty sections cannot turn zero block reads into an unbounded scan-queue traversal.
+
+## Version 1.10.62 Auto Mining Candidate Refresh Coalescing Update
+
+- Iteration 1: stopped normal ore-scan marker revisions from rebuilding the nearest-96 candidate heap every client tick, restoring the intended four-tick candidate-cache interval during initial scanning.
+- Iteration 2: retained immediate cache invalidation for target labels, quota reservations, cooldown changes and player feet-cell movement, so behavioral state transitions are not delayed by the coalescing interval.
+- Iteration 3: detected marker changes that interrupt an empty-path retry and invalidated the candidate cache before selection, allowing a newly scanned ore to wake the miner without entering another 20-tick wait.
+- Iteration 4: kept in-progress A* snapshots stable when unrelated markers arrive, avoiding repeated path-search resets while the shared cache is still filling.
+- Iteration 5: removed the redundant per-candidate-cache marker revision state and covered retry wake-up separately, making the refresh rules explicit rather than coupling every marker mutation to heap reconstruction.

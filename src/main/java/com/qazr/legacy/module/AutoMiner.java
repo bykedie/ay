@@ -144,7 +144,6 @@ public final class AutoMiner {
     private int routeCorridorCacheIndex = -1;
     private BlockPos routeCorridorCacheStart;
     private List<OreVisualizer.CachedOre> currentCandidateCache = java.util.Collections.emptyList();
-    private long currentCandidateMarkerRevision = Long.MIN_VALUE;
     private int currentCandidateTickBucket = Integer.MIN_VALUE;
     private BlockPos currentCandidateFeet;
 
@@ -221,6 +220,10 @@ public final class AutoMiner {
             return;
         }
         long markerRevision = oreVisualizer.markerRevision();
+        if (pathRetryInterruptedByMarkerChange(
+                pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
+            invalidateCurrentCandidateCache();
+        }
         if (continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
             pathRetryDelay--;
             mc.player.motionX = planningMotion(mc.player.motionX);
@@ -1224,6 +1227,11 @@ public final class AutoMiner {
         return delay > 0 && scheduledRevision == currentRevision;
     }
 
+    static boolean pathRetryInterruptedByMarkerChange(
+            int delay, long scheduledRevision, long currentRevision) {
+        return delay > 0 && scheduledRevision != currentRevision;
+    }
+
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
         return !routeFound && failedCandidates >= MAX_FAILED_CANDIDATES_PER_SNAPSHOT;
     }
@@ -2177,28 +2185,25 @@ public final class AutoMiner {
     }
 
     private List<OreVisualizer.CachedOre> currentMineCandidates() {
-        long markerRevision = oreVisualizer.markerRevision();
         int tickBucket = mc.player.ticksExisted / 4;
         BlockPos feet = miningPlayerFeet;
-        if (!reuseCurrentCandidateCache(currentCandidateMarkerRevision, markerRevision,
+        if (!reuseCurrentCandidateCache(
                 currentCandidateTickBucket, tickBucket, currentCandidateFeet, feet)) {
             currentCandidateCache = cachedMineCandidates();
-            currentCandidateMarkerRevision = markerRevision;
             currentCandidateTickBucket = tickBucket;
             currentCandidateFeet = feet == null ? null : feet.toImmutable();
         }
         return currentCandidateCache;
     }
 
-    static boolean reuseCurrentCandidateCache(long cachedRevision, long currentRevision,
-            int cachedTickBucket, int currentTickBucket, BlockPos cachedFeet, BlockPos currentFeet) {
-        return cachedRevision == currentRevision && cachedTickBucket == currentTickBucket
+    static boolean reuseCurrentCandidateCache(int cachedTickBucket, int currentTickBucket,
+            BlockPos cachedFeet, BlockPos currentFeet) {
+        return cachedTickBucket == currentTickBucket
             && java.util.Objects.equals(cachedFeet, currentFeet);
     }
 
     private void invalidateCurrentCandidateCache() {
         currentCandidateCache = java.util.Collections.emptyList();
-        currentCandidateMarkerRevision = Long.MIN_VALUE;
         currentCandidateTickBucket = Integer.MIN_VALUE;
         currentCandidateFeet = null;
     }
