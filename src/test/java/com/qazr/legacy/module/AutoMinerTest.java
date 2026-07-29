@@ -938,6 +938,7 @@ public class AutoMinerTest {
             false, newOre, OreType.GOLD, oldOre, OreType.IRON));
         assertTrue(AutoMiner.routeBlockerOwnership(true, true, false));
         assertFalse(AutoMiner.routeBlockerOwnership(false, true, false));
+        assertTrue(AutoMiner.routeBlockerOwnership(false, true, true));
         assertTrue(AutoMiner.routeBlockerOwnership(false, false, true));
         assertFalse(AutoMiner.routeBlockerOwnership(true, false, false));
         assertTrue(AutoMiner.completionAwaitsRoute(

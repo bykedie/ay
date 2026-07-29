@@ -531,7 +531,7 @@ public final class AutoMiner {
             clearMiningTarget();
             return false;
         }
-        mine(target);
+        mine(target, miningRouteBlocker);
         return true;
     }
 

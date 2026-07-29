@@ -563,3 +563,11 @@
 - Iteration 3: entered the existing posture, face, visibility, and exposure checks in the same tick.
 - Iteration 4: retained landing confirmation for descents and exact node-center checks for turns and vertical steps.
 - Iteration 5: covered one-node and longer completed routes alongside active and zero-node route states.
+
+## Version 1.10.102 Auto Mining Blocker Chain Update
+
+- Iteration 1: reproduced a blocker ray changing to a nearer ore during continued route clearing.
+- Iteration 2: propagated explicit route-blocker ownership through the continued mining entry point.
+- Iteration 3: retained the original queued route target while the blocker chain changes ore positions.
+- Iteration 4: kept ordinary direct mining on the unowned path so unrelated targets cannot inherit the route.
+- Iteration 5: covered same-target inheritance, explicit cross-target propagation, replacement, and ordinary mining states.
