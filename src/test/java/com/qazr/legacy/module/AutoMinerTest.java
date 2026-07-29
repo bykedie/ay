@@ -520,6 +520,8 @@ public class AutoMinerTest {
 
         assertTrue(AutoMiner.connectedToLabeledVein(
             labeled.up().east(), OreType.IRON, labels, OreType.IRON));
+        assertTrue(AutoMiner.connectedToLabeledVein(
+            labeled.down().west().north(), OreType.IRON, labels, OreType.IRON));
         assertFalse(AutoMiner.connectedToLabeledVein(
             labeled.add(2, 0, 0), OreType.IRON, labels, OreType.IRON));
         assertFalse(AutoMiner.connectedToLabeledVein(

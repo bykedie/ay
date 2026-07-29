@@ -331,3 +331,11 @@
 - Iteration 3: granted a fresh bounded recovery after the player genuinely reaches a different navigation cell.
 - Iteration 4: retained target changes as a separate ownership boundary, so a stall history from one ore never penalizes another ore.
 - Iteration 5: kept route-node completion as the explicit stable-progress reset while ordinary distance updates only reset the 30-tick timer.
+
+## Version 1.10.73 Auto Mining Vein Extension Lookup Update
+
+- Iteration 1: replaced full-label-map scans for every unlabeled candidate with a fixed neighborhood lookup around that candidate.
+- Iteration 2: bounded each connectivity decision to the 26 adjacent ore positions regardless of the active vein's total size.
+- Iteration 3: preserved face, edge and corner connectivity exactly, including negative-coordinate diagonal neighbors, using one reusable mutable coordinate cursor.
+- Iteration 4: retained the existing same-type and already-labeled guards before any neighborhood work.
+- Iteration 5: removed dense-vein quadratic comparisons from the per-tick direct-mining fallback without changing queue ownership.

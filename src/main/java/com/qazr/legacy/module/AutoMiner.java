@@ -2412,8 +2412,16 @@ public final class AutoMiner {
             Map<BlockPos, Integer> labels, OreType labelType) {
         if (candidate == null || candidateType == null || candidateType != labelType
                 || labels == null || labels.isEmpty() || labels.containsKey(candidate)) return false;
-        for (BlockPos labeled : labels.keySet()) {
-            if (sameVein(labeled, candidate, labelType, candidateType)) return true;
+        BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    neighbor.setPos(candidate.getX() + dx, candidate.getY() + dy,
+                        candidate.getZ() + dz);
+                    if (labels.containsKey(neighbor)) return true;
+                }
+            }
         }
         return false;
     }
