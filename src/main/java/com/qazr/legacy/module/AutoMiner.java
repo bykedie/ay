@@ -96,6 +96,7 @@ public final class AutoMiner {
         new HashMap<>();
     private final List<OreVisualizer.CachedOre> labeledVisibilityCandidates =
         new ArrayList<>(MAX_CACHED_TARGETS);
+    private List<OreVisualizer.CachedOre> labeledVisibilityCandidateSource;
     private List<BlockPos> path = java.util.Collections.emptyList();
     private BlockPos currentOre;
     private OreType currentOreType;
@@ -2675,18 +2676,22 @@ public final class AutoMiner {
 
     private MineTarget findVisibleLabeledTarget(List<OreVisualizer.CachedOre> candidates) {
         if (targetLabels.isEmpty()) return null;
-        labeledVisibilityCandidates.clear();
-        for (OreVisualizer.CachedOre candidate : candidates) {
-            int label = targetLabels.getOrDefault(candidate.pos(), Integer.MAX_VALUE);
-            if (label != Integer.MAX_VALUE && !targetTemporarilyUnavailable(candidate.pos())) {
-                labeledVisibilityCandidates.add(candidate);
+        if (!reuseLabeledVisibilityCandidates(
+                labeledVisibilityCandidateSource, candidates, true)) {
+            labeledVisibilityCandidates.clear();
+            for (OreVisualizer.CachedOre candidate : candidates) {
+                int label = targetLabels.getOrDefault(candidate.pos(), Integer.MAX_VALUE);
+                if (label != Integer.MAX_VALUE && !targetTemporarilyUnavailable(candidate.pos())) {
+                    labeledVisibilityCandidates.add(candidate);
+                }
             }
+            labeledVisibilityCandidates.sort((left, right) -> {
+                int label = Integer.compare(targetLabels.getOrDefault(left.pos(), Integer.MAX_VALUE),
+                    targetLabels.getOrDefault(right.pos(), Integer.MAX_VALUE));
+                return label != 0 ? label : OreVisualizer.compareCachedOres(left, right);
+            });
+            labeledVisibilityCandidateSource = candidates;
         }
-        labeledVisibilityCandidates.sort((left, right) -> {
-            int label = Integer.compare(targetLabels.getOrDefault(left.pos(), Integer.MAX_VALUE),
-                targetLabels.getOrDefault(right.pos(), Integer.MAX_VALUE));
-            return label != 0 ? label : OreVisualizer.compareCachedOres(left, right);
-        });
         int candidateCount = labeledVisibilityCandidates.size();
         int inspections = labeledVisibilityInspectionCount(candidateCount, MAX_VISIBLE_TARGETS);
         int fixed = fixedLabeledVisibilityInspections(candidateCount, MAX_VISIBLE_TARGETS,
@@ -2734,6 +2739,11 @@ public final class AutoMiner {
     static int advanceLabeledVisibilityCursor(int cursor, int rotatingCount, int inspected) {
         if (rotatingCount <= 0 || inspected <= 0) return 0;
         return Math.floorMod(cursor + inspected, rotatingCount);
+    }
+
+    static boolean reuseLabeledVisibilityCandidates(List<OreVisualizer.CachedOre> previous,
+            List<OreVisualizer.CachedOre> current, boolean labelsPresent) {
+        return labelsPresent && previous != null && previous == current;
     }
 
     static boolean cachedOreStillPresent(OreType cached, OreType actual) {
@@ -2854,6 +2864,7 @@ public final class AutoMiner {
     private void targetLabelsChanged() {
         labeledVisibilityCursor = 0;
         labeledVisibilityCandidates.clear();
+        labeledVisibilityCandidateSource = null;
         invalidateCurrentCandidateCache();
     }
 

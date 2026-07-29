@@ -1061,6 +1061,12 @@ public class AutoMinerTest {
         assertEquals(4, AutoMiner.labeledVisibilityInspectionCount(20, 4));
         assertEquals(-1, AutoMiner.labeledVisibilityIndex(16, candidateCount, limit, fixed, 0));
         assertEquals(0, AutoMiner.advanceLabeledVisibilityCursor(8, 0, 8));
+        List<OreVisualizer.CachedOre> snapshot = new java.util.ArrayList<>();
+        assertTrue(AutoMiner.reuseLabeledVisibilityCandidates(snapshot, snapshot, true));
+        assertFalse(AutoMiner.reuseLabeledVisibilityCandidates(
+            snapshot, new java.util.ArrayList<>(snapshot), true));
+        assertFalse(AutoMiner.reuseLabeledVisibilityCandidates(snapshot, snapshot, false));
+        assertFalse(AutoMiner.reuseLabeledVisibilityCandidates(null, snapshot, true));
     }
 
     @Test

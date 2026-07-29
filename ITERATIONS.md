@@ -467,3 +467,11 @@
 - Iteration 3: retained the existing same-bucket marker coalescing behavior during active scanning.
 - Iteration 4: preserved immediate invalidation for labels, cooldowns, quota reservations, manual takeover and control-panel pauses.
 - Iteration 5: covered movement, marker changes, feet-cell changes and same-bucket coalescing independently.
+
+## Version 1.10.90 Auto Mining Labeled Visibility Cache Update
+
+- Iteration 1: cached the filtered and label-sorted visible candidate list for the current nearest-96 snapshot.
+- Iteration 2: reused that ordered list across direct-mining ticks instead of filtering and sorting the same vein repeatedly.
+- Iteration 3: retained the fixed nearest-eight plus rotating-tail inspection schedule unchanged.
+- Iteration 4: invalidated the ordered list whenever labels change or a new candidate snapshot is produced.
+- Iteration 5: covered identity reuse, replacement snapshots, missing labels and uninitialized state independently.
