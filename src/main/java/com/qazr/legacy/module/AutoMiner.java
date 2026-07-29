@@ -1910,13 +1910,24 @@ public final class AutoMiner {
     }
 
     private void pruneBlockedTargets(int currentTick) {
-        if (pruneExpiredTargets(blockedTargetsUntil, currentTick)) invalidateCurrentCandidateCache();
+        refreshAfterCooldownExpiry(pruneExpiredTargets(blockedTargetsUntil, currentTick));
     }
 
     private void pruneRejectedBlocks(int currentTick) {
         boolean targetsChanged = pruneExpiredTargets(rejectedTargetsUntil, currentTick);
-        pruneExpiredTargets(rejectedObstaclesUntil, currentTick);
-        if (targetsChanged) invalidateCurrentCandidateCache();
+        boolean obstaclesChanged = pruneExpiredTargets(rejectedObstaclesUntil, currentTick);
+        refreshAfterCooldownExpiry(targetsChanged || obstaclesChanged);
+    }
+
+    private void refreshAfterCooldownExpiry(boolean cooldownExpired) {
+        pathRetryDelay = retryDelayAfterCooldownExpiry(pathRetryDelay, cooldownExpired);
+        if (!cooldownExpired) return;
+        resetPathCandidateBatch();
+        invalidateCurrentCandidateCache();
+    }
+
+    static int retryDelayAfterCooldownExpiry(int delay, boolean cooldownExpired) {
+        return cooldownExpired ? 0 : delay;
     }
 
     static boolean pruneExpiredTargets(Map<BlockPos, Integer> targets, int currentTick) {

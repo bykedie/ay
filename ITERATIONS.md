@@ -291,3 +291,11 @@
 - Iteration 3: stopped horizontal route motion before clearing a newly non-standable path node, preventing the action delay from carrying the player into the obstacle.
 - Iteration 4: restarted routes after player displacement or transient path-structure changes without hiding a nearby target for the 100-tick failed-route window.
 - Iteration 5: retained target cooldown only when a completed mining stand cannot produce a valid seven-sample hit or movement records 30 consecutive ticks without meaningful progress.
+
+## Version 1.10.68 Auto Mining Cooldown Expiry Wake-Up Update
+
+- Iteration 1: made blocked-target cooldown expiry cancel any remaining empty-path retry delay instead of waiting up to another 20 ticks.
+- Iteration 2: applied the same wake-up to rejected mining targets and runtime obstacle cells, covering every automatic retry source.
+- Iteration 3: discarded the in-progress path-candidate snapshot when a cooldown expires so a newly eligible target is not omitted until the old batch completes.
+- Iteration 4: discarded cached A* traversal and clearance costs from the cooldown window, allowing a newly clearable obstacle to participate in a fresh search immediately.
+- Iteration 5: invalidated the nearest-candidate snapshot atomically with path state while leaving ticks with no expiry completely untouched.

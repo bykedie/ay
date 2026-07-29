@@ -585,6 +585,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.pruneExpiredTargets(blocked, 119));
         assertTrue(AutoMiner.pruneExpiredTargets(blocked, 120));
         assertTrue(blocked.isEmpty());
+        assertEquals(20, AutoMiner.retryDelayAfterCooldownExpiry(20, false));
+        assertEquals(0, AutoMiner.retryDelayAfterCooldownExpiry(20, true));
+        assertEquals(-1, AutoMiner.retryDelayAfterCooldownExpiry(-1, false));
         assertFalse(AutoMiner.pruneExpiredTargets(null, 100));
         assertFalse(AutoMiner.extendTargetCooldown(null, failed, 100));
         assertFalse(AutoMiner.extendTargetCooldown(blocked, null, 100));
