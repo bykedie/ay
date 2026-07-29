@@ -34,6 +34,12 @@ public class OreVisualizerTest {
     public void autoMineUsesASmallerPerTickScanBudget() {
         assertEquals(12, OreVisualizer.scanBudget(false));
         assertEquals(2, OreVisualizer.scanBudget(true));
+        assertEquals(16384, OreVisualizer.scanBlockBudget(false));
+        assertEquals(4096, OreVisualizer.scanBlockBudget(true));
+        assertEquals(1024, OreVisualizer.scanSliceChecks(0, 4096, 1024));
+        assertEquals(1096, OreVisualizer.scanSliceChecks(3000, 4096, 4096));
+        assertEquals(0, OreVisualizer.scanSliceChecks(4096, 4096, 1024));
+        assertEquals(0, OreVisualizer.scanSliceChecks(0, 4096, 0));
     }
 
     @Test

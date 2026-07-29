@@ -41,6 +41,9 @@ import org.lwjgl.opengl.GL11;
 public final class OreVisualizer {
     private static final int VISUALIZER_SECTIONS_PER_TICK = 12;
     private static final int AUTO_MINE_SECTIONS_PER_TICK = 2;
+    private static final int SECTION_BLOCK_COUNT = 16 * 16 * 16;
+    private static final int VISUALIZER_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT * 4;
+    private static final int AUTO_MINE_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT;
     private static final int VALIDATION_MARKERS_PER_PASS = 128;
     private static final double BOX_INSET = 0.002;
 
@@ -138,14 +141,17 @@ public final class OreVisualizer {
             seededWorld = null;
         }
         seedLoadedChunks();
-        int remaining = scanBudget(modules.isEnabled(ModuleId.AUTO_MINE));
-        while (remaining-- > 0 && !scanQueue.isEmpty()) {
+        boolean autoMineEnabled = modules.isEnabled(ModuleId.AUTO_MINE);
+        int remainingTasks = scanBudget(autoMineEnabled);
+        int remainingBlocks = scanBlockBudget(autoMineEnabled);
+        while (remainingTasks-- > 0 && remainingBlocks > 0 && !scanQueue.isEmpty()) {
             ScanTask task = scanQueue.removeFirst();
             queuedChunks.remove(task.key);
             if (task.world != mc.world || !task.chunk.isLoaded()) {
                 continue;
             }
-            appendChunkMarkers(task.key, task.scanNextSection());
+            appendChunkMarkers(task.key, task.scanNextBlocks(remainingBlocks));
+            remainingBlocks -= task.lastScanChecks;
             if (task.isComplete()) {
                 scannedChunks.add(task.key);
             } else {
@@ -372,6 +378,15 @@ public final class OreVisualizer {
 
     static int scanBudget(boolean autoMineEnabled) {
         return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
+    }
+
+    static int scanBlockBudget(boolean autoMineEnabled) {
+        return autoMineEnabled ? AUTO_MINE_BLOCKS_PER_TICK : VISUALIZER_BLOCKS_PER_TICK;
+    }
+
+    static int scanSliceChecks(int blockCursor, int blockCount, int budget) {
+        int start = MathHelper.clamp(blockCursor, 0, Math.max(0, blockCount));
+        return Math.min(Math.max(0, budget), Math.max(0, blockCount - start));
     }
 
     static boolean sameSeedState(boolean sameWorld, int previousRadius, double previousRange,
@@ -766,6 +781,8 @@ public final class OreVisualizer {
         private final List<OreMarker> sectionMarkers = new ArrayList<>();
         private final int[] sectionOrder;
         private int sectionCursor;
+        private int blockCursor;
+        private int lastScanChecks;
 
         private ScanTask(World world, Chunk chunk, int centerSection) {
             this.world = world;
@@ -774,22 +791,34 @@ public final class OreVisualizer {
             this.sectionOrder = OreVisualizer.sectionOrder(chunk.getBlockStorageArray().length, centerSection);
         }
 
-        private List<OreMarker> scanNextSection() {
+        private List<OreMarker> scanNextBlocks(int budget) {
             sectionMarkers.clear();
+            lastScanChecks = 0;
             ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
             while (sectionCursor < sectionOrder.length) {
-                ExtendedBlockStorage section = sections[sectionOrder[sectionCursor++]];
-                if (section == null || section.isEmpty()) continue;
+                ExtendedBlockStorage section = sections[sectionOrder[sectionCursor]];
+                if (section == null || section.isEmpty()) {
+                    sectionCursor++;
+                    blockCursor = 0;
+                    continue;
+                }
                 int baseX = chunk.x << 4;
                 int baseY = section.getYLocation();
                 int baseZ = chunk.z << 4;
-                for (int y = 0; y < 16; y++) {
-                    for (int z = 0; z < 16; z++) {
-                        for (int x = 0; x < 16; x++) {
-                            OreType type = OreType.fromBlock(section.get(x, y, z).getBlock());
-                            if (type != null) sectionMarkers.add(new OreMarker(new BlockPos(baseX + x, baseY + y, baseZ + z), type));
-                        }
-                    }
+                int checks = scanSliceChecks(blockCursor, SECTION_BLOCK_COUNT, budget);
+                int end = blockCursor + checks;
+                for (; blockCursor < end; blockCursor++) {
+                    int x = blockCursor & 15;
+                    int z = blockCursor >> 4 & 15;
+                    int y = blockCursor >> 8 & 15;
+                    OreType type = OreType.fromBlock(section.get(x, y, z).getBlock());
+                    if (type != null) sectionMarkers.add(new OreMarker(
+                        new BlockPos(baseX + x, baseY + y, baseZ + z), type));
+                }
+                lastScanChecks = checks;
+                if (blockCursor >= SECTION_BLOCK_COUNT) {
+                    sectionCursor++;
+                    blockCursor = 0;
                 }
                 return sectionMarkers;
             }

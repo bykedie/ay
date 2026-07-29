@@ -235,3 +235,11 @@
 - Iteration 3: restored the ore marker and restarted owned work when a previously missing ore reappears after a chunk gap, instead of treating the entry as an ordinary untouched timeout.
 - Iteration 4: centralized target cooldown writes so every new or extended mining, scaffold and failed-route cooldown immediately invalidates the bounded candidate cache.
 - Iteration 5: made cooldown updates monotonic and batched cache invalidation for failed candidate sets, preventing a shorter retry window from reviving a target early without adding repeated cache rebuilds.
+
+## Version 1.10.61 Auto Mining Ore Scan Budget Update
+
+- Iteration 1: replaced section-count-only throttling with a hard per-tick block-read budget for the shared ore cache, making scan work measurable even when section density varies.
+- Iteration 2: reduced the auto-mining scan ceiling from two complete sections to 4096 block states per tick, halving its previous worst-case scan work while preserving one full-section throughput.
+- Iteration 3: retained a separate 16384-block visualization budget, keeping four-section loading throughput when auto mining is disabled instead of applying the stricter mining budget globally.
+- Iteration 4: added an in-section block cursor so a future or reduced budget can resume at the exact next block without rescanning an earlier portion of the section.
+- Iteration 5: kept the existing task-visit bound alongside the block budget, so empty sections cannot turn zero block reads into an unbounded scan-queue traversal.
