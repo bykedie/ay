@@ -883,6 +883,22 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.routeProgressed(1.0, 1.01));
         assertFalse(AutoMiner.routeStallLimitReached(29));
         assertTrue(AutoMiner.routeStallLimitReached(30));
+        assertFalse(AutoMiner.routeProgressResetsStallRecovery(
+            Double.POSITIVE_INFINITY, 1.0));
+        assertTrue(AutoMiner.routeProgressResetsStallRecovery(1.0, 0.99));
+        BlockPos ore = new BlockPos(4, 20, 7);
+        assertTrue(AutoMiner.stalledRouteReplanAvailable(
+            ore, OreType.IRON, null, null, 0));
+        assertTrue(AutoMiner.stalledRouteReplanAvailable(
+            ore, OreType.IRON, ore, OreType.IRON, 0));
+        assertFalse(AutoMiner.stalledRouteReplanAvailable(
+            ore, OreType.IRON, ore, OreType.IRON, 1));
+        assertTrue(AutoMiner.stalledRouteReplanAvailable(
+            ore.east(), OreType.IRON, ore, OreType.IRON, 1));
+        assertEquals(1, AutoMiner.nextStalledRouteReplanCount(
+            ore, OreType.IRON, null, null, 0));
+        assertEquals(2, AutoMiner.nextStalledRouteReplanCount(
+            ore, OreType.IRON, ore, OreType.IRON, 1));
     }
 
     @Test

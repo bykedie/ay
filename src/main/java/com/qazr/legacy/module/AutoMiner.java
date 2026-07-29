@@ -63,6 +63,7 @@ public final class AutoMiner {
     private static final int FIXED_LABELED_VISIBILITY_INSPECTIONS = 8;
     private static final int BLOCK_VISIBILITY_SAMPLE_COUNT = 7;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
+    private static final int MAX_STALLED_ROUTE_REPLANS = 1;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
     private static final double ROUTE_NODE_REACH_DISTANCE_SQ = 0.04;
     private static final double PRECISE_ROUTE_NODE_REACH_DISTANCE_SQ = 0.01;
@@ -130,6 +131,9 @@ public final class AutoMiner {
     private double miningReachDistance;
     private double lastRouteDistanceSq = Double.POSITIVE_INFINITY;
     private int stalledRouteTicks;
+    private BlockPos stalledRouteOre;
+    private OreType stalledRouteType;
+    private int stalledRouteReplans;
     private OreType targetLabelType;
     private int labeledVisibilityCursor;
     private BlockPos scaffoldPos;
@@ -926,6 +930,7 @@ public final class AutoMiner {
         if (reachedPathNode(actualFeet, next, distanceSq, verticalDistance, reachDistanceSq)
                 && routeLandingConfirmed(descending, mc.player.onGround, verticalDistance)) {
             pathIndex++;
+            resetRouteStallRecovery();
             resetRouteProgress();
             if (pathIndex < path.size()) {
                 followPathToOre(candidates);
@@ -935,11 +940,19 @@ public final class AutoMiner {
             return;
         }
         double nodeDistanceSq = routeNodeDistanceSq(distanceSq, verticalDistance);
+        boolean meaningfulProgress = routeProgressResetsStallRecovery(
+            lastRouteDistanceSq, nodeDistanceSq);
         if (routeProgressed(lastRouteDistanceSq, nodeDistanceSq)) {
             lastRouteDistanceSq = nodeDistanceSq;
             stalledRouteTicks = 0;
+            if (meaningfulProgress) resetRouteStallRecovery();
         } else if (routeStallLimitReached(++stalledRouteTicks)) {
-            coolDownUnusableRouteTarget();
+            if (stalledRouteReplanAvailable(currentOre, currentOreType,
+                    stalledRouteOre, stalledRouteType, stalledRouteReplans)) {
+                replanStalledRoute();
+            } else {
+                coolDownUnusableRouteTarget();
+            }
             return;
         }
         if (waitingForAscendingClearance(from.getY(), next.getY(), physicalFeetY)) {
@@ -989,6 +1002,25 @@ public final class AutoMiner {
 
     static boolean routeStallLimitReached(int stalledTicks) {
         return stalledTicks >= MAX_STALLED_ROUTE_TICKS;
+    }
+
+    static boolean routeProgressResetsStallRecovery(double previousDistanceSq,
+            double currentDistanceSq) {
+        return Double.isFinite(previousDistanceSq)
+            && routeProgressed(previousDistanceSq, currentDistanceSq);
+    }
+
+    static boolean stalledRouteReplanAvailable(BlockPos currentOre, OreType currentType,
+            BlockPos retryOre, OreType retryType, int retries) {
+        return currentOre != null && currentType != null
+            && (!completionOwnsWork(retryOre, retryType, currentOre, currentType)
+                || retries < MAX_STALLED_ROUTE_REPLANS);
+    }
+
+    static int nextStalledRouteReplanCount(BlockPos currentOre, OreType currentType,
+            BlockPos retryOre, OreType retryType, int retries) {
+        return completionOwnsWork(retryOre, retryType, currentOre, currentType)
+            ? Math.max(0, retries) + 1 : 1;
     }
 
     static double routeNodeDistanceSq(double horizontalDistanceSq, double verticalDistance) {
@@ -1901,8 +1933,26 @@ public final class AutoMiner {
         delay = 0;
     }
 
+    private void replanStalledRoute() {
+        BlockPos retryOre = currentOre == null ? null : currentOre.toImmutable();
+        OreType retryType = currentOreType;
+        int retries = nextStalledRouteReplanCount(
+            currentOre, currentOreType, stalledRouteOre, stalledRouteType, stalledRouteReplans);
+        stopRouteMotion();
+        clearPath();
+        stalledRouteOre = retryOre;
+        stalledRouteType = retryType;
+        stalledRouteReplans = retries;
+        pathRetryDelay = 0;
+        delay = 0;
+    }
+
     private void activatePathTarget(PathTarget target) {
         resetPathCandidateBatch();
+        if (!completionOwnsWork(
+                stalledRouteOre, stalledRouteType, target.ore, target.type)) {
+            resetRouteStallRecovery();
+        }
         currentOre = target.ore;
         currentOreType = target.type;
         path = target.path;
@@ -1913,6 +1963,12 @@ public final class AutoMiner {
     private void resetRouteProgress() {
         lastRouteDistanceSq = Double.POSITIVE_INFINITY;
         stalledRouteTicks = 0;
+    }
+
+    private void resetRouteStallRecovery() {
+        stalledRouteOre = null;
+        stalledRouteType = null;
+        stalledRouteReplans = 0;
     }
 
     private void pruneBlockedTargets(int currentTick) {
@@ -1991,6 +2047,7 @@ public final class AutoMiner {
         pathIndex = 0;
         clearScaffoldAssist();
         resetRouteProgress();
+        resetRouteStallRecovery();
         invalidatePlannedObstacleCache();
     }
 

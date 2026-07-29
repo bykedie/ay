@@ -315,3 +315,11 @@
 - Iteration 3: required the extension ore to match the locked ore type, preventing adjacent mixed ores from silently joining the wrong queue.
 - Iteration 4: appended a connected extension to the invisible label set before mining it and reordered the remaining labels by current player distance.
 - Iteration 5: preserved diagonal vein connectivity for ore-cluster ownership while continuing to forbid diagonal player mining positions.
+
+## Version 1.10.71 Auto Mining Route Stall Recovery Update
+
+- Iteration 1: changed the first 30-tick no-progress event from a target-wide failure into a fresh route plan from the player's current feet cell.
+- Iteration 2: retained one recovery attempt per unchanged ore target, preventing an unreachable route from entering an endless replan loop.
+- Iteration 3: treated reaching a route node or making measurable movement as genuine recovery and reset the prior stall ownership.
+- Iteration 4: kept the retry ownership through the initial infinite-distance sample of a rebuilt route, so merely starting the same path cannot erase its retry history.
+- Iteration 5: preserved the existing 100-tick target cooldown only after the rebuilt route to the same ore also makes no progress.
