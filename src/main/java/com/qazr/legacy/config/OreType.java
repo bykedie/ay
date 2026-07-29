@@ -1,7 +1,9 @@
 package com.qazr.legacy.config;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.util.ResourceLocation;
 
@@ -16,6 +18,9 @@ public enum OreType {
     QUARTZ("quartz", "下界石英矿", 0xF2E4D2, "minecraft:quartz_ore");
 
     private static final Map<ResourceLocation, OreType> BY_REGISTRY_NAME = new HashMap<>();
+    private static final Map<Block, OreType> BY_BLOCK = new IdentityHashMap<>();
+    private static final Set<Block> NON_ORE_BLOCKS =
+        java.util.Collections.newSetFromMap(new IdentityHashMap<Block, Boolean>());
 
     static {
         for (OreType type : values()) {
@@ -61,6 +66,14 @@ public enum OreType {
     }
 
     public static OreType fromBlock(Block block) {
-        return block == null ? null : BY_REGISTRY_NAME.get(block.getRegistryName());
+        if (block == null) return null;
+        OreType cached = BY_BLOCK.get(block);
+        if (cached != null || NON_ORE_BLOCKS.contains(block)) return cached;
+        ResourceLocation registryName = block.getRegistryName();
+        if (registryName == null) return null;
+        OreType resolved = BY_REGISTRY_NAME.get(registryName);
+        if (resolved == null) NON_ORE_BLOCKS.add(block);
+        else BY_BLOCK.put(block, resolved);
+        return resolved;
     }
 }

@@ -499,3 +499,11 @@
 - Iteration 3: skipped unchanged same-type markers with bounded ore-type hash lookups.
 - Iteration 4: retained the existing rare replacement path when a scanned position changes ore type.
 - Iteration 5: preserved the 4096-block auto-mining scan budget and covered present, absent, and empty index lookups.
+
+## Version 1.10.94 Auto Mining Ore Type Lookup Update
+
+- Iteration 1: resolved each encountered Block instance once, then retained its ore type in an identity map.
+- Iteration 2: added an identity-based negative cache so common non-ore blocks also avoid repeated registry-name hashing.
+- Iteration 3: retained the existing registry-name table for configuration matching and compatibility.
+- Iteration 4: covered all vanilla ore blocks, lit and unlit redstone, non-ore stone, and null input.
+- Iteration 5: kept lookup initialization lazy so early enum loading cannot capture an uninitialized Minecraft registry.
