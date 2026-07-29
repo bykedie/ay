@@ -463,9 +463,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(19, 20, 64.2, 64, -0.1, false));
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.99, 64, -0.1, true));
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.2, 64, 0.1, false));
-        assertTrue(AutoMiner.stableScaffoldBlock(true, false));
-        assertFalse(AutoMiner.stableScaffoldBlock(true, true));
-        assertFalse(AutoMiner.stableScaffoldBlock(false, false));
+        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true));
     }
 
     @Test
@@ -493,6 +493,14 @@ public class AutoMinerTest {
             AutoMiner.scaffoldHitVec(support, EnumFacing.UP));
         assertEquals(new Vec3d(4.0, 63.5, 7.5),
             AutoMiner.scaffoldHitVec(support, EnumFacing.EAST));
+    }
+
+    @Test
+    public void scaffoldAssistUsesOnlyStableFullHeightBlocks() {
+        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, false, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true));
     }
 
     @Test

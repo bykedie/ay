@@ -755,12 +755,13 @@ public final class AutoMiner {
     private boolean canScaffoldWith(ItemStack stack, BlockPos pos) {
         if (stack.isEmpty() || !(stack.getItem() instanceof ItemBlock)) return false;
         Block block = ((ItemBlock) stack.getItem()).getBlock();
-        return block != null && stableScaffoldBlock(block.getDefaultState().getMaterial().isSolid(),
-            block instanceof BlockFalling) && block.canPlaceBlockAt(mc.world, pos);
+        return block != null && stableScaffoldBlock(
+            block.getDefaultState().getMaterial().isSolid(), block instanceof BlockFalling,
+            block.getDefaultState().isFullCube()) && block.canPlaceBlockAt(mc.world, pos);
     }
 
-    static boolean stableScaffoldBlock(boolean solid, boolean falling) {
-        return solid && !falling;
+    static boolean stableScaffoldBlock(boolean solid, boolean falling, boolean fullCube) {
+        return solid && !falling && fullCube;
     }
 
     private void clearScaffoldAssist() {
