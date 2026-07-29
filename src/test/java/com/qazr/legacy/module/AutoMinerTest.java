@@ -289,6 +289,27 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.miningExposureObstacleAllowed(feet.up(), feet, ore));
         assertFalse(AutoMiner.miningExposureObstacleAllowed(feet.down(), feet, ore));
         assertFalse(AutoMiner.miningExposureObstacleAllowed(ore.north(2), feet, ore));
+        assertTrue(AutoMiner.exposureObstacleUsable(false, true, true, true, false));
+        assertFalse(AutoMiner.exposureObstacleUsable(false, true, false, true, false));
+        assertTrue(AutoMiner.exposureObstacleUsable(false, false, false, true, true));
+        assertFalse(AutoMiner.exposureObstacleUsable(false, false, false, true, false));
+        assertFalse(AutoMiner.exposureObstacleUsable(true, false, false, true, true));
+        assertFalse(AutoMiner.exposureObstacleUsable(false, false, false, false, true));
+
+        Map<BlockPos, Map<BlockPos, Integer>> rejectedStands = new HashMap<>();
+        Map<BlockPos, Integer> stands = new HashMap<>();
+        BlockPos alternateStand = feet.north();
+        stands.put(feet, 20);
+        stands.put(alternateStand, 10);
+        rejectedStands.put(ore, stands);
+        assertTrue(AutoMiner.miningStandTemporarilyUnavailable(
+            rejectedStands, ore, feet, 15));
+        assertFalse(AutoMiner.miningStandTemporarilyUnavailable(
+            rejectedStands, ore, alternateStand, 15));
+        assertTrue(AutoMiner.pruneExpiredMiningStands(rejectedStands, 15));
+        assertEquals(1, rejectedStands.get(ore).size());
+        assertTrue(AutoMiner.pruneExpiredMiningStands(rejectedStands, 20));
+        assertTrue(rejectedStands.isEmpty());
     }
 
     @Test

@@ -92,6 +92,8 @@ public final class AutoMiner {
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedObstaclesUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedScaffoldsUntil = new HashMap<>();
+    private final Map<BlockPos, Map<BlockPos, Integer>> rejectedMiningStandsUntil =
+        new HashMap<>();
     private final List<OreVisualizer.CachedOre> labeledVisibilityCandidates =
         new ArrayList<>(MAX_CACHED_TARGETS);
     private List<BlockPos> path = java.util.Collections.emptyList();
@@ -169,6 +171,7 @@ public final class AutoMiner {
         rejectedTargetsUntil.clear();
         rejectedObstaclesUntil.clear();
         rejectedScaffoldsUntil.clear();
+        rejectedMiningStandsUntil.clear();
         invalidateCurrentCandidateCache();
         clearPendingCompletion();
         clearTargetLabels();
@@ -320,6 +323,7 @@ public final class AutoMiner {
             rejectedTargetsUntil.clear();
             rejectedObstaclesUntil.clear();
             rejectedScaffoldsUntil.clear();
+            rejectedMiningStandsUntil.clear();
             minedCounts.clear();
             lastMinedOre = null;
             lastMinedType = null;
@@ -545,7 +549,8 @@ public final class AutoMiner {
         } else if (clearMiningExposureObstacle(currentOre)) {
             delay = ModConfig.mineDelayTicks;
         } else {
-            coolDownUnusableRouteTarget();
+            rejectMiningStand(currentOre, miningPlayerFeet);
+            restartRouteFromCurrentPosition();
         }
     }
 
@@ -1593,6 +1598,7 @@ public final class AutoMiner {
         for (BlockPos candidate : miningStandCandidates(ore)) {
             if (!safeRemoteMiningStand(candidate, ore)) continue;
             BlockPos stand = standPos(candidate);
+            if (miningStandTemporarilyUnavailable(ore, stand)) continue;
             BlockPos faceNeighbor = miningFaceNeighbor(stand, ore);
             if (canTraverse(stand) && faceNeighbor != null
                     && (isPassable(faceNeighbor) || canClearForCorridor(faceNeighbor))) {
@@ -1779,13 +1785,16 @@ public final class AutoMiner {
         RayTraceResult hit = rayTraceMiningExposureObstacle(miningEyes, miningPlayerFeet, ore);
         if (hit == null) return false;
         BlockPos obstacle = hit.getBlockPos();
-        if (temporarilyBlocked(obstacle, rejectedObstaclesUntil, mc.player.ticksExisted)) {
-            return false;
-        }
         OreType obstacleType = targetType(obstacle);
+        boolean blocked = temporarilyBlocked(
+            obstacle, rejectedObstaclesUntil, mc.player.ticksExisted);
+        boolean reachable = withinMiningReach(miningEyes, obstacle, miningReach());
         if (obstacleType != null) {
-            if (!stableMiningPosition(miningPlayerFeet, obstacle)
-                    || !withinMiningReach(miningEyes, obstacle, miningReach())) return false;
+            if (!exposureObstacleUsable(blocked, true,
+                    stableMiningPosition(miningPlayerFeet, obstacle), reachable, false)) {
+                rejectRouteObstacle(obstacle);
+                return false;
+            }
             if (!targetLabels.containsKey(obstacle) && connectedToLabeledVein(
                     obstacle, obstacleType, targetLabels, targetLabelType)) {
                 targetLabels.put(obstacle.toImmutable(), targetLabels.size() + 1);
@@ -1794,7 +1803,20 @@ public final class AutoMiner {
             mine(new MineTarget(obstacle.toImmutable(), obstacleType, hit.sideHit), true);
             return true;
         }
-        return beginClearingObstacle(obstacle, hit);
+        if (!exposureObstacleUsable(
+                blocked, false, false, reachable, isBreakableBlock(obstacle))) {
+            rejectRouteObstacle(obstacle);
+            return false;
+        }
+        if (beginClearingObstacle(obstacle, hit)) return true;
+        rejectRouteObstacle(obstacle);
+        return false;
+    }
+
+    static boolean exposureObstacleUsable(boolean temporarilyBlocked, boolean ore,
+            boolean stableMiningPosition, boolean withinReach, boolean breakable) {
+        return !temporarilyBlocked && withinReach
+            && (ore ? stableMiningPosition : breakable);
     }
 
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
@@ -2038,7 +2060,10 @@ public final class AutoMiner {
         boolean targetsChanged = pruneExpiredTargets(rejectedTargetsUntil, currentTick);
         boolean obstaclesChanged = pruneExpiredTargets(rejectedObstaclesUntil, currentTick);
         boolean scaffoldsChanged = pruneExpiredTargets(rejectedScaffoldsUntil, currentTick);
-        refreshAfterCooldownExpiry(targetsChanged || obstaclesChanged || scaffoldsChanged);
+        boolean standsChanged = pruneExpiredMiningStands(
+            rejectedMiningStandsUntil, currentTick);
+        refreshAfterCooldownExpiry(
+            targetsChanged || obstaclesChanged || scaffoldsChanged || standsChanged);
     }
 
     private void refreshAfterCooldownExpiry(boolean cooldownExpired) {
@@ -2055,6 +2080,40 @@ public final class AutoMiner {
     static boolean pruneExpiredTargets(Map<BlockPos, Integer> targets, int currentTick) {
         return targets != null
             && targets.entrySet().removeIf(entry -> entry.getValue() <= currentTick);
+    }
+
+    static boolean pruneExpiredMiningStands(
+            Map<BlockPos, Map<BlockPos, Integer>> rejectedStands, int currentTick) {
+        if (rejectedStands == null || rejectedStands.isEmpty()) return false;
+        boolean changed = false;
+        Iterator<Map.Entry<BlockPos, Map<BlockPos, Integer>>> iterator =
+            rejectedStands.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map<BlockPos, Integer> stands = iterator.next().getValue();
+            changed |= pruneExpiredTargets(stands, currentTick);
+            if (stands == null || stands.isEmpty()) iterator.remove();
+        }
+        return changed;
+    }
+
+    private void rejectMiningStand(BlockPos ore, BlockPos stand) {
+        if (ore == null || stand == null) return;
+        Map<BlockPos, Integer> stands = rejectedMiningStandsUntil.computeIfAbsent(
+            ore.toImmutable(), ignored -> new HashMap<>());
+        extendTargetCooldown(
+            stands, stand, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
+    }
+
+    private boolean miningStandTemporarilyUnavailable(BlockPos ore, BlockPos stand) {
+        return miningStandTemporarilyUnavailable(
+            rejectedMiningStandsUntil, ore, stand, mc.player.ticksExisted);
+    }
+
+    static boolean miningStandTemporarilyUnavailable(
+            Map<BlockPos, Map<BlockPos, Integer>> rejectedStands, BlockPos ore, BlockPos stand,
+            int currentTick) {
+        if (rejectedStands == null || ore == null || stand == null) return false;
+        return temporarilyBlocked(stand, rejectedStands.get(ore), currentTick);
     }
 
     private boolean targetTemporarilyUnavailable(BlockPos target) {

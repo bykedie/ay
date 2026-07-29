@@ -403,3 +403,11 @@
 - Iteration 3: skipped cache pruning and the full loaded-chunk radius enumeration when only height changed.
 - Iteration 4: skipped whole-queue horizontal distance sorting and validation-delay resets on the vertical-only path.
 - Iteration 5: retained the full seed refresh whenever the world, range, radius or horizontal chunk changes.
+
+## Version 1.10.82 Auto Mining Endpoint Exposure Route Update
+
+- Iteration 1: changed a final visibility failure into route replanning instead of immediately cooling down the ore target.
+- Iteration 2: recorded the failed endpoint under its exact ore target and feet cell, then excluded only that stand from the next A* search.
+- Iteration 3: retained all other mining stands so the route can immediately try another side or height around the same ore.
+- Iteration 4: cooled only the specific unbreakable, unreachable or already rejected exposure blocker, without adding hypothetical per-stand ray traces during path search.
+- Iteration 5: expired stand rejections after 100 ticks and retained target cooldown only after bounded path search confirms that no valid stand remains.
