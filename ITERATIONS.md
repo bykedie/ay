@@ -275,3 +275,11 @@
 - Iteration 3: preserved labels while their chunks are temporarily unavailable instead of interpreting an unloaded position as a confirmed non-ore block.
 - Iteration 4: removed the label through the existing confirmation path only after stable destruction, while a rollback restores the marker and keeps its original ordering.
 - Iteration 5: consulted the bounded pending-completion queue only for loaded labels whose live ore type disagrees, keeping ordinary large-vein pruning on the fast path.
+
+## Version 1.10.66 Auto Mining Retry Position Ownership Update
+
+- Iteration 1: treated a changed player feet cell as an interruption of an empty-path retry even when the shared ore marker revision is unchanged.
+- Iteration 2: invalidated the old nearest-candidate snapshot before selecting from the new feet cell, allowing nearby ore to be reconsidered immediately.
+- Iteration 3: cancelled the old retry delay on manual takeover instead of freezing its remaining ticks throughout the configured manual-pause window.
+- Iteration 4: applied the same retry and snapshot reset while a screen pauses automation, so closing the panel resumes from current world state.
+- Iteration 5: retained four-tick scan-marker coalescing when the player stays in the same feet cell, preserving the previous heap-rebuild optimization.

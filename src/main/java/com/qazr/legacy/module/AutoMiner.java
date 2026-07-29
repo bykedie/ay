@@ -222,6 +222,8 @@ public final class AutoMiner {
         long markerRevision = oreVisualizer.markerRevision();
         boolean markerChangedDuringRetry = pathRetryInterruptedByMarkerChange(
             pathRetryDelay, pathRetryMarkerRevision, markerRevision);
+        boolean feetChangedDuringRetry = pathRetryInterruptedByFeetChange(
+            pathRetryDelay, currentCandidateFeet, miningPlayerFeet);
         int candidateTickBucket = mc.player.ticksExisted / 4;
         if (markerChangedDuringRetry && reuseCurrentCandidateCache(currentCandidateTickBucket,
                 candidateTickBucket, currentCandidateFeet, miningPlayerFeet)) {
@@ -229,10 +231,11 @@ public final class AutoMiner {
             mc.player.motionZ = planningMotion(mc.player.motionZ);
             return;
         }
-        if (markerChangedDuringRetry) {
+        if (markerChangedDuringRetry || feetChangedDuringRetry) {
             invalidateCurrentCandidateCache();
         }
-        if (continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
+        if (!feetChangedDuringRetry
+                && continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
             pathRetryDelay--;
             mc.player.motionX = planningMotion(mc.player.motionX);
             mc.player.motionZ = planningMotion(mc.player.motionZ);
@@ -1240,6 +1243,11 @@ public final class AutoMiner {
         return delay > 0 && scheduledRevision != currentRevision;
     }
 
+    static boolean pathRetryInterruptedByFeetChange(
+            int delay, BlockPos cachedFeet, BlockPos currentFeet) {
+        return delay > 0 && !java.util.Objects.equals(cachedFeet, currentFeet);
+    }
+
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
         return !routeFound && failedCandidates >= MAX_FAILED_CANDIDATES_PER_SNAPSHOT;
     }
@@ -1949,6 +1957,8 @@ public final class AutoMiner {
     private void stopAutomatedWork(boolean stopMotion) {
         if (stopMotion && mc.player != null) stopRouteMotion();
         if (mc.playerController != null) mc.playerController.resetBlockRemoving();
+        pathRetryDelay = 0;
+        invalidateCurrentCandidateCache();
         clearPath();
         clearTargetLabels();
     }

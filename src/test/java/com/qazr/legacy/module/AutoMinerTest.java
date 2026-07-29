@@ -658,6 +658,11 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.pathRetryInterruptedByMarkerChange(20, 4L, 5L));
         assertFalse(AutoMiner.pathRetryInterruptedByMarkerChange(20, 4L, 4L));
         assertFalse(AutoMiner.pathRetryInterruptedByMarkerChange(0, 4L, 5L));
+        assertTrue(AutoMiner.pathRetryInterruptedByFeetChange(20, feet, feet.east()));
+        assertFalse(AutoMiner.pathRetryInterruptedByFeetChange(20, feet, feet));
+        assertTrue(AutoMiner.pathRetryInterruptedByFeetChange(20, null, feet));
+        assertFalse(AutoMiner.pathRetryInterruptedByFeetChange(20, null, null));
+        assertFalse(AutoMiner.pathRetryInterruptedByFeetChange(0, feet, feet.east()));
         assertFalse(AutoMiner.routeComparisonExpired(0));
         assertFalse(AutoMiner.routeComparisonExpired(3));
         assertTrue(AutoMiner.routeComparisonExpired(4));
