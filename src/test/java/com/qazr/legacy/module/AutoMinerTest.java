@@ -802,6 +802,8 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.pathRetryInterruptedBySelectionChange(20, 4L, 5L));
         assertFalse(AutoMiner.pathRetryInterruptedBySelectionChange(20, 4L, 4L));
         assertFalse(AutoMiner.pathRetryInterruptedBySelectionChange(0, 4L, 5L));
+        assertTrue(AutoMiner.selectionRevisionChanged(4L, 5L));
+        assertFalse(AutoMiner.selectionRevisionChanged(4L, 4L));
         assertFalse(AutoMiner.routeComparisonExpired(0));
         assertFalse(AutoMiner.routeComparisonExpired(3));
         assertTrue(AutoMiner.routeComparisonExpired(4));

@@ -483,3 +483,11 @@
 - Iteration 3: bound nearest-candidate cache reuse to the same selection revision, including same-bucket marker coalescing.
 - Iteration 4: interrupted an empty-route retry immediately when its scheduled selection revision becomes stale.
 - Iteration 5: covered relevant changes, no-op saves, unrelated settings, reloads, and retry/cache invalidation independently.
+
+## Version 1.10.92 Auto Mining Active Selection Refresh Update
+
+- Iteration 1: observed the current auto-mining selection revision at module startup and every enabled tick.
+- Iteration 2: released an active route when path range or candidate eligibility changes outside the control panel.
+- Iteration 3: stopped current block breaking and scaffold assistance before rebuilding selection state.
+- Iteration 4: cleared owned vein labels, candidate snapshots, route motion, and stale action delay together.
+- Iteration 5: retained the existing config-reload listener behavior and covered changed versus unchanged revisions independently.

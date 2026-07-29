@@ -130,6 +130,7 @@ public final class AutoMiner {
     private PathSearch pendingPathSearch;
     private boolean pathSnapshotRefreshRequested;
     private boolean observedEnabled;
+    private long observedSelectionRevision = Long.MIN_VALUE;
     private BlockPos miningPlayerFeet;
     private Vec3d miningEyes;
     private double miningReachDistance;
@@ -172,6 +173,7 @@ public final class AutoMiner {
     }
 
     public void reloadTargets() {
+        observedSelectionRevision = ModConfig.autoMineSelectionRevision();
         delay = 0;
         manualPause = 0;
         minedCounts.clear();
@@ -202,6 +204,12 @@ public final class AutoMiner {
             observedEnabled = true;
         }
         if (mc.player == null || mc.world == null || mc.playerController == null) return;
+        long selectionRevision = ModConfig.autoMineSelectionRevision();
+        if (selectionRevisionChanged(observedSelectionRevision, selectionRevision)) {
+            observedSelectionRevision = selectionRevision;
+            stopAutomatedWork(true);
+            delay = 0;
+        }
         if (mc.currentScreen != null) {
             stopAutomatedWork(true);
             return;
@@ -246,7 +254,6 @@ public final class AutoMiner {
         boolean feetChangedDuringRetry = pathRetryInterruptedByFeetChange(
             pathRetryDelay, currentCandidateFeet, miningPlayerFeet);
         int candidateTickBucket = mc.player.ticksExisted / 4;
-        long selectionRevision = ModConfig.autoMineSelectionRevision();
         boolean selectionChangedDuringRetry = pathRetryInterruptedBySelectionChange(
             pathRetryDelay, pathRetrySelectionRevision, selectionRevision);
         if (markerChangedDuringRetry && reuseCurrentCandidateCache(currentCandidateTickBucket,
@@ -1337,6 +1344,10 @@ public final class AutoMiner {
     static boolean pathRetryInterruptedBySelectionChange(
             int delay, long scheduledRevision, long currentRevision) {
         return delay > 0 && scheduledRevision != currentRevision;
+    }
+
+    static boolean selectionRevisionChanged(long observedRevision, long currentRevision) {
+        return observedRevision != currentRevision;
     }
 
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
