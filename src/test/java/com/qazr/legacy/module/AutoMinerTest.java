@@ -594,6 +594,20 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void scaffoldFailureCooldownDoesNotHideTheMiningTarget() {
+        BlockPos ore = new BlockPos(4, 23, 7);
+        Map<BlockPos, Integer> blockedTargets = new HashMap<>();
+        Map<BlockPos, Integer> rejectedTargets = new HashMap<>();
+        Map<BlockPos, Integer> rejectedScaffolds = new HashMap<>();
+        AutoMiner.extendTargetCooldown(rejectedScaffolds, ore, 120);
+
+        assertFalse(AutoMiner.targetTemporarilyUnavailable(
+            ore, blockedTargets, rejectedTargets, 119));
+        assertTrue(AutoMiner.scaffoldTemporarilyUnavailable(ore, rejectedScaffolds, 119));
+        assertFalse(AutoMiner.scaffoldTemporarilyUnavailable(ore, rejectedScaffolds, 120));
+    }
+
+    @Test
     public void pathFailureCooldownIncludesOnlyTargetsActuallySearchedAndFailed() {
         BlockPos failed = new BlockPos(4, 20, 7);
         BlockPos untouched = new BlockPos(5, 20, 7);

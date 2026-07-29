@@ -68,6 +68,7 @@ public final class AutoMiner {
     private static final double PRECISE_ROUTE_NODE_REACH_DISTANCE_SQ = 0.01;
     private static final int ROUTE_RENDER_LIMIT = 220;
     private static final int SCAFFOLD_TIMEOUT_TICKS = 40;
+    private static final int SCAFFOLD_RETRY_TICKS = 20;
     private static final int SCAFFOLD_ASCENT_RETRY_TICKS = 4;
     private static final int MAX_SCAFFOLD_ATTEMPTS = 5;
     private static final int MAX_ROUTE_VERTICAL_STEP = 1;
@@ -89,6 +90,7 @@ public final class AutoMiner {
     private final Map<BlockPos, Integer> blockedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedObstaclesUntil = new HashMap<>();
+    private final Map<BlockPos, Integer> rejectedScaffoldsUntil = new HashMap<>();
     private final List<OreVisualizer.CachedOre> labeledVisibilityCandidates =
         new ArrayList<>(MAX_CACHED_TARGETS);
     private List<BlockPos> path = java.util.Collections.emptyList();
@@ -161,6 +163,7 @@ public final class AutoMiner {
         blockedTargetsUntil.clear();
         rejectedTargetsUntil.clear();
         rejectedObstaclesUntil.clear();
+        rejectedScaffoldsUntil.clear();
         invalidateCurrentCandidateCache();
         clearPendingCompletion();
         clearTargetLabels();
@@ -311,6 +314,7 @@ public final class AutoMiner {
             blockedTargetsUntil.clear();
             rejectedTargetsUntil.clear();
             rejectedObstaclesUntil.clear();
+            rejectedScaffoldsUntil.clear();
             minedCounts.clear();
             lastMinedOre = null;
             lastMinedType = null;
@@ -556,6 +560,8 @@ public final class AutoMiner {
 
     private boolean beginScaffoldAssist(BlockPos ore, OreType type) {
         if (scaffoldPos != null || ore == null || type == null || targetType(ore) != type
+                || scaffoldTemporarilyUnavailable(ore, rejectedScaffoldsUntil,
+                    mc.player.ticksExisted)
                 || !mc.player.onGround || mc.player.capabilities.isFlying
                 || mc.player.isInWater() || mc.player.isInLava()) return false;
         if (!scaffoldCandidate(miningPlayerFeet, ore, true, isPassable(miningPlayerFeet),
@@ -754,8 +760,8 @@ public final class AutoMiner {
 
     private void failScaffoldAssist() {
         if (scaffoldOre != null) {
-            coolDownCandidate(blockedTargetsUntil, scaffoldOre,
-                mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
+            extendTargetCooldown(rejectedScaffoldsUntil, scaffoldOre,
+                mc.player.ticksExisted + SCAFFOLD_RETRY_TICKS);
         }
         clearScaffoldAssist();
         clearPath();
@@ -1916,7 +1922,8 @@ public final class AutoMiner {
     private void pruneRejectedBlocks(int currentTick) {
         boolean targetsChanged = pruneExpiredTargets(rejectedTargetsUntil, currentTick);
         boolean obstaclesChanged = pruneExpiredTargets(rejectedObstaclesUntil, currentTick);
-        refreshAfterCooldownExpiry(targetsChanged || obstaclesChanged);
+        boolean scaffoldsChanged = pruneExpiredTargets(rejectedScaffoldsUntil, currentTick);
+        refreshAfterCooldownExpiry(targetsChanged || obstaclesChanged || scaffoldsChanged);
     }
 
     private void refreshAfterCooldownExpiry(boolean cooldownExpired) {
@@ -1937,8 +1944,20 @@ public final class AutoMiner {
 
     private boolean targetTemporarilyUnavailable(BlockPos target) {
         int currentTick = mc.player.ticksExisted;
-        return temporarilyBlocked(target, blockedTargetsUntil, currentTick)
-            || temporarilyBlocked(target, rejectedTargetsUntil, currentTick);
+        return targetTemporarilyUnavailable(target, blockedTargetsUntil,
+            rejectedTargetsUntil, currentTick);
+    }
+
+    static boolean targetTemporarilyUnavailable(BlockPos target,
+            Map<BlockPos, Integer> blockedTargets, Map<BlockPos, Integer> rejectedTargets,
+            int currentTick) {
+        return temporarilyBlocked(target, blockedTargets, currentTick)
+            || temporarilyBlocked(target, rejectedTargets, currentTick);
+    }
+
+    static boolean scaffoldTemporarilyUnavailable(BlockPos target,
+            Map<BlockPos, Integer> rejectedScaffolds, int currentTick) {
+        return temporarilyBlocked(target, rejectedScaffolds, currentTick);
     }
 
     private void blockTargets(Iterable<BlockPos> targets, int untilTick) {

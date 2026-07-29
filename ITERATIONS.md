@@ -299,3 +299,11 @@
 - Iteration 3: discarded the in-progress path-candidate snapshot when a cooldown expires so a newly eligible target is not omitted until the old batch completes.
 - Iteration 4: discarded cached A* traversal and clearance costs from the cooldown window, allowing a newly clearable obstacle to participate in a fresh search immediately.
 - Iteration 5: invalidated the nearest-candidate snapshot atomically with path state while leaving ticks with no expiry completely untouched.
+
+## Version 1.10.69 Auto Mining Scaffold Failure Ownership Update
+
+- Iteration 1: separated auxiliary scaffold failures from failed mining routes so a rejected placement no longer hides the ore target for 100 ticks.
+- Iteration 2: added a dedicated 20-tick scaffold-strategy cooldown, preventing immediate jump/place retry loops while leaving direct mining and A* routing available.
+- Iteration 3: applied the dedicated cooldown to placement exhaustion, missing inventory support, column drift, timeout and post-placement visibility failure.
+- Iteration 4: pruned scaffold cooldowns with the other retry sources and woke path selection when the strategy becomes eligible again.
+- Iteration 5: covered the ownership boundary directly: scaffold rejection blocks only scaffold assistance, not the mining target.
