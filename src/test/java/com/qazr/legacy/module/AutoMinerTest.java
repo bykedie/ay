@@ -1005,6 +1005,13 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void completedRouteHandoffStopsResidualHorizontalDrift() {
+        assertEquals(0.0, AutoMiner.routeHandoffMotion(0.04), 0.0);
+        assertEquals(0.0, AutoMiner.routeHandoffMotion(-0.04), 0.0);
+        assertEquals(0.0, AutoMiner.routeHandoffMotion(0.0), 0.0);
+    }
+
+    @Test
     public void routeOwnsItsTargetFromTheFirstNodeUntilArrival() {
         BlockPos ore = new BlockPos(5, 20, 0);
 

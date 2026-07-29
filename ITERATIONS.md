@@ -603,3 +603,11 @@
 - Iteration 3: stopped movement and reused normal replanning when either runtime cell is hazardous.
 - Iteration 4: retained collision-box handling for ordinary non-hazardous passable shapes.
 - Iteration 5: covered safe, hazardous-foot, and hazardous-head runtime stands.
+
+## Version 1.10.107 Auto Mining Endpoint Motion Update
+
+- Iteration 1: reproduced a zero-node route retaining planning-stage horizontal drift when mining began immediately.
+- Iteration 2: moved the stop into the shared endpoint-mining entry point instead of patching one caller.
+- Iteration 3: made zero-node and ordinary final-node handoffs follow the same stop-before-mining order.
+- Iteration 4: retained the existing posture, face-neighbor, visibility, and exposure recovery checks.
+- Iteration 5: covered positive, negative, and already-zero residual horizontal motion.

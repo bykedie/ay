@@ -564,6 +564,7 @@ public final class AutoMiner {
             restartRouteFromCurrentPosition();
             return;
         }
+        stopRouteMotion();
         boolean stablePosition = stableMiningPosition(miningPlayerFeet, currentOre);
         boolean workAreaReady = miningWorkAreaReady(isPassable(miningPlayerFeet),
             isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet));
@@ -1058,6 +1059,10 @@ public final class AutoMiner {
         return Math.abs(slowed) < 0.005 ? 0.0 : slowed;
     }
 
+    static double routeHandoffMotion(double current) {
+        return 0.0;
+    }
+
     static boolean routeProgressed(double previousDistanceSq, double currentDistanceSq) {
         return currentDistanceSq + ROUTE_PROGRESS_EPSILON < previousDistanceSq;
     }
@@ -1179,8 +1184,8 @@ public final class AutoMiner {
     }
 
     private void stopRouteMotion() {
-        mc.player.motionX = 0.0;
-        mc.player.motionZ = 0.0;
+        mc.player.motionX = routeHandoffMotion(mc.player.motionX);
+        mc.player.motionZ = routeHandoffMotion(mc.player.motionZ);
     }
 
     private boolean routeStepClear(double motionX, double motionZ) {
