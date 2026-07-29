@@ -550,15 +550,21 @@ public final class AutoMiner {
     }
 
     private void prepareAndMineCurrentOre() {
-        if (currentOre == null || targetType(currentOre) == null
-                || !stableMiningPosition(miningPlayerFeet, currentOre)
-                || !miningWorkAreaReady(isPassable(miningPlayerFeet),
-                    isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet))) {
+        if (currentOre == null || targetType(currentOre) == null) {
+            restartRouteFromCurrentPosition();
+            return;
+        }
+        boolean stablePosition = stableMiningPosition(miningPlayerFeet, currentOre);
+        boolean workAreaReady = miningWorkAreaReady(isPassable(miningPlayerFeet),
+            isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet));
+        if (endpointRequiresAlternateStand(stablePosition, workAreaReady)) {
+            rejectMiningStand(currentOre, miningPlayerFeet);
             restartRouteFromCurrentPosition();
             return;
         }
         BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, currentOre);
         if (faceNeighbor == null) {
+            rejectMiningStand(currentOre, miningPlayerFeet);
             restartRouteFromCurrentPosition();
             return;
         }
@@ -1705,6 +1711,10 @@ public final class AutoMiner {
 
     static boolean miningWorkAreaReady(boolean feetClear, boolean headClear, boolean supported) {
         return feetClear && headClear && supported;
+    }
+
+    static boolean endpointRequiresAlternateStand(boolean stablePosition, boolean workAreaReady) {
+        return !stablePosition || !workAreaReady;
     }
 
     static List<BlockPos> reconstruct(Map<BlockPos, BlockPos> previous, BlockPos goal) {

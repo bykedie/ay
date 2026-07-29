@@ -531,3 +531,11 @@
 - Iteration 3: retained the endpoint checks for stable footing, head room, support, mining face, visibility, and exposure clearing.
 - Iteration 4: retained immediate replanning when the current cell is no longer a valid mining stand.
 - Iteration 5: covered zero-length, completed, active, and targetless route states with the focused auto-miner test suite.
+
+## Version 1.10.98 Auto Mining Endpoint Posture Update
+
+- Iteration 1: reproduced endpoint replanning that could immediately select the same unusable mining stand again.
+- Iteration 2: separated target validity from the player's final mining posture checks.
+- Iteration 3: rejected only the current ore-and-stand pair when relative position, foot room, head room, or support is invalid.
+- Iteration 4: retained alternate stand searches for the same ore instead of cooling down the entire target.
+- Iteration 5: covered valid posture, invalid relative position, and invalid work-area outcomes in the focused auto-miner tests.
