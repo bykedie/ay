@@ -387,3 +387,11 @@
 - Iteration 3: kept a partially scanned section fixed at the front, preventing duplicate block reads or lost cursor progress.
 - Iteration 4: used the original nearest-section ordering rule, preferring the lower section first when two heights are equally distant.
 - Iteration 5: retained fully scanned chunks and horizontal queue state while making nearby ores at the new height appear sooner.
+
+## Version 1.10.80 Auto Mining Unloaded Validation Guard Update
+
+- Iteration 1: checked chunk availability before reading cached ore positions during background validation.
+- Iteration 2: deferred unavailable chunk tasks instead of interpreting placeholder air as confirmed ore removal.
+- Iteration 3: kept the validation cursor unchanged while deferred, so the same marker resumes when its chunk is available again.
+- Iteration 4: retained fair rotation by moving a deferred task to the end of the insertion-ordered validation queue.
+- Iteration 5: preserved the existing marker-read budget for loaded chunks because deferred tasks consume no block checks.

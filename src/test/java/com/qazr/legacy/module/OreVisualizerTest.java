@@ -100,6 +100,9 @@ public class OreVisualizerTest {
         assertEquals(128, OreVisualizer.validationTaskVisitLimit(500, 128));
         assertEquals(2, OreVisualizer.validationTaskVisitLimit(2, 128));
         assertEquals(0, OreVisualizer.validationTaskVisitLimit(500, 0));
+        assertTrue(OreVisualizer.validationChunkReady(true, true));
+        assertTrue(!OreVisualizer.validationChunkReady(true, false));
+        assertTrue(!OreVisualizer.validationChunkReady(false, true));
         assertTrue(OreVisualizer.reuseVisibleOreCount(20, 20));
         assertTrue(!OreVisualizer.reuseVisibleOreCount(20, 21));
         assertTrue(OreVisualizer.markerRestoreNeeded(OreType.IRON, 0, 0));

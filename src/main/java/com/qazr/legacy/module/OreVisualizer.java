@@ -708,6 +708,11 @@ public final class OreVisualizer {
             iterator.remove();
             List<OreMarker> markers = markersByChunk.get(task.key);
             if (markers == null || markers.isEmpty()) continue;
+            if (!validationChunkReady(mc.world != null,
+                    mc.world != null && mc.world.isBlockLoaded(markers.get(0).pos))) {
+                validationTasks.put(task.key, task);
+                continue;
+            }
             if (task.markerIndex >= markers.size()) task.markerIndex = 0;
             int checks = validationChecksForSlice(markers.size(), task.markerIndex, markerBudget);
             int checked = 0;
@@ -756,6 +761,10 @@ public final class OreVisualizer {
 
     static int validationTaskVisitLimit(int queueSize, int markerBudget) {
         return Math.min(Math.max(0, queueSize), Math.max(0, markerBudget));
+    }
+
+    static boolean validationChunkReady(boolean worldAvailable, boolean chunkLoaded) {
+        return worldAvailable && chunkLoaded;
     }
 
     private void removeQueued(long key) {
