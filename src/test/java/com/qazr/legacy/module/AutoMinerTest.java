@@ -848,6 +848,8 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeProgressed(1.0, 0.99));
         assertFalse(AutoMiner.routeProgressed(1.0, 0.999));
         assertFalse(AutoMiner.routeProgressed(1.0, 1.01));
+        assertFalse(AutoMiner.routeStallLimitReached(29));
+        assertTrue(AutoMiner.routeStallLimitReached(30));
     }
 
     @Test

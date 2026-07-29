@@ -508,17 +508,17 @@ public final class AutoMiner {
                 || !stableMiningPosition(miningPlayerFeet, currentOre)
                 || !miningWorkAreaReady(isPassable(miningPlayerFeet),
                     isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet))) {
-            abandonCurrentRoute();
+            restartRouteFromCurrentPosition();
             return;
         }
         BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, currentOre);
         if (faceNeighbor == null) {
-            abandonCurrentRoute();
+            restartRouteFromCurrentPosition();
             return;
         }
         if (!isPassable(faceNeighbor)) {
             if (!clearCorridorCell(faceNeighbor, faceNeighbor)) {
-                abandonCurrentRoute();
+                rejectClearingObstacleAndReplan(faceNeighbor);
                 return;
             }
             delay = ModConfig.mineDelayTicks;
@@ -528,7 +528,7 @@ public final class AutoMiner {
         if (routedTarget != null) {
             mine(routedTarget);
         } else {
-            abandonCurrentRoute();
+            coolDownUnusableRouteTarget();
         }
     }
 
@@ -766,16 +766,11 @@ public final class AutoMiner {
         if (!mc.world.isBlockLoaded(clearingPos) || isPassable(clearingPos)) return true;
         if (destructionWorkExhausted(clearingAttempts, clearingAttemptBudget,
                 mc.player.ticksExisted, clearingDeadlineTick)) {
-            rejectedObstaclesUntil.put(clearingPos.toImmutable(),
-                mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
-            mc.playerController.resetBlockRemoving();
-            clearPath();
-            delay = 2;
+            rejectClearingObstacleAndReplan(clearingPos);
             return true;
         }
         if (!damageCorridorBlock(clearingPos)) {
-            clearClearingTarget();
-            abandonCurrentRoute();
+            rejectClearingObstacleAndReplan(clearingPos);
             return true;
         }
         delay = ModConfig.mineDelayTicks;
@@ -797,12 +792,22 @@ public final class AutoMiner {
         stopRouteMotion();
         if (delay > 0) delay--;
         if (completionConfirmationExpired(mc.player.ticksExisted, clearingDeadlineTick)) {
-            rejectedObstaclesUntil.put(clearingPos.toImmutable(),
-                mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
-            clearPath();
-            delay = 2;
+            rejectClearingObstacleAndReplan(clearingPos);
         }
         return true;
+    }
+
+    private void rejectClearingObstacleAndReplan(BlockPos obstacle) {
+        rejectRouteObstacle(obstacle);
+        mc.playerController.resetBlockRemoving();
+        stopRouteMotion();
+        restartRouteFromCurrentPosition();
+        delay = 2;
+    }
+
+    private void rejectRouteObstacle(BlockPos obstacle) {
+        extendTargetCooldown(rejectedObstaclesUntil, obstacle,
+            mc.player.ticksExisted + DESTRUCTION_RETRY_TICKS);
     }
 
     static int nextClearingMissingTicks(boolean loaded, boolean passable, int previous) {
@@ -876,7 +881,7 @@ public final class AutoMiner {
         if (routeRequiresSupportRemoval(from, next) && !isPassable(from.down())) {
             stopRouteMotion();
             if (!clearCorridorCell(from.down(), from.down())) {
-                abandonCurrentRoute();
+                rejectClearingObstacleAndReplan(from.down());
                 return;
             }
             delay = ModConfig.mineDelayTicks;
@@ -886,15 +891,16 @@ public final class AutoMiner {
         if (next.getY() > jumpStart.getY() && !isPassable(jumpStart.up(2))) {
             stopRouteMotion();
             if (!clearCorridorCell(jumpStart.up(2), jumpStart.up(2))) {
-                abandonCurrentRoute();
+                rejectClearingObstacleAndReplan(jumpStart.up(2));
                 return;
             }
             delay = ModConfig.mineDelayTicks;
             return;
         }
         if (!isStandable(next)) {
+            stopRouteMotion();
             if (!clearBlockingObstacle(next)) {
-                abandonCurrentRoute();
+                restartRouteFromCurrentPosition();
                 return;
             }
             delay = ModConfig.mineDelayTicks;
@@ -904,7 +910,7 @@ public final class AutoMiner {
         double dz = next.getZ() + 0.5 - mc.player.posZ;
         double distanceSq = dx * dx + dz * dz;
         if (distanceSq > 16.0) {
-            abandonCurrentRoute();
+            restartRouteFromCurrentPosition();
             return;
         }
         double verticalDistance = next.getY() - navigationFeetY;
@@ -926,8 +932,8 @@ public final class AutoMiner {
         if (routeProgressed(lastRouteDistanceSq, nodeDistanceSq)) {
             lastRouteDistanceSq = nodeDistanceSq;
             stalledRouteTicks = 0;
-        } else if (++stalledRouteTicks >= MAX_STALLED_ROUTE_TICKS) {
-            abandonCurrentRoute();
+        } else if (routeStallLimitReached(++stalledRouteTicks)) {
+            coolDownUnusableRouteTarget();
             return;
         }
         if (waitingForAscendingClearance(from.getY(), next.getY(), physicalFeetY)) {
@@ -945,7 +951,7 @@ public final class AutoMiner {
                 if (clearRouteStepObstacle(motionX, motionZ)) {
                     resetRouteProgress();
                 } else {
-                    abandonCurrentRoute();
+                    restartRouteFromCurrentPosition();
                 }
                 return;
             }
@@ -973,6 +979,10 @@ public final class AutoMiner {
 
     static boolean routeProgressed(double previousDistanceSq, double currentDistanceSq) {
         return currentDistanceSq + ROUTE_PROGRESS_EPSILON < previousDistanceSq;
+    }
+
+    static boolean routeStallLimitReached(int stalledTicks) {
+        return stalledTicks >= MAX_STALLED_ROUTE_TICKS;
     }
 
     static double routeNodeDistanceSq(double horizontalDistanceSq, double verticalDistance) {
@@ -1085,10 +1095,13 @@ public final class AutoMiner {
     private boolean clearRouteStepObstacle(double motionX, double motionZ) {
         AxisAlignedBB routeStep = routeStepBounds(mc.player.getEntityBoundingBox(), motionX, motionZ);
         for (BlockPos cell : routeOccupiedCells(routeStep)) {
-            if (!isPassable(cell) && clearCorridorCell(cell, cell)) {
+            if (isPassable(cell)) continue;
+            if (clearCorridorCell(cell, cell)) {
                 delay = ModConfig.mineDelayTicks;
                 return true;
             }
+            rejectRouteObstacle(cell);
+            return false;
         }
         return false;
     }
@@ -1689,8 +1702,16 @@ public final class AutoMiner {
     }
 
     private boolean clearBlockingObstacle(BlockPos next) {
-        if (!isPassable(next.up()) && clearCorridorCell(next.up(), next)) return true;
-        return !isPassable(next) && clearCorridorCell(next, next);
+        if (!isPassable(next.up())) {
+            if (clearCorridorCell(next.up(), next)) return true;
+            rejectRouteObstacle(next.up());
+            return false;
+        }
+        if (!isPassable(next)) {
+            if (clearCorridorCell(next, next)) return true;
+            rejectRouteObstacle(next);
+        }
+        return false;
     }
 
     private boolean clearCorridorCell(BlockPos desired, BlockPos permittedLower) {
@@ -1857,7 +1878,7 @@ public final class AutoMiner {
         return quotaReached && !activeMiningTarget;
     }
 
-    private void abandonCurrentRoute() {
+    private void coolDownUnusableRouteTarget() {
         if (mc.player != null) stopRouteMotion();
         if (currentOre != null) {
             coolDownCandidate(blockedTargetsUntil, currentOre,

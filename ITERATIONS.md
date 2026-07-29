@@ -283,3 +283,11 @@
 - Iteration 3: cancelled the old retry delay on manual takeover instead of freezing its remaining ticks throughout the configured manual-pause window.
 - Iteration 4: applied the same retry and snapshot reset while a screen pauses automation, so closing the panel resumes from current world state.
 - Iteration 5: retained four-tick scan-marker coalescing when the player stays in the same feet cell, preserving the previous heap-rebuild optimization.
+
+## Version 1.10.67 Auto Mining Runtime Obstacle Ownership Update
+
+- Iteration 1: assigned failed runtime clearing to the specific obstacle cell and replanned from the player's current position instead of cooling the target ore.
+- Iteration 2: applied the same obstacle ownership to final mining-face blockers, descent supports, ascent headroom and newly detected swept-player collisions.
+- Iteration 3: stopped horizontal route motion before clearing a newly non-standable path node, preventing the action delay from carrying the player into the obstacle.
+- Iteration 4: restarted routes after player displacement or transient path-structure changes without hiding a nearby target for the 100-tick failed-route window.
+- Iteration 5: retained target cooldown only when a completed mining stand cannot produce a valid seven-sample hit or movement records 30 consecutive ticks without meaningful progress.
