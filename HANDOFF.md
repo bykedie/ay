@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.10.71`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
+Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本为 `1.10.72`。它不是 Meteor addon，也不是高版本 Fabric/Forge 项目；所有功能都基于 Forge 1.12.2、Java 8 和 1.12.2 的 MCP stable 39 映射实现。
 
 用户可见名称已经迁移为 `Voris Hub`，控制面板标题是 `Voris Hub 控制面板`。为了保留旧配置、旧按键记录和安装兼容性，内部仍保留这些历史标识：
 
@@ -25,7 +25,7 @@ Voris Hub 是一个 Minecraft Forge 1.12.2 客户端工具模组，当前版本�
 - Gradle wrapper: `7.6.1`
 - ForgeGradle: `5.1.77`
 - MCP mappings: `stable_39-1.12`
-- 当前发行 JAR: `build/libs/voris-hub-1.10.71.jar`
+- 当前发行 JAR: `build/libs/voris-hub-1.10.72.jar`
 
 Windows 构建命令：
 
@@ -230,9 +230,9 @@ git ls-remote origin refs/heads/main
 
 ## 10. 当前交接状态
 
-截至本文档编写时，项目主功能状态为 `Voris Hub 1.10.71`：
+截至本文档编写时，项目主功能状态为 `Voris Hub 1.10.72`：
 
-- 构建产物名：`voris-hub-1.10.71.jar`
+- 构建产物名：`voris-hub-1.10.72.jar`
 - 面板入口：`·`（Esc 下方的反引号键）
 - 模块快捷键：默认未绑定，由用户自行绑定
 - 目标可视化：默认 `150`，最大 `500`

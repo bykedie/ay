@@ -323,3 +323,11 @@
 - Iteration 3: treated reaching a route node or making measurable movement as genuine recovery and reset the prior stall ownership.
 - Iteration 4: kept the retry ownership through the initial infinite-distance sample of a rebuilt route, so merely starting the same path cannot erase its retry history.
 - Iteration 5: preserved the existing 100-tick target cooldown only after the rebuilt route to the same ore also makes no progress.
+
+## Version 1.10.72 Auto Mining Stall Location Ownership Update
+
+- Iteration 1: bound a route-stall recovery attempt to both the ore target and the player's feet cell where the stall occurred.
+- Iteration 2: prevented tiny within-cell movement from resetting the retry budget and creating repeated route rebuilds at the same obstruction.
+- Iteration 3: granted a fresh bounded recovery after the player genuinely reaches a different navigation cell.
+- Iteration 4: retained target changes as a separate ownership boundary, so a stall history from one ore never penalizes another ore.
+- Iteration 5: kept route-node completion as the explicit stable-progress reset while ordinary distance updates only reset the 30-tick timer.
