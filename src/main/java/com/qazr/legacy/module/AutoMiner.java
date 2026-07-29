@@ -2325,7 +2325,9 @@ public final class AutoMiner {
         int inspected = 0;
         for (OreVisualizer.CachedOre candidate : candidates) {
             if (targetLabels.containsKey(candidate.pos())
-                    || targetTemporarilyUnavailable(candidate.pos())) continue;
+                    || targetTemporarilyUnavailable(candidate.pos())
+                    || !connectedToLabeledVein(candidate.pos(), candidate.type(),
+                        targetLabels, targetLabelType)) continue;
             OreType actual = OreType.fromBlock(mc.world.getBlockState(candidate.pos()).getBlock());
             if (!cachedOreStillPresent(candidate.type(), actual)) {
                 oreVisualizer.reconcileMarker(candidate.pos(), actual);
@@ -2334,10 +2336,28 @@ public final class AutoMiner {
             if (!candidateTypeAvailable(
                     ModConfig.isMineOreEnabled(candidate.type()), quotaReached(candidate.type()))) continue;
             MineTarget visible = visibleTarget(candidate.pos());
-            if (visible != null) return visible;
+            if (visible != null) {
+                if (!targetLabels.containsKey(visible.pos)
+                        && connectedToLabeledVein(visible.pos, visible.type,
+                            targetLabels, targetLabelType)) {
+                    targetLabels.put(visible.pos, targetLabels.size() + 1);
+                    reorderRemainingTargetLabels();
+                }
+                return visible;
+            }
             if (++inspected >= MAX_VISIBLE_TARGETS) break;
         }
         return null;
+    }
+
+    static boolean connectedToLabeledVein(BlockPos candidate, OreType candidateType,
+            Map<BlockPos, Integer> labels, OreType labelType) {
+        if (candidate == null || candidateType == null || candidateType != labelType
+                || labels == null || labels.isEmpty() || labels.containsKey(candidate)) return false;
+        for (BlockPos labeled : labels.keySet()) {
+            if (sameVein(labeled, candidate, labelType, candidateType)) return true;
+        }
+        return false;
     }
 
     static boolean preserveExistingLabelsForVisibleTarget(

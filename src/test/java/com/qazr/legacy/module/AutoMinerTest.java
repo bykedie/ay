@@ -513,6 +513,22 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void onlyNewlyExposedOreConnectedToTheLockedVeinMayJoinItsQueue() {
+        BlockPos labeled = new BlockPos(10, 20, 30);
+        Map<BlockPos, Integer> labels = new HashMap<>();
+        labels.put(labeled, 1);
+
+        assertTrue(AutoMiner.connectedToLabeledVein(
+            labeled.up().east(), OreType.IRON, labels, OreType.IRON));
+        assertFalse(AutoMiner.connectedToLabeledVein(
+            labeled.add(2, 0, 0), OreType.IRON, labels, OreType.IRON));
+        assertFalse(AutoMiner.connectedToLabeledVein(
+            labeled.east(), OreType.GOLD, labels, OreType.IRON));
+        assertFalse(AutoMiner.connectedToLabeledVein(
+            labeled, OreType.IRON, labels, OreType.IRON));
+    }
+
+    @Test
     public void pathPlanningSpreadsUnreachableCandidatesAcrossTicks() {
         assertEquals(128, AutoMiner.pathSearchSliceBudget(0));
         assertEquals(128, AutoMiner.pathSearchSliceBudget(256));

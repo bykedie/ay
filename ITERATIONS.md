@@ -307,3 +307,11 @@
 - Iteration 3: applied the dedicated cooldown to placement exhaustion, missing inventory support, column drift, timeout and post-placement visibility failure.
 - Iteration 4: pruned scaffold cooldowns with the other retry sources and woke path selection when the strategy becomes eligible again.
 - Iteration 5: covered the ownership boundary directly: scaffold rejection blocks only scaffold assistance, not the mining target.
+
+## Version 1.10.70 Auto Mining Vein Queue Ownership Update
+
+- Iteration 1: stopped an unrelated visible ore from replacing the current mining target while a labeled vein is still locked.
+- Iteration 2: retained opportunistic direct mining for newly scanned or newly exposed ore that is physically connected to the active labeled vein.
+- Iteration 3: required the extension ore to match the locked ore type, preventing adjacent mixed ores from silently joining the wrong queue.
+- Iteration 4: appended a connected extension to the invisible label set before mining it and reordered the remaining labels by current player distance.
+- Iteration 5: preserved diagonal vein connectivity for ore-cluster ownership while continuing to forbid diagonal player mining positions.
