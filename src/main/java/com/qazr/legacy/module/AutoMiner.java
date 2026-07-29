@@ -1741,10 +1741,15 @@ public final class AutoMiner {
     }
 
     private boolean isStandable(BlockPos feet) {
-        if (!hasSolidSupport(feet)) return false;
+        if (!routeStandSafe(isHazardousRouteCell(feet), isHazardousRouteCell(feet.up()))
+                || !hasSolidSupport(feet)) return false;
         AxisAlignedBB box = new AxisAlignedBB(feet.getX() + 0.1, feet.getY(), feet.getZ() + 0.1,
             feet.getX() + 0.9, feet.getY() + 1.8, feet.getZ() + 0.9);
         return mc.world.getCollisionBoxes(mc.player, box).isEmpty();
+    }
+
+    static boolean routeStandSafe(boolean hazardousFeet, boolean hazardousHead) {
+        return !hazardousFeet && !hazardousHead;
     }
 
     private boolean canTraverse(BlockPos feet) {
@@ -1820,8 +1825,15 @@ public final class AutoMiner {
 
     private boolean isPassable(BlockPos pos) {
         Material material = mc.world.getBlockState(pos).getMaterial();
-        return routeCellPassable(material.isReplaceable(),
-            material == Material.LAVA || material == Material.FIRE);
+        return routeCellPassable(material.isReplaceable(), hazardousRouteMaterial(material));
+    }
+
+    private boolean isHazardousRouteCell(BlockPos pos) {
+        return hazardousRouteMaterial(mc.world.getBlockState(pos).getMaterial());
+    }
+
+    static boolean hazardousRouteMaterial(Material material) {
+        return material == Material.LAVA || material == Material.FIRE;
     }
 
     static boolean routeCellPassable(boolean replaceable, boolean hazardous) {

@@ -595,3 +595,11 @@
 - Iteration 3: excluded magma blocks and cactus before full-cube and collision-shape acceptance.
 - Iteration 4: retained ordinary full blocks and safe low-collision support surfaces.
 - Iteration 5: covered safe support, hazardous support, and non-support materials.
+
+## Version 1.10.106 Auto Mining Runtime Hazard Update
+
+- Iteration 1: reproduced fire or lava appearing after route validation but before node entry.
+- Iteration 2: rechecked the actual destination foot and head cells during route execution.
+- Iteration 3: stopped movement and reused normal replanning when either runtime cell is hazardous.
+- Iteration 4: retained collision-box handling for ordinary non-hazardous passable shapes.
+- Iteration 5: covered safe, hazardous-foot, and hazardous-head runtime stands.
