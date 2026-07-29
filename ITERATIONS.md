@@ -515,3 +515,11 @@
 - Iteration 3: excluded an inactive all-disabled auto miner from the shared ore-cache range calculation.
 - Iteration 4: let ore visualization continue independently with its own larger scan budget when enabled.
 - Iteration 5: covered default, all-disabled, re-enabled, module-disabled, and cache-budget decisions.
+
+## Version 1.10.96 Auto Mining Path Candidate Origin Update
+
+- Iteration 1: recorded the player feet cell that produced each bounded path-candidate snapshot.
+- Iteration 2: reused an unfinished candidate comparison only while the player remains in that cell.
+- Iteration 3: discarded the pending A* search, best route, failed targets, and comparison timer after a cell change.
+- Iteration 4: rebuilt candidate distance ordering from the new player position in the same selection cycle.
+- Iteration 5: retained active-route control and manual-takeover behavior while covering stable, moved, and empty snapshots.

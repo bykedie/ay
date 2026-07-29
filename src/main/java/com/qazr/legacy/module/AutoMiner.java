@@ -121,6 +121,7 @@ public final class AutoMiner {
     private long pathRetrySelectionRevision = Long.MIN_VALUE;
     private int pathCandidateOffset;
     private List<OreVisualizer.CachedOre> pathCandidateBatch = java.util.Collections.emptyList();
+    private BlockPos pathCandidateFeet;
     private PathTarget pendingPathTarget;
     private final Set<BlockPos> pendingFailedPathTargets = new HashSet<>();
     private int pendingPathTargetScore = Integer.MAX_VALUE;
@@ -293,8 +294,9 @@ public final class AutoMiner {
             return;
         }
         if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentCandidates)) return;
-        List<OreVisualizer.CachedOre> pathCandidates = reusePathCandidateSnapshot(pathCandidateBatch)
-            ? pathCandidateBatch : currentCandidates;
+        List<OreVisualizer.CachedOre> pathCandidates = reusePathCandidateSnapshot(
+            pathCandidateBatch, pathCandidateFeet, miningPlayerFeet)
+                ? pathCandidateBatch : currentCandidates;
         followPathToOre(pathCandidates);
     }
 
@@ -1210,8 +1212,13 @@ public final class AutoMiner {
     }
 
     private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
+        if (!pathCandidateBatch.isEmpty() && !reusePathCandidateSnapshot(
+                pathCandidateBatch, pathCandidateFeet, miningPlayerFeet)) {
+            resetPathCandidateBatch();
+        }
         if (pathCandidateBatch.isEmpty()) {
             pathCandidateBatch = snapshotPathCandidates(candidates, MAX_CACHED_TARGETS);
+            pathCandidateFeet = miningPlayerFeet == null ? null : miningPlayerFeet.toImmutable();
             pathCandidateOffset = 0;
         }
         if (pendingPathTarget != null) {
@@ -1363,6 +1370,12 @@ public final class AutoMiner {
 
     static boolean reusePathCandidateSnapshot(List<OreVisualizer.CachedOre> snapshot) {
         return snapshot != null && !snapshot.isEmpty();
+    }
+
+    static boolean reusePathCandidateSnapshot(List<OreVisualizer.CachedOre> snapshot,
+            BlockPos snapshotFeet, BlockPos currentFeet) {
+        return reusePathCandidateSnapshot(snapshot)
+            && java.util.Objects.equals(snapshotFeet, currentFeet);
     }
 
     static boolean temporarilyBlocked(BlockPos candidate, Map<BlockPos, Integer> blockedUntil,
@@ -2456,6 +2469,7 @@ public final class AutoMiner {
     private void resetPathCandidateBatch() {
         pathCandidateOffset = 0;
         pathCandidateBatch = java.util.Collections.emptyList();
+        pathCandidateFeet = null;
         pendingPathTarget = null;
         pendingPathTargetScore = Integer.MAX_VALUE;
         pendingPathTargetSameVein = false;
