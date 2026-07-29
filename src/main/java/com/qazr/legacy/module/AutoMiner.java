@@ -17,7 +17,9 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 import net.minecraft.block.Block;
+import net.minecraft.block.BlockCactus;
 import net.minecraft.block.BlockFalling;
+import net.minecraft.block.BlockMagma;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
@@ -1786,7 +1788,12 @@ public final class AutoMiner {
         IBlockState support = mc.world.getBlockState(supportPos);
         boolean materialSupport = !support.getMaterial().isReplaceable()
             && support.getMaterial().blocksMovement();
-        if (!materialSupport || support.isFullCube()) return materialSupport;
+        boolean hazardousSupport = support.getBlock() instanceof BlockMagma
+            || support.getBlock() instanceof BlockCactus;
+        if (!routeSupportSafe(materialSupport, hazardousSupport)) {
+            return false;
+        }
+        if (support.isFullCube()) return true;
         double feetY = feet.getY();
         AxisAlignedBB column = new AxisAlignedBB(feet.getX() + 0.1, feetY - 0.999,
             feet.getZ() + 0.1, feet.getX() + 0.9, feetY + 1.8, feet.getZ() + 0.9);
@@ -1800,6 +1807,10 @@ public final class AutoMiner {
             if (box.maxY > feetY + 0.001) intrudesAbove = true;
         }
         return routeSupportShapeUsable(materialSupport, false, collisionBelow, intrudesAbove);
+    }
+
+    static boolean routeSupportSafe(boolean materialSupport, boolean hazardousSupport) {
+        return materialSupport && !hazardousSupport;
     }
 
     static boolean routeSupportShapeUsable(boolean materialSupport, boolean fullCube,

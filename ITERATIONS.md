@@ -587,3 +587,11 @@
 - Iteration 3: excluded fire and lava from A* traversal, endpoint posture, and route execution checks.
 - Iteration 4: retained water and ordinary replaceable blocks so underwater mining remains available.
 - Iteration 5: covered safe replaceable, hazardous replaceable, and solid non-replaceable cells.
+
+## Version 1.10.105 Auto Mining Hazardous Support Update
+
+- Iteration 1: reproduced solid magma and cactus blocks passing the route support test.
+- Iteration 2: separated physical support from whether that support is safe to stand on.
+- Iteration 3: excluded magma blocks and cactus before full-cube and collision-shape acceptance.
+- Iteration 4: retained ordinary full blocks and safe low-collision support surfaces.
+- Iteration 5: covered safe support, hazardous support, and non-support materials.

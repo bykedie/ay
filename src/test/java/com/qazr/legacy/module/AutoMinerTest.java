@@ -326,6 +326,9 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeCellPassable(true, false));
         assertFalse(AutoMiner.routeCellPassable(true, true));
         assertFalse(AutoMiner.routeCellPassable(false, false));
+        assertTrue(AutoMiner.routeSupportSafe(true, false));
+        assertFalse(AutoMiner.routeSupportSafe(true, true));
+        assertFalse(AutoMiner.routeSupportSafe(false, false));
         assertTrue(AutoMiner.miningWorkAreaReady(true, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, false, true));
