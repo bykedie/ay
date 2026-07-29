@@ -491,3 +491,11 @@
 - Iteration 3: stopped current block breaking and scaffold assistance before rebuilding selection state.
 - Iteration 4: cleared owned vein labels, candidate snapshots, route motion, and stale action delay together.
 - Iteration 5: retained the existing config-reload listener behavior and covered changed versus unchanged revisions independently.
+
+## Version 1.10.93 Auto Mining Scan Slice Index Update
+
+- Iteration 1: reused the existing per-ore encoded-position sets while merging partial chunk scan results.
+- Iteration 2: replaced a new whole-chunk temporary index allocation on every non-empty scan slice.
+- Iteration 3: skipped unchanged same-type markers with bounded ore-type hash lookups.
+- Iteration 4: retained the existing rare replacement path when a scanned position changes ore type.
+- Iteration 5: preserved the 4096-block auto-mining scan budget and covered present, absent, and empty index lookups.

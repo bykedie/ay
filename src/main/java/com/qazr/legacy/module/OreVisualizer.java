@@ -622,44 +622,29 @@ public final class OreVisualizer {
     }
 
     private boolean mergeScannedMarkers(List<OreMarker> stored, List<OreMarker> scanned) {
-        Map<Long, Integer> indexes = new HashMap<>(Math.max(16, stored.size() * 2));
-        boolean duplicates = false;
-        for (int index = 0; index < stored.size(); index++) {
-            if (indexes.put(stored.get(index).pos.toLong(), index) != null) duplicates = true;
-        }
         boolean changed = false;
-        if (duplicates) {
-            Map<Long, OreMarker> compacted = new LinkedHashMap<>();
-            for (OreMarker marker : stored) compacted.put(marker.pos.toLong(), marker);
-            for (OreMarker marker : stored) removeTypeMarker(marker);
-            stored.clear();
-            stored.addAll(compacted.values());
-            indexes.clear();
-            for (int index = 0; index < stored.size(); index++) {
-                OreMarker marker = stored.get(index);
-                indexes.put(marker.pos.toLong(), index);
-                addTypeMarker(marker);
-            }
-            changed = true;
-        }
         for (OreMarker marker : scanned) {
             long key = marker.pos.toLong();
-            Integer index = indexes.get(key);
-            OreMarker existing = index == null ? null : stored.get(index);
-            if (!scannedMarkerChangesCache(index != null,
-                    existing == null ? null : existing.type, marker.type)) continue;
-            if (index == null) {
-                indexes.put(key, stored.size());
+            OreType storedType = cachedMarkerType(markerSetsByType, key);
+            if (!scannedMarkerChangesCache(storedType != null, storedType, marker.type)) continue;
+            if (storedType == null) {
                 stored.add(marker);
                 addTypeMarker(marker);
             } else {
-                removeTypeMarker(existing);
-                stored.set(index, marker);
-                addTypeMarker(marker);
+                mergeMarker(stored, marker);
             }
             changed = true;
         }
         return changed;
+    }
+
+    static OreType cachedMarkerType(Map<OreType, Set<Long>> markersByType, long position) {
+        if (markersByType == null || markersByType.isEmpty()) return null;
+        for (OreType type : OreType.values()) {
+            Set<Long> markers = markersByType.get(type);
+            if (markers != null && markers.contains(position)) return type;
+        }
+        return null;
     }
 
     static boolean scannedMarkerChangesCache(boolean positionPresent, OreType storedType,

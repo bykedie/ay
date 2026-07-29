@@ -3,8 +3,10 @@ package com.qazr.legacy.module;
 import com.qazr.legacy.config.OreType;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -45,6 +47,19 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.mineTypeEligible(true, true));
         assertTrue(!OreVisualizer.mineTypeEligible(true, false));
         assertTrue(!OreVisualizer.mineTypeEligible(false, true));
+    }
+
+    @Test
+    public void scannedSlicesReuseTheExistingTypePositionIndex() {
+        Map<OreType, Set<Long>> markersByType = new EnumMap<>(OreType.class);
+        Set<Long> iron = new HashSet<>();
+        long position = new BlockPos(3, 12, -4).toLong();
+        iron.add(position);
+        markersByType.put(OreType.IRON, iron);
+
+        assertEquals(OreType.IRON, OreVisualizer.cachedMarkerType(markersByType, position));
+        assertEquals(null, OreVisualizer.cachedMarkerType(markersByType, position + 1));
+        assertEquals(null, OreVisualizer.cachedMarkerType(null, position));
     }
 
     @Test
