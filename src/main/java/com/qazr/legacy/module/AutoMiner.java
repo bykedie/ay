@@ -92,7 +92,7 @@ public final class AutoMiner {
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedObstaclesUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedScaffoldsUntil = new HashMap<>();
-    private final Map<BlockPos, Map<BlockPos, Integer>> rejectedMiningStandsUntil =
+    private final Map<BlockPos, RejectedMiningStands> rejectedMiningStandsUntil =
         new HashMap<>();
     private final List<OreVisualizer.CachedOre> labeledVisibilityCandidates =
         new ArrayList<>(MAX_CACHED_TARGETS);
@@ -402,6 +402,7 @@ public final class AutoMiner {
             minedCounts.put(pending.type, minedCount(pending.type) + 1);
             lastMinedOre = pending.pos;
             lastMinedType = pending.type;
+            rejectedMiningStandsUntil.remove(pending.pos);
             oreVisualizer.reconcileMarker(pending.pos, remainingType);
             if (targetLabels.remove(pending.pos) != null) targetLabelsChanged();
             boolean ownsCurrentWork = completionOwnsWork(pending.pos, pending.type,
@@ -2092,37 +2093,51 @@ public final class AutoMiner {
     }
 
     static boolean pruneExpiredMiningStands(
-            Map<BlockPos, Map<BlockPos, Integer>> rejectedStands, int currentTick) {
+            Map<BlockPos, RejectedMiningStands> rejectedStands, int currentTick) {
         if (rejectedStands == null || rejectedStands.isEmpty()) return false;
         boolean changed = false;
-        Iterator<Map.Entry<BlockPos, Map<BlockPos, Integer>>> iterator =
+        Iterator<Map.Entry<BlockPos, RejectedMiningStands>> iterator =
             rejectedStands.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map<BlockPos, Integer> stands = iterator.next().getValue();
-            changed |= pruneExpiredTargets(stands, currentTick);
-            if (stands == null || stands.isEmpty()) iterator.remove();
+            RejectedMiningStands rejected = iterator.next().getValue();
+            changed |= rejected != null && pruneExpiredTargets(rejected.stands, currentTick);
+            if (rejected == null || rejected.stands.isEmpty()) {
+                iterator.remove();
+                changed = true;
+            }
         }
         return changed;
     }
 
     private void rejectMiningStand(BlockPos ore, BlockPos stand) {
         if (ore == null || stand == null) return;
-        Map<BlockPos, Integer> stands = rejectedMiningStandsUntil.computeIfAbsent(
-            ore.toImmutable(), ignored -> new HashMap<>());
+        OreType type = targetType(ore);
+        if (type == null) return;
+        RejectedMiningStands rejected = rejectedMiningStandsUntil.get(ore);
+        if (rejected == null || rejected.type != type) {
+            rejected = new RejectedMiningStands(type);
+            rejectedMiningStandsUntil.put(ore.toImmutable(), rejected);
+        }
         extendTargetCooldown(
-            stands, stand, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
+            rejected.stands, stand, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
     }
 
     private boolean miningStandTemporarilyUnavailable(BlockPos ore, BlockPos stand) {
         return miningStandTemporarilyUnavailable(
-            rejectedMiningStandsUntil, ore, stand, mc.player.ticksExisted);
+            rejectedMiningStandsUntil, ore, stand, targetType(ore), mc.player.ticksExisted);
     }
 
     static boolean miningStandTemporarilyUnavailable(
-            Map<BlockPos, Map<BlockPos, Integer>> rejectedStands, BlockPos ore, BlockPos stand,
-            int currentTick) {
+            Map<BlockPos, RejectedMiningStands> rejectedStands, BlockPos ore, BlockPos stand,
+            OreType currentType, int currentTick) {
         if (rejectedStands == null || ore == null || stand == null) return false;
-        return temporarilyBlocked(stand, rejectedStands.get(ore), currentTick);
+        RejectedMiningStands rejected = rejectedStands.get(ore);
+        if (rejected == null) return false;
+        if (rejected.type != currentType) {
+            rejectedStands.remove(ore);
+            return false;
+        }
+        return temporarilyBlocked(stand, rejected.stands, currentTick);
     }
 
     private boolean targetTemporarilyUnavailable(BlockPos target) {
@@ -3115,6 +3130,15 @@ public final class AutoMiner {
             this.pos = pos;
             this.type = type;
             this.side = side;
+        }
+    }
+
+    static final class RejectedMiningStands {
+        final OreType type;
+        final Map<BlockPos, Integer> stands = new HashMap<>();
+
+        RejectedMiningStands(OreType type) {
+            this.type = type;
         }
     }
 

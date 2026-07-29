@@ -435,3 +435,11 @@
 - Iteration 3: removed the contradictory requirement that the ore must be outside raw vanilla reach before the raise.
 - Iteration 4: retained the raised-eye vanilla reach check and exact raised-position ray trace before any jump or placement.
 - Iteration 5: rejected targets that are already stable, occupy the raised player space or remain too high after one block.
+
+## Version 1.10.86 Auto Mining Endpoint Identity Update
+
+- Iteration 1: bound failed endpoint stands to both the ore position and its current ore type.
+- Iteration 2: discarded a stored stand rejection immediately when the same position contains a different ore type.
+- Iteration 3: removed all endpoint rejections for a position after server-confirmed mining completes there.
+- Iteration 4: retained independent expiry for each stand while removing the empty typed container atomically.
+- Iteration 5: prevented a replacement ore from inheriting the previous block's 100-tick endpoint history.

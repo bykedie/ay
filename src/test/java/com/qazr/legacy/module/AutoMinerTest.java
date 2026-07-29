@@ -296,18 +296,27 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.exposureObstacleUsable(true, false, false, true, true));
         assertFalse(AutoMiner.exposureObstacleUsable(false, false, false, false, true));
 
-        Map<BlockPos, Map<BlockPos, Integer>> rejectedStands = new HashMap<>();
-        Map<BlockPos, Integer> stands = new HashMap<>();
+        Map<BlockPos, AutoMiner.RejectedMiningStands> rejectedStands = new HashMap<>();
+        AutoMiner.RejectedMiningStands stands =
+            new AutoMiner.RejectedMiningStands(OreType.IRON);
         BlockPos alternateStand = feet.north();
-        stands.put(feet, 20);
-        stands.put(alternateStand, 10);
+        stands.stands.put(feet, 20);
+        stands.stands.put(alternateStand, 10);
         rejectedStands.put(ore, stands);
         assertTrue(AutoMiner.miningStandTemporarilyUnavailable(
-            rejectedStands, ore, feet, 15));
+            rejectedStands, ore, feet, OreType.IRON, 15));
         assertFalse(AutoMiner.miningStandTemporarilyUnavailable(
-            rejectedStands, ore, alternateStand, 15));
+            rejectedStands, ore, alternateStand, OreType.IRON, 15));
         assertTrue(AutoMiner.pruneExpiredMiningStands(rejectedStands, 15));
-        assertEquals(1, rejectedStands.get(ore).size());
+        assertEquals(1, rejectedStands.get(ore).stands.size());
+        assertFalse(AutoMiner.miningStandTemporarilyUnavailable(
+            rejectedStands, ore, feet, OreType.GOLD, 15));
+        assertTrue(rejectedStands.isEmpty());
+
+        AutoMiner.RejectedMiningStands expiring =
+            new AutoMiner.RejectedMiningStands(OreType.IRON);
+        expiring.stands.put(feet, 20);
+        rejectedStands.put(ore, expiring);
         assertTrue(AutoMiner.pruneExpiredMiningStands(rejectedStands, 20));
         assertTrue(rejectedStands.isEmpty());
     }
