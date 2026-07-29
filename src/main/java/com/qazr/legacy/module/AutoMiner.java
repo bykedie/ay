@@ -2418,15 +2418,33 @@ public final class AutoMiner {
 
     private void pruneTargetLabels() {
         if (targetLabels.isEmpty()) return;
-        boolean changed = targetLabels.entrySet().removeIf(entry -> !labelOreStillPresent(
-            targetLabelType, OreType.fromBlock(mc.world.getBlockState(entry.getKey()).getBlock()),
-            targetLabelType != null && ModConfig.isMineOreEnabled(targetLabelType)));
+        boolean configured = targetLabelType != null
+            && ModConfig.isMineOreEnabled(targetLabelType);
+        boolean changed = targetLabels.entrySet().removeIf(entry -> {
+            boolean loaded = mc.world.isBlockLoaded(entry.getKey());
+            OreType actual = loaded
+                ? OreType.fromBlock(mc.world.getBlockState(entry.getKey()).getBlock()) : null;
+            boolean pendingConfirmation = loaded && actual != targetLabelType
+                && pendingCompletionPreservesLabel(entry.getKey(), targetLabelType);
+            return !labelOreStillPresent(targetLabelType, actual, configured, loaded,
+                pendingConfirmation);
+        });
         if (targetLabels.isEmpty()) targetLabelType = null;
         if (changed) targetLabelsChanged();
     }
 
-    static boolean labelOreStillPresent(OreType expected, OreType actual, boolean configured) {
-        return configured && expected != null && expected == actual;
+    private boolean pendingCompletionPreservesLabel(BlockPos pos, OreType type) {
+        for (PendingCompletion pending : pendingCompletions) {
+            if (pending.world == mc.world && pending.absenceObserved
+                    && completionOwnsWork(pending.pos, pending.type, pos, type)) return true;
+        }
+        return false;
+    }
+
+    static boolean labelOreStillPresent(OreType expected, OreType actual, boolean configured,
+            boolean loaded, boolean pendingConfirmation) {
+        return configured && expected != null
+            && (!loaded || expected == actual || pendingConfirmation);
     }
 
     private void clearTargetLabels() {

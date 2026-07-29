@@ -691,9 +691,18 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.GOLD));
         assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, null));
-        assertTrue(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.IRON, true));
-        assertFalse(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.GOLD, true));
-        assertFalse(AutoMiner.labelOreStillPresent(OreType.IRON, OreType.IRON, false));
+        assertTrue(AutoMiner.labelOreStillPresent(
+            OreType.IRON, OreType.IRON, true, true, false));
+        assertFalse(AutoMiner.labelOreStillPresent(
+            OreType.IRON, OreType.GOLD, true, true, false));
+        assertFalse(AutoMiner.labelOreStillPresent(
+            OreType.IRON, OreType.IRON, false, true, false));
+        assertTrue(AutoMiner.labelOreStillPresent(
+            OreType.IRON, null, true, false, false));
+        assertTrue(AutoMiner.labelOreStillPresent(
+            OreType.IRON, null, true, true, true));
+        assertFalse(AutoMiner.labelOreStillPresent(
+            OreType.IRON, null, true, true, false));
     }
 
     @Test

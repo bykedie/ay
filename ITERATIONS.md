@@ -267,3 +267,11 @@
 - Iteration 3: skipped a full chunk once its nearest possible block center is strictly farther than the filled nearest-candidate heap, while retaining equal-distance chunks for stable coordinate tie-breaking.
 - Iteration 4: rejected individual markers that cannot improve a filled heap before consulting the target-cooldown predicate, reducing hot-map lookups in dense caches.
 - Iteration 5: constructed `CachedOre` objects only for candidates that actually enter the nearest heap, preserving the existing distance and coordinate ordering with less allocation pressure.
+
+## Version 1.10.65 Auto Mining Confirmation Label Ownership Update
+
+- Iteration 1: retained a mined ore's invisible vein label while its client-side disappearance is still inside the three-tick server confirmation window.
+- Iteration 2: matched that temporary ownership by world, block position and ore type, preventing an unrelated historical completion from preserving the wrong label.
+- Iteration 3: preserved labels while their chunks are temporarily unavailable instead of interpreting an unloaded position as a confirmed non-ore block.
+- Iteration 4: removed the label through the existing confirmation path only after stable destruction, while a rollback restores the marker and keeps its original ordering.
+- Iteration 5: consulted the bounded pending-completion queue only for loaded labels whose live ore type disagrees, keeping ordinary large-vein pruning on the fast path.
