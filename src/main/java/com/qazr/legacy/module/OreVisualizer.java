@@ -45,7 +45,7 @@ public final class OreVisualizer {
     private static final int VISUALIZER_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT * 4;
     private static final int AUTO_MINE_BLOCKS_PER_TICK = SECTION_BLOCK_COUNT;
     private static final int VALIDATION_MARKERS_PER_PASS = 128;
-    private static final double RESUMED_SCAN_NEARBY_DISTANCE_SQ = 4.0D;
+    private static final double RESUMED_SCAN_NEARBY_DISTANCE = 2.0D;
     private static final double BOX_INSET = 0.002;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -487,7 +487,10 @@ public final class OreVisualizer {
     }
 
     static boolean scanTaskPrecedesResumed(double queuedDistanceSq, double resumedDistanceSq) {
-        return queuedDistanceSq <= resumedDistanceSq + RESUMED_SCAN_NEARBY_DISTANCE_SQ;
+        if (queuedDistanceSq <= resumedDistanceSq) return true;
+        double resumedDistance = Math.sqrt(Math.max(0.0D, resumedDistanceSq));
+        double nearbyDistance = resumedDistance + RESUMED_SCAN_NEARBY_DISTANCE;
+        return queuedDistanceSq <= nearbyDistance * nearbyDistance;
     }
 
     private void pruneQueue(int centerChunkX, int centerChunkZ, double range) {

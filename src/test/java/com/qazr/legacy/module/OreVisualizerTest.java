@@ -60,8 +60,9 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(0.25, 0.0));
         assertTrue(OreVisualizer.scanTaskPrecedesResumed(4.0, 0.0));
         assertTrue(!OreVisualizer.scanTaskPrecedesResumed(4.01, 0.0));
-        assertTrue(OreVisualizer.scanTaskPrecedesResumed(9.0, 5.0));
-        assertTrue(!OreVisualizer.scanTaskPrecedesResumed(9.01, 5.0));
+        assertTrue(OreVisualizer.scanTaskPrecedesResumed(144.0, 100.0));
+        assertTrue(!OreVisualizer.scanTaskPrecedesResumed(144.01, 100.0));
+        assertTrue(OreVisualizer.scanTaskPrecedesResumed(5.0, 9.0));
     }
 
     @Test

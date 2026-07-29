@@ -371,3 +371,11 @@
 - Iteration 3: replaced changed ore types in place instead of unregistering and rebuilding every marker in the chunk.
 - Iteration 4: retained a rare full compaction path when historical duplicate positions are detected, preserving rollback-marker deduplication.
 - Iteration 5: skipped marker revision and validation work when a scan slice only rediscovers identical cached positions and types.
+
+## Version 1.10.78 Auto Mining Scan Distance Window Update
+
+- Iteration 1: corrected the resumed-task fairness window from an additive squared-distance approximation to a true two-block physical distance.
+- Iteration 2: converted the resumed lower-bound distance back to linear space before applying the two-block allowance.
+- Iteration 3: squared the resulting threshold once for comparison, retaining the existing squared-distance queue representation.
+- Iteration 4: kept all tasks already nearer than the resumed task ahead without performing an unnecessary square root.
+- Iteration 5: covered both the origin boundary and a resumed task ten blocks away, where the old approximation was most visibly too strict.
