@@ -363,3 +363,11 @@
 - Iteration 3: covered cardinal and diagonal boundary cases through the same physical-distance ordering instead of special-casing chunk coordinates.
 - Iteration 4: retained the existing 4096-block auto-mining budget, so the latency improvement does not increase worst-case per-tick block reads.
 - Iteration 5: continued ordering truly farther chunks behind the resumed nearer task once the two-block fairness window is exceeded.
+
+## Version 1.10.77 Auto Mining Scan Merge Allocation Update
+
+- Iteration 1: replaced three full marker maps per scan slice with one position-to-index map over the stored chunk markers.
+- Iteration 2: appended newly discovered ores directly and updated the per-type index only for those new entries.
+- Iteration 3: replaced changed ore types in place instead of unregistering and rebuilding every marker in the chunk.
+- Iteration 4: retained a rare full compaction path when historical duplicate positions are detected, preserving rollback-marker deduplication.
+- Iteration 5: skipped marker revision and validation work when a scan slice only rediscovers identical cached positions and types.

@@ -4,9 +4,7 @@ import com.qazr.legacy.config.OreType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -94,13 +92,9 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.markerCacheOwnsChunk(false, true, false));
         assertTrue(OreVisualizer.markerCacheOwnsChunk(false, false, true));
         assertTrue(!OreVisualizer.markerCacheOwnsChunk(false, false, false));
-        Map<Long, OreType> iron = new LinkedHashMap<>();
-        iron.put(new BlockPos(1, 20, 1).toLong(), OreType.IRON);
-        assertTrue(!OreVisualizer.markerMergeChanged(1, iron, new LinkedHashMap<>(iron)));
-        assertTrue(OreVisualizer.markerMergeChanged(2, iron, new LinkedHashMap<>(iron)));
-        Map<Long, OreType> gold = new LinkedHashMap<>();
-        gold.put(new BlockPos(1, 20, 1).toLong(), OreType.GOLD);
-        assertTrue(OreVisualizer.markerMergeChanged(1, iron, gold));
+        assertTrue(OreVisualizer.scannedMarkerChangesCache(false, null, OreType.IRON));
+        assertTrue(!OreVisualizer.scannedMarkerChangesCache(true, OreType.IRON, OreType.IRON));
+        assertTrue(OreVisualizer.scannedMarkerChangesCache(true, OreType.IRON, OreType.GOLD));
     }
 
     @Test
