@@ -489,6 +489,9 @@ public final class AutoMiner {
         selectBestPickaxe(target.pos);
         boolean sameMiningTarget = target.pos.equals(miningPos) && target.type == miningType;
         if (!sameMiningTarget) {
+            if (miningTargetChanged(miningPos, miningType, target.pos, target.type)) {
+                releasePendingQuotaReservation(miningPos, miningType);
+            }
             miningAttempts = 0;
             miningAttemptBudget = destructionAttemptBudget(
                 mc.world.getBlockState(target.pos).getPlayerRelativeBlockHardness(
@@ -2466,6 +2469,12 @@ public final class AutoMiner {
     static boolean routeBlockerOwnership(boolean sameTarget, boolean previousOwnership,
             boolean requestedOwnership) {
         return requestedOwnership || sameTarget && previousOwnership;
+    }
+
+    static boolean miningTargetChanged(BlockPos current, OreType currentType,
+            BlockPos requested, OreType requestedType) {
+        return current != null && currentType != null
+            && !completionOwnsWork(current, currentType, requested, requestedType);
     }
 
     static boolean completionAwaitsRoute(BlockPos routeOre, OreType routeType,

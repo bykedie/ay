@@ -571,3 +571,11 @@
 - Iteration 3: retained the original queued route target while the blocker chain changes ore positions.
 - Iteration 4: kept ordinary direct mining on the unowned path so unrelated targets cannot inherit the route.
 - Iteration 5: covered same-target inheritance, explicit cross-target propagation, replacement, and ordinary mining states.
+
+## Version 1.10.103 Auto Mining Target Switch Reservation Update
+
+- Iteration 1: reproduced an old mining target retaining a finite-quota reservation after the active ray switched blocks.
+- Iteration 2: detected target changes by both block position and ore type.
+- Iteration 3: released only reservations that had not yet observed server-side block absence.
+- Iteration 4: retained later absence confirmation so a genuinely mined old target is still counted.
+- Iteration 5: covered no-current-target, same-target, changed-position, and changed-type transitions.
