@@ -507,3 +507,11 @@
 - Iteration 3: retained the existing registry-name table for configuration matching and compatibility.
 - Iteration 4: covered all vanilla ore blocks, lit and unlit redstone, non-ore stone, and null input.
 - Iteration 5: kept lookup initialization lazy so early enum loading cannot capture an uninitialized Minecraft registry.
+
+## Version 1.10.95 Auto Mining Disabled Ore Idle Update
+
+- Iteration 1: added a shared check for whether any auto-mining ore type is currently enabled.
+- Iteration 2: stopped auto-mining target, visibility, and path work while every ore switch is off.
+- Iteration 3: excluded an inactive all-disabled auto miner from the shared ore-cache range calculation.
+- Iteration 4: let ore visualization continue independently with its own larger scan budget when enabled.
+- Iteration 5: covered default, all-disabled, re-enabled, module-disabled, and cache-budget decisions.

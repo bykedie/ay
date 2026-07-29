@@ -456,6 +456,13 @@ public final class ModConfig {
         return enabled == null || enabled;
     }
 
+    public static boolean hasEnabledMineOre() {
+        for (OreType type : OreType.values()) {
+            if (isMineOreEnabled(type)) return true;
+        }
+        return false;
+    }
+
     public static int getMineTargetCount(OreType type) {
         Integer count = mineTargetCounts.get(type);
         return count == null ? 0 : count;

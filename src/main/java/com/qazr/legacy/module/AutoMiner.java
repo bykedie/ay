@@ -214,6 +214,7 @@ public final class AutoMiner {
             stopAutomatedWork(true);
             return;
         }
+        if (!ModConfig.hasEnabledMineOre()) return;
         miningPlayerFeet = playerNavigationFeetCell();
         miningEyes = mc.player.getPositionEyes(1.0F);
         miningReachDistance = mc.playerController.getBlockReachDistance();

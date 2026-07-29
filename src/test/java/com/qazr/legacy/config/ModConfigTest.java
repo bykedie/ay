@@ -299,6 +299,25 @@ public class ModConfigTest {
     }
 
     @Test
+    public void reportsWhetherAnyAutoMiningOreTypeIsEnabled() throws Exception {
+        ModConfig.load(configFile());
+        assertTrue(ModConfig.hasEnabledMineOre());
+        ModuleSetting[] oreToggles = {
+            ModuleSetting.MINE_COAL, ModuleSetting.MINE_IRON,
+            ModuleSetting.MINE_GOLD, ModuleSetting.MINE_REDSTONE,
+            ModuleSetting.MINE_LAPIS, ModuleSetting.MINE_DIAMOND,
+            ModuleSetting.MINE_EMERALD, ModuleSetting.MINE_QUARTZ
+        };
+        for (ModuleSetting setting : oreToggles) {
+            if (ModConfig.getToggle(setting)) ModConfig.toggle(setting);
+        }
+        assertFalse(ModConfig.hasEnabledMineOre());
+
+        ModConfig.toggle(ModuleSetting.MINE_QUARTZ);
+        assertTrue(ModConfig.hasEnabledMineOre());
+    }
+
+    @Test
     public void persistsWweFlightModeAndSpeed() throws Exception {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.FLIGHT, true);

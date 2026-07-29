@@ -94,9 +94,10 @@ public final class OreVisualizer {
         } else {
             int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
             int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
+            boolean autoMineCache = autoMineCacheNeeded();
             double cacheRange = effectiveCacheRange(
                 modules.isEnabled(ModuleId.ORE_VISUALIZER), ModConfig.oreVisualizerRange,
-                modules.isEnabled(ModuleId.AUTO_MINE), ModConfig.minePathRange);
+                autoMineCache, ModConfig.minePathRange);
             if (!chunkCouldEnterRange(key, centerChunkX, centerChunkZ, cacheRange)) return;
             requeueScanTask(task, mc.player.posX, mc.player.posZ);
         }
@@ -143,7 +144,7 @@ public final class OreVisualizer {
             seededWorld = null;
         }
         seedLoadedChunks();
-        boolean autoMineEnabled = modules.isEnabled(ModuleId.AUTO_MINE);
+        boolean autoMineEnabled = autoMineCacheNeeded();
         int remainingTasks = scanBudget(autoMineEnabled);
         int remainingBlocks = scanBlockBudget(autoMineEnabled);
         while (remainingTasks-- > 0 && remainingBlocks > 0 && !scanQueue.isEmpty()) {
@@ -357,14 +358,24 @@ public final class OreVisualizer {
     }
 
     private boolean cacheNeeded() {
-        return modules.isEnabled(ModuleId.ORE_VISUALIZER) || modules.isEnabled(ModuleId.AUTO_MINE);
+        return modules.isEnabled(ModuleId.ORE_VISUALIZER) || autoMineCacheNeeded();
+    }
+
+    private boolean autoMineCacheNeeded() {
+        return autoMineCacheNeeded(
+            modules.isEnabled(ModuleId.AUTO_MINE), ModConfig.hasEnabledMineOre());
+    }
+
+    static boolean autoMineCacheNeeded(boolean moduleEnabled, boolean anyOreEnabled) {
+        return moduleEnabled && anyOreEnabled;
     }
 
     private void seedLoadedChunks() {
         if (mc.player == null || mc.world == null) return;
         if (!(mc.world.getChunkProvider() instanceof ChunkProviderClient)) return;
+        boolean autoMineCache = autoMineCacheNeeded();
         double cacheRange = effectiveCacheRange(modules.isEnabled(ModuleId.ORE_VISUALIZER),
-            ModConfig.oreVisualizerRange, modules.isEnabled(ModuleId.AUTO_MINE), ModConfig.minePathRange);
+            ModConfig.oreVisualizerRange, autoMineCache, ModConfig.minePathRange);
         int radiusChunks = chunkSearchRadius(cacheRange);
         ChunkProviderClient provider = (ChunkProviderClient) mc.world.getChunkProvider();
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
