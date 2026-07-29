@@ -453,7 +453,11 @@ public class AutoMinerTest {
             true, true, true, true));
         assertTrue(AutoMiner.scaffoldCandidate(feet, feet.east().up(3), true,
             true, true, true, true));
-        assertTrue(AutoMiner.scaffoldCandidate(feet, feet.up(2), true,
+        assertTrue(AutoMiner.scaffoldCandidate(feet, feet.east().up(2), true,
+            true, true, true, true));
+        assertFalse(AutoMiner.scaffoldCandidate(feet, feet.up(2), true,
+            true, true, true, true));
+        assertFalse(AutoMiner.scaffoldCandidate(feet, feet.up(6), true,
             true, true, true, true));
         assertFalse(AutoMiner.scaffoldCandidate(feet, feet.up(3), false,
             true, true, true, true));
@@ -464,13 +468,21 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void scaffoldAssistOnlyStartsWhenOneBlockOfHeightAddsReach() {
+    public void scaffoldAssistOnlyStartsWhenOneBlockAddsAStableMiningPosture() {
+        BlockPos feet = new BlockPos(0, 64, 0);
         Vec3d eyes = new Vec3d(0.5, 65.62, 0.5);
-        BlockPos ore = new BlockPos(0, 70, 0);
+        BlockPos overhead = feet.up(3);
 
-        assertTrue(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 4.0));
-        assertFalse(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 3.0));
-        assertFalse(AutoMiner.scaffoldRaisesIntoReach(eyes, ore, 4.5));
+        assertTrue(AutoMiner.scaffoldRaiseMakesTargetMineable(
+            feet, eyes, overhead, 4.5));
+        assertTrue(AutoMiner.scaffoldRaiseMakesTargetMineable(
+            feet, eyes, feet.east().up(3), 4.5));
+        assertFalse(AutoMiner.scaffoldRaiseMakesTargetMineable(
+            feet, eyes, feet.up(2), 4.5));
+        assertFalse(AutoMiner.scaffoldRaiseMakesTargetMineable(
+            feet, eyes, feet.up(6), 4.5));
+        assertFalse(AutoMiner.scaffoldRaiseMakesTargetMineable(
+            feet, eyes, overhead, 0.2));
     }
 
     @Test

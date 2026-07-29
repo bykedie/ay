@@ -590,7 +590,8 @@ public final class AutoMiner {
         if (!scaffoldCandidate(miningPlayerFeet, ore, true, isPassable(miningPlayerFeet),
                 isPassable(miningPlayerFeet.up()), isPassable(miningPlayerFeet.up(2)),
                 hasSolidSupport(miningPlayerFeet))
-                || !scaffoldRaisesIntoReach(miningEyes, ore, miningReachDistance)) return false;
+                || !scaffoldRaiseMakesTargetMineable(
+                    miningPlayerFeet, miningEyes, ore, miningReachDistance)) return false;
         Vec3d raisedEyes = new Vec3d(miningEyes.x, miningEyes.y + 1.0, miningEyes.z);
         RayTraceResult hit = rayTraceTarget(raisedEyes, ore, type, false);
         if (hit == null
@@ -683,12 +684,15 @@ public final class AutoMiner {
                 || !jumpClear || !supported) return false;
         int dx = Math.abs(feet.getX() - ore.getX());
         int dz = Math.abs(feet.getZ() - ore.getZ());
-        return dx + dz <= 1 && ore.getY() > feet.getY() + 1;
+        return dx + dz <= 1 && ore.getY() > feet.getY() + 1
+            && stableMiningPosition(feet.up(), ore);
     }
 
-    static boolean scaffoldRaisesIntoReach(Vec3d eyes, BlockPos ore, double reach) {
-        return eyes != null && ore != null && reach > 0.0
-            && !withinMiningReach(eyes, ore, reach)
+    static boolean scaffoldRaiseMakesTargetMineable(BlockPos feet, Vec3d eyes, BlockPos ore,
+            double reach) {
+        return feet != null && eyes != null && ore != null && reach > 0.0
+            && !stableMiningPosition(feet, ore)
+            && stableMiningPosition(feet.up(), ore)
             && withinMiningReach(new Vec3d(eyes.x, eyes.y + 1.0, eyes.z), ore, reach);
     }
 

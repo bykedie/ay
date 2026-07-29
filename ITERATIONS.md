@@ -427,3 +427,11 @@
 - Iteration 3: ran expansion immediately after a snapshot rebuild caused by scanning, movement or behavioral cache invalidation.
 - Iteration 4: kept label acquisition unchanged because its initial flood fill already includes every connected ore in that snapshot.
 - Iteration 5: reset snapshot ownership on reload and world unload without coupling it to unrelated path-search state.
+
+## Version 1.10.85 Auto Mining Scaffold Posture Update
+
+- Iteration 1: evaluated scaffold assistance against both the current feet cell and the feet cell after the one-block raise.
+- Iteration 2: started assistance when the current posture is invalid but the raised posture satisfies the same stable-mining rule used after placement.
+- Iteration 3: removed the contradictory requirement that the ore must be outside raw vanilla reach before the raise.
+- Iteration 4: retained the raised-eye vanilla reach check and exact raised-position ray trace before any jump or placement.
+- Iteration 5: rejected targets that are already stable, occupy the raised player space or remain too high after one block.
