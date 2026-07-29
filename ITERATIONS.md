@@ -475,3 +475,11 @@
 - Iteration 3: retained the fixed nearest-eight plus rotating-tail inspection schedule unchanged.
 - Iteration 4: invalidated the ordered list whenever labels change or a new candidate snapshot is produced.
 - Iteration 5: covered identity reuse, replacement snapshots, missing labels and uninitialized state independently.
+
+## Version 1.10.91 Auto Mining Selection Revision Update
+
+- Iteration 1: added a monotonic revision for settings that change the auto-mining candidate set.
+- Iteration 2: advanced it for path range, per-ore target counts, ore switches, and full config synchronization.
+- Iteration 3: bound nearest-candidate cache reuse to the same selection revision, including same-bucket marker coalescing.
+- Iteration 4: interrupted an empty-route retry immediately when its scheduled selection revision becomes stale.
+- Iteration 5: covered relevant changes, no-op saves, unrelated settings, reloads, and retry/cache invalidation independently.

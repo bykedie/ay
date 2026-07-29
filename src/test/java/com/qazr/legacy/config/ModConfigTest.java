@@ -276,6 +276,29 @@ public class ModConfigTest {
     }
 
     @Test
+    public void revisionsTrackOnlyAutoMiningCandidateSettings() throws Exception {
+        ModConfig.load(configFile());
+        long revision = ModConfig.autoMineSelectionRevision();
+
+        ModConfig.saveNumber(ModuleSetting.MINE_DELAY, 5.0);
+        ModConfig.toggle(ModuleSetting.MINE_VISUALIZE_PATH);
+        assertEquals(revision, ModConfig.autoMineSelectionRevision());
+
+        ModConfig.saveNumber(ModuleSetting.MINE_PATH_RANGE, 64.0);
+        assertEquals(++revision, ModConfig.autoMineSelectionRevision());
+        ModConfig.saveNumber(ModuleSetting.MINE_PATH_RANGE, 64.0);
+        assertEquals(revision, ModConfig.autoMineSelectionRevision());
+
+        ModConfig.saveNumber(ModuleSetting.MINE_DIAMOND_COUNT, 3.0);
+        assertEquals(++revision, ModConfig.autoMineSelectionRevision());
+        ModConfig.toggle(ModuleSetting.MINE_DIAMOND);
+        assertEquals(++revision, ModConfig.autoMineSelectionRevision());
+
+        ModConfig.reload();
+        assertEquals(++revision, ModConfig.autoMineSelectionRevision());
+    }
+
+    @Test
     public void persistsWweFlightModeAndSpeed() throws Exception {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.FLIGHT, true);

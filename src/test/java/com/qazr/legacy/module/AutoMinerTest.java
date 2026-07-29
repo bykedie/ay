@@ -775,15 +775,17 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.reusePathCandidateSnapshot(Arrays.asList(
             new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0))));
         BlockPos feet = new BlockPos(1, 64, 1);
-        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east()));
-        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, true));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 13L, true));
-        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, false));
-        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 12L, 13L, false));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east(), 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 20L, 21L));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, true, 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 13L, true, 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, false, 20L, 20L));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 12L, 13L, false, 20L, 20L));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 12L, 12L, true, 20L, 21L));
         assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east(),
-            12L, 12L, true));
+            12L, 12L, true, 20L, 20L));
         assertTrue(AutoMiner.sameCandidateOrigin(1.0, 2.0, 3.0, 1.0, 2.0, 3.0));
         assertFalse(AutoMiner.sameCandidateOrigin(1.0, 2.0, 3.0, 1.01, 2.0, 3.0));
         assertTrue(AutoMiner.continuePathRetryDelay(20, 4L, 4L));
@@ -797,6 +799,9 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.pathRetryInterruptedByFeetChange(20, null, feet));
         assertFalse(AutoMiner.pathRetryInterruptedByFeetChange(20, null, null));
         assertFalse(AutoMiner.pathRetryInterruptedByFeetChange(0, feet, feet.east()));
+        assertTrue(AutoMiner.pathRetryInterruptedBySelectionChange(20, 4L, 5L));
+        assertFalse(AutoMiner.pathRetryInterruptedBySelectionChange(20, 4L, 4L));
+        assertFalse(AutoMiner.pathRetryInterruptedBySelectionChange(0, 4L, 5L));
         assertFalse(AutoMiner.routeComparisonExpired(0));
         assertFalse(AutoMiner.routeComparisonExpired(3));
         assertTrue(AutoMiner.routeComparisonExpired(4));

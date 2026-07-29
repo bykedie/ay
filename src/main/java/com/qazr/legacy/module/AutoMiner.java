@@ -118,6 +118,7 @@ public final class AutoMiner {
     private int manualPause;
     private int pathRetryDelay;
     private long pathRetryMarkerRevision = Long.MIN_VALUE;
+    private long pathRetrySelectionRevision = Long.MIN_VALUE;
     private int pathCandidateOffset;
     private List<OreVisualizer.CachedOre> pathCandidateBatch = java.util.Collections.emptyList();
     private PathTarget pendingPathTarget;
@@ -157,6 +158,7 @@ public final class AutoMiner {
     private int currentCandidateTickBucket = Integer.MIN_VALUE;
     private BlockPos currentCandidateFeet;
     private long currentCandidateMarkerRevision = Long.MIN_VALUE;
+    private long currentCandidateSelectionRevision = Long.MIN_VALUE;
     private double currentCandidateX = Double.NaN;
     private double currentCandidateY = Double.NaN;
     private double currentCandidateZ = Double.NaN;
@@ -244,16 +246,20 @@ public final class AutoMiner {
         boolean feetChangedDuringRetry = pathRetryInterruptedByFeetChange(
             pathRetryDelay, currentCandidateFeet, miningPlayerFeet);
         int candidateTickBucket = mc.player.ticksExisted / 4;
+        long selectionRevision = ModConfig.autoMineSelectionRevision();
+        boolean selectionChangedDuringRetry = pathRetryInterruptedBySelectionChange(
+            pathRetryDelay, pathRetrySelectionRevision, selectionRevision);
         if (markerChangedDuringRetry && reuseCurrentCandidateCache(currentCandidateTickBucket,
-                candidateTickBucket, currentCandidateFeet, miningPlayerFeet)) {
+                candidateTickBucket, currentCandidateFeet, miningPlayerFeet,
+                currentCandidateSelectionRevision, selectionRevision)) {
             mc.player.motionX = planningMotion(mc.player.motionX);
             mc.player.motionZ = planningMotion(mc.player.motionZ);
             return;
         }
-        if (markerChangedDuringRetry || feetChangedDuringRetry) {
+        if (markerChangedDuringRetry || feetChangedDuringRetry || selectionChangedDuringRetry) {
             invalidateCurrentCandidateCache();
         }
-        if (!feetChangedDuringRetry
+        if (!feetChangedDuringRetry && !selectionChangedDuringRetry
                 && continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
             pathRetryDelay--;
             mc.player.motionX = planningMotion(mc.player.motionX);
@@ -890,6 +896,7 @@ public final class AutoMiner {
                 pathRetryDelay = pathSnapshotRefreshRequested ? 1
                     : pathSearchRetryDelay(pathCandidateOffset, pendingPathSearch != null);
                 pathRetryMarkerRevision = oreVisualizer.markerRevision();
+                pathRetrySelectionRevision = ModConfig.autoMineSelectionRevision();
                 pathSnapshotRefreshRequested = false;
                 return;
             }
@@ -1325,6 +1332,11 @@ public final class AutoMiner {
     static boolean pathRetryInterruptedByFeetChange(
             int delay, BlockPos cachedFeet, BlockPos currentFeet) {
         return delay > 0 && !java.util.Objects.equals(cachedFeet, currentFeet);
+    }
+
+    static boolean pathRetryInterruptedBySelectionChange(
+            int delay, long scheduledRevision, long currentRevision) {
+        return delay > 0 && scheduledRevision != currentRevision;
     }
 
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
@@ -2474,15 +2486,18 @@ public final class AutoMiner {
         int tickBucket = mc.player.ticksExisted / 4;
         BlockPos feet = miningPlayerFeet;
         long markerRevision = oreVisualizer.markerRevision();
+        long selectionRevision = ModConfig.autoMineSelectionRevision();
         boolean sameOrigin = sameCandidateOrigin(currentCandidateX, currentCandidateY,
             currentCandidateZ, mc.player.posX, mc.player.posY, mc.player.posZ);
         if (!reuseCurrentCandidateCache(
                 currentCandidateTickBucket, tickBucket, currentCandidateFeet, feet,
-                currentCandidateMarkerRevision, markerRevision, sameOrigin)) {
+                currentCandidateMarkerRevision, markerRevision, sameOrigin,
+                currentCandidateSelectionRevision, selectionRevision)) {
             currentCandidateCache = cachedMineCandidates();
             currentCandidateTickBucket = tickBucket;
             currentCandidateFeet = feet == null ? null : feet.toImmutable();
             currentCandidateMarkerRevision = markerRevision;
+            currentCandidateSelectionRevision = selectionRevision;
             currentCandidateX = mc.player.posX;
             currentCandidateY = mc.player.posY;
             currentCandidateZ = mc.player.posZ;
@@ -2491,14 +2506,18 @@ public final class AutoMiner {
     }
 
     static boolean reuseCurrentCandidateCache(int cachedTickBucket, int currentTickBucket,
-            BlockPos cachedFeet, BlockPos currentFeet) {
-        return cachedTickBucket == currentTickBucket
+            BlockPos cachedFeet, BlockPos currentFeet, long cachedSelectionRevision,
+            long currentSelectionRevision) {
+        return cachedSelectionRevision == currentSelectionRevision
+            && cachedTickBucket == currentTickBucket
             && java.util.Objects.equals(cachedFeet, currentFeet);
     }
 
     static boolean reuseCurrentCandidateCache(int cachedTickBucket, int currentTickBucket,
             BlockPos cachedFeet, BlockPos currentFeet, long cachedMarkerRevision,
-            long currentMarkerRevision, boolean sameOrigin) {
+            long currentMarkerRevision, boolean sameOrigin, long cachedSelectionRevision,
+            long currentSelectionRevision) {
+        if (cachedSelectionRevision != currentSelectionRevision) return false;
         if (!java.util.Objects.equals(cachedFeet, currentFeet)) return false;
         return cachedTickBucket == currentTickBucket
             || cachedMarkerRevision == currentMarkerRevision && sameOrigin;
@@ -2516,6 +2535,7 @@ public final class AutoMiner {
         currentCandidateTickBucket = Integer.MIN_VALUE;
         currentCandidateFeet = null;
         currentCandidateMarkerRevision = Long.MIN_VALUE;
+        currentCandidateSelectionRevision = Long.MIN_VALUE;
         currentCandidateX = Double.NaN;
         currentCandidateY = Double.NaN;
         currentCandidateZ = Double.NaN;

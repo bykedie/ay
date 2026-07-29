@@ -36,6 +36,7 @@ public final class ModConfig {
     public static boolean mineScaffoldAssist;
     private static final EnumMap<OreType, Boolean> mineOreEnabled = new EnumMap<>(OreType.class);
     private static final EnumMap<OreType, Integer> mineTargetCounts = new EnumMap<>(OreType.class);
+    private static long autoMineSelectionRevision;
     public static double bridgeLookahead;
     public static int bridgeDownScan;
     public static int bridgeDelayTicks;
@@ -215,6 +216,7 @@ public final class ModConfig {
         configuration.get("autoGg", "messages", DEFAULT_GG_MESSAGES).set(ggMessages);
         configuration.get("autoReply", "messages", DEFAULT_REPLY_MESSAGES).set(replyMessages);
         if (configuration.hasChanged()) configuration.save();
+        autoMineSelectionRevision++;
     }
 
     public static void reload() {
@@ -310,9 +312,11 @@ public final class ModConfig {
         OreType ore = setting.oreType();
         if (ore != null && setting.module() == ModuleId.AUTO_MINE && setting.type() == ModuleSetting.Type.NUMBER) {
             int count = (int) rounded;
+            boolean changed = getMineTargetCount(ore) != count;
             mineTargetCounts.put(ore, count);
             saveInt("autoMine", ore.key() + "TargetCount", count);
             configuration.save();
+            if (changed) autoMineSelectionRevision++;
             return count;
         }
         switch (setting) {
@@ -330,7 +334,12 @@ public final class ModConfig {
                 break;
             case REPLY_COOLDOWN: replyCooldownTicks = (int) rounded; saveInt("autoReply", "cooldownTicks", replyCooldownTicks); break;
             case MINE_DELAY: mineDelayTicks = (int) rounded; saveInt("autoMine", "delayTicks", mineDelayTicks); break;
-            case MINE_PATH_RANGE: minePathRange = (int) rounded; saveInt("autoMine", "pathRange", minePathRange); break;
+            case MINE_PATH_RANGE:
+                int pathRange = (int) rounded;
+                if (minePathRange != pathRange) autoMineSelectionRevision++;
+                minePathRange = pathRange;
+                saveInt("autoMine", "pathRange", minePathRange);
+                break;
             case MINE_MANUAL_PAUSE: mineManualPauseTicks = (int) rounded; saveInt("autoMine", "manualPauseTicks", mineManualPauseTicks); break;
             case BRIDGE_LOOKAHEAD: bridgeLookahead = rounded; saveDouble("autoBridge", "lookAhead", rounded); break;
             case BRIDGE_DOWN_SCAN: bridgeDownScan = (int) rounded; saveInt("autoBridge", "downScan", bridgeDownScan); break;
@@ -395,6 +404,7 @@ public final class ModConfig {
             mineOreEnabled.put(ore, value);
             saveBoolean("autoMine", ore.key() + "Mine", value);
             configuration.save();
+            autoMineSelectionRevision++;
             return value;
         }
         if (ore != null && setting.type() == ModuleSetting.Type.TOGGLE) {
@@ -449,6 +459,10 @@ public final class ModConfig {
     public static int getMineTargetCount(OreType type) {
         Integer count = mineTargetCounts.get(type);
         return count == null ? 0 : count;
+    }
+
+    public static long autoMineSelectionRevision() {
+        return autoMineSelectionRevision;
     }
 
     public static int getOreColor(OreType type) {
