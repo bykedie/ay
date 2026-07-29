@@ -778,6 +778,14 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet));
         assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet));
         assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east()));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, true));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 13L, true));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 9, feet, feet, 12L, 12L, false));
+        assertTrue(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet, 12L, 13L, false));
+        assertFalse(AutoMiner.reuseCurrentCandidateCache(8, 8, feet, feet.east(),
+            12L, 12L, true));
+        assertTrue(AutoMiner.sameCandidateOrigin(1.0, 2.0, 3.0, 1.0, 2.0, 3.0));
+        assertFalse(AutoMiner.sameCandidateOrigin(1.0, 2.0, 3.0, 1.01, 2.0, 3.0));
         assertTrue(AutoMiner.continuePathRetryDelay(20, 4L, 4L));
         assertFalse(AutoMiner.continuePathRetryDelay(20, 4L, 5L));
         assertFalse(AutoMiner.continuePathRetryDelay(0, 4L, 4L));

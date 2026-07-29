@@ -36,7 +36,7 @@ For a guarded landing, keep `flight` enabled and hold Sneak until the player tou
 
 All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. The legacy file name, internal mod ID, and `/qazr` command are retained so existing installations keep their settings and key bindings after the Voris Hub rename.
 
-Path selection keeps an active vein locked when the eight-failure snapshot threshold is reached or a selected route becomes stale before activation. Exact failed candidates still enter their own retry cooldowns; the vein is released only after the complete candidate snapshot has no available route. Resumed ore-cache scans are inserted directly after the nearby queue prefix, avoiding a full queue rotation after every scanned section while preserving near-chunk priority.
+Path selection keeps an active vein locked when the eight-failure snapshot threshold is reached or a selected route becomes stale before activation. Exact failed candidates still enter their own retry cooldowns; the vein is released only after the complete candidate snapshot has no available route. Resumed ore-cache scans are inserted directly after the nearby queue prefix, avoiding a full queue rotation after every scanned section while preserving near-chunk priority. The nearest-96 candidate heap remains cached beyond four ticks while both the player origin and ore-marker revision are unchanged.
 
 ## Controls And Commands
 
@@ -72,7 +72,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.10.88.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.10.89.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

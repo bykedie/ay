@@ -459,3 +459,11 @@
 - Iteration 3: calculated the resumed-distance threshold once per insertion instead of once per queued task.
 - Iteration 4: retained the existing closest-chunk ordering and bounded per-tick block scan budget.
 - Iteration 5: covered zero, positive and clamped negative distance thresholds with focused tests.
+
+## Version 1.10.89 Auto Mining Stable Candidate Cache Update
+
+- Iteration 1: retained the nearest-96 candidate heap beyond its four-tick bucket while the player remains exactly still.
+- Iteration 2: bound extended reuse to the ore-marker revision so newly scanned, removed or changed ore still refreshes selection.
+- Iteration 3: retained the existing same-bucket marker coalescing behavior during active scanning.
+- Iteration 4: preserved immediate invalidation for labels, cooldowns, quota reservations, manual takeover and control-panel pauses.
+- Iteration 5: covered movement, marker changes, feet-cell changes and same-bucket coalescing independently.

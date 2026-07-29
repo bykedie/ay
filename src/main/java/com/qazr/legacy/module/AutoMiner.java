@@ -155,6 +155,10 @@ public final class AutoMiner {
     private List<OreVisualizer.CachedOre> currentCandidateCache = java.util.Collections.emptyList();
     private int currentCandidateTickBucket = Integer.MIN_VALUE;
     private BlockPos currentCandidateFeet;
+    private long currentCandidateMarkerRevision = Long.MIN_VALUE;
+    private double currentCandidateX = Double.NaN;
+    private double currentCandidateY = Double.NaN;
+    private double currentCandidateZ = Double.NaN;
     private List<OreVisualizer.CachedOre> extendedTargetLabelCandidates =
         java.util.Collections.emptyList();
 
@@ -2468,11 +2472,19 @@ public final class AutoMiner {
     private List<OreVisualizer.CachedOre> currentMineCandidates() {
         int tickBucket = mc.player.ticksExisted / 4;
         BlockPos feet = miningPlayerFeet;
+        long markerRevision = oreVisualizer.markerRevision();
+        boolean sameOrigin = sameCandidateOrigin(currentCandidateX, currentCandidateY,
+            currentCandidateZ, mc.player.posX, mc.player.posY, mc.player.posZ);
         if (!reuseCurrentCandidateCache(
-                currentCandidateTickBucket, tickBucket, currentCandidateFeet, feet)) {
+                currentCandidateTickBucket, tickBucket, currentCandidateFeet, feet,
+                currentCandidateMarkerRevision, markerRevision, sameOrigin)) {
             currentCandidateCache = cachedMineCandidates();
             currentCandidateTickBucket = tickBucket;
             currentCandidateFeet = feet == null ? null : feet.toImmutable();
+            currentCandidateMarkerRevision = markerRevision;
+            currentCandidateX = mc.player.posX;
+            currentCandidateY = mc.player.posY;
+            currentCandidateZ = mc.player.posZ;
         }
         return currentCandidateCache;
     }
@@ -2483,10 +2495,29 @@ public final class AutoMiner {
             && java.util.Objects.equals(cachedFeet, currentFeet);
     }
 
+    static boolean reuseCurrentCandidateCache(int cachedTickBucket, int currentTickBucket,
+            BlockPos cachedFeet, BlockPos currentFeet, long cachedMarkerRevision,
+            long currentMarkerRevision, boolean sameOrigin) {
+        if (!java.util.Objects.equals(cachedFeet, currentFeet)) return false;
+        return cachedTickBucket == currentTickBucket
+            || cachedMarkerRevision == currentMarkerRevision && sameOrigin;
+    }
+
+    static boolean sameCandidateOrigin(double cachedX, double cachedY, double cachedZ,
+            double currentX, double currentY, double currentZ) {
+        return Double.compare(cachedX, currentX) == 0
+            && Double.compare(cachedY, currentY) == 0
+            && Double.compare(cachedZ, currentZ) == 0;
+    }
+
     private void invalidateCurrentCandidateCache() {
         currentCandidateCache = java.util.Collections.emptyList();
         currentCandidateTickBucket = Integer.MIN_VALUE;
         currentCandidateFeet = null;
+        currentCandidateMarkerRevision = Long.MIN_VALUE;
+        currentCandidateX = Double.NaN;
+        currentCandidateY = Double.NaN;
+        currentCandidateZ = Double.NaN;
     }
 
     private float toolSpeed(ItemStack stack, IBlockState state) {
