@@ -25,6 +25,9 @@ public class OreVisualizerTest {
         assertTrue(OreVisualizer.autoMineCacheNeeded(true, true));
         assertTrue(!OreVisualizer.autoMineCacheNeeded(true, false));
         assertTrue(!OreVisualizer.autoMineCacheNeeded(false, true));
+        assertTrue(OreVisualizer.scanContextReady(true, true));
+        assertTrue(!OreVisualizer.scanContextReady(true, false));
+        assertTrue(!OreVisualizer.scanContextReady(false, true));
     }
 
     @Test

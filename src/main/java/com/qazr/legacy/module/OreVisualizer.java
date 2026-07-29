@@ -134,7 +134,8 @@ public final class OreVisualizer {
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || mc.world == null) return;
+        if (event.phase != TickEvent.Phase.END
+                || !scanContextReady(mc.world != null, mc.player != null)) return;
         if (!cacheNeeded()) {
             if (hasCacheState()) clearCache();
             return;
@@ -368,6 +369,10 @@ public final class OreVisualizer {
 
     static boolean autoMineCacheNeeded(boolean moduleEnabled, boolean anyOreEnabled) {
         return moduleEnabled && anyOreEnabled;
+    }
+
+    static boolean scanContextReady(boolean worldAvailable, boolean playerAvailable) {
+        return worldAvailable && playerAvailable;
     }
 
     private void seedLoadedChunks() {

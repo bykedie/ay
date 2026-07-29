@@ -547,3 +547,11 @@
 - Iteration 3: inherited blocker ownership only while continuing the exact same mining target.
 - Iteration 4: cleared ownership when mining state is released or a different target begins.
 - Iteration 5: covered inherited, replaced, newly requested, and ordinary mining ownership transitions.
+
+## Version 1.10.100 Auto Mining Scan Startup Update
+
+- Iteration 1: reproduced queued chunk scans reaching player-coordinate code before the client player existed.
+- Iteration 2: required both the client world and player before consuming shared ore-cache scan tasks.
+- Iteration 3: retained chunk-load tasks queued during early world initialization instead of discarding them.
+- Iteration 4: resumed the same queue automatically once the player snapshot became available.
+- Iteration 5: covered ready, missing-player, and missing-world scan contexts alongside both ore-cache consumers.
