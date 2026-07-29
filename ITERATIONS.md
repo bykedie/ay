@@ -251,3 +251,11 @@
 - Iteration 3: detected marker changes that interrupt an empty-path retry and invalidated the candidate cache before selection, allowing a newly scanned ore to wake the miner without entering another 20-tick wait.
 - Iteration 4: kept in-progress A* snapshots stable when unrelated markers arrive, avoiding repeated path-search resets while the shared cache is still filling.
 - Iteration 5: removed the redundant per-candidate-cache marker revision state and covered retry wake-up separately, making the refresh rules explicit rather than coupling every marker mutation to heap reconstruction.
+
+## Version 1.10.63 Auto Mining Empty Retry Coalescing Update
+
+- Iteration 1: coalesced scan-marker changes that arrive during an empty-path retry while the current four-tick candidate snapshot is still reusable, preventing one heap rebuild per scan batch.
+- Iteration 2: retained the originally scheduled marker revision during that short deferral so repeated scan revisions cannot prematurely satisfy a rewritten retry state.
+- Iteration 3: invalidated the candidate snapshot as soon as its tick bucket expires, allowing newly scanned ore to wake path selection at the intended cache boundary.
+- Iteration 4: kept player feet-cell changes as an immediate refresh condition, so movement never waits for the old snapshot's remaining ticks.
+- Iteration 5: preserved planning-state motion damping during the deferred retry without consuming the longer empty-search delay or starting a duplicate path search.

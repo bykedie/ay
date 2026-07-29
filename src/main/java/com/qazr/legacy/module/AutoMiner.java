@@ -220,8 +220,16 @@ public final class AutoMiner {
             return;
         }
         long markerRevision = oreVisualizer.markerRevision();
-        if (pathRetryInterruptedByMarkerChange(
-                pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
+        boolean markerChangedDuringRetry = pathRetryInterruptedByMarkerChange(
+            pathRetryDelay, pathRetryMarkerRevision, markerRevision);
+        int candidateTickBucket = mc.player.ticksExisted / 4;
+        if (markerChangedDuringRetry && reuseCurrentCandidateCache(currentCandidateTickBucket,
+                candidateTickBucket, currentCandidateFeet, miningPlayerFeet)) {
+            mc.player.motionX = planningMotion(mc.player.motionX);
+            mc.player.motionZ = planningMotion(mc.player.motionZ);
+            return;
+        }
+        if (markerChangedDuringRetry) {
             invalidateCurrentCandidateCache();
         }
         if (continuePathRetryDelay(pathRetryDelay, pathRetryMarkerRevision, markerRevision)) {
