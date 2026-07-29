@@ -767,6 +767,10 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.pathSnapshotRefreshNeeded(7, false));
         assertTrue(AutoMiner.pathSnapshotRefreshNeeded(8, false));
         assertFalse(AutoMiner.pathSnapshotRefreshNeeded(8, true));
+        assertFalse(AutoMiner.pathSearchCanReleaseVeinLock(false, false, 8, 12));
+        assertTrue(AutoMiner.pathSearchCanReleaseVeinLock(false, false, 8, 8));
+        assertFalse(AutoMiner.pathSearchCanReleaseVeinLock(false, true, 8, 8));
+        assertFalse(AutoMiner.pathSearchCanReleaseVeinLock(true, false, 8, 8));
         assertFalse(AutoMiner.reusePathCandidateSnapshot(java.util.Collections.emptyList()));
         assertTrue(AutoMiner.reusePathCandidateSnapshot(Arrays.asList(
             new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0))));

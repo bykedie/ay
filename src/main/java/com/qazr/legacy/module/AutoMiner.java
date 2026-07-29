@@ -1240,7 +1240,8 @@ public final class AutoMiner {
                                 pendingPathTarget != null)) {
                             blockTargets(pendingFailedPathTargets,
                                 mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
-                            clearTargetLabels();
+                            if (pathSearchCanReleaseVeinLock(false, false, pathCandidateOffset,
+                                    pathCandidateBatch.size())) clearTargetLabels();
                             resetPathCandidateBatch();
                             pathSnapshotRefreshRequested = true;
                             return null;
@@ -1268,7 +1269,8 @@ public final class AutoMiner {
         if (!failedTargets.isEmpty()) {
             blockTargets(failedTargets, mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
         }
-        if (best == null) clearTargetLabels();
+        if (pathSearchCanReleaseVeinLock(best != null, refreshSnapshot, pathCandidateOffset,
+                pathCandidateBatch.size())) clearTargetLabels();
         resetPathCandidateBatch();
         if (refreshSnapshot) pathSnapshotRefreshRequested = true;
         return best;
@@ -1322,6 +1324,12 @@ public final class AutoMiner {
 
     static boolean pathSnapshotRefreshNeeded(int failedCandidates, boolean routeFound) {
         return !routeFound && failedCandidates >= MAX_FAILED_CANDIDATES_PER_SNAPSHOT;
+    }
+
+    static boolean pathSearchCanReleaseVeinLock(boolean routeAvailable, boolean refreshSnapshot,
+            int nextCandidateOffset, int candidateCount) {
+        return !routeAvailable && !refreshSnapshot
+            && nextCandidateOffset >= Math.max(0, candidateCount);
     }
 
     static boolean reusePathCandidateSnapshot(List<OreVisualizer.CachedOre> snapshot) {

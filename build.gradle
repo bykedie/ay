@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-version = '1.10.86'
+version = '1.10.87'
 group = 'com.qazr.legacy'
 archivesBaseName = 'voris-hub'
 

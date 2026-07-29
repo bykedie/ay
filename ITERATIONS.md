@@ -443,3 +443,11 @@
 - Iteration 3: removed all endpoint rejections for a position after server-confirmed mining completes there.
 - Iteration 4: retained independent expiry for each stand while removing the empty typed container atomically.
 - Iteration 5: prevented a replacement ore from inheriting the previous block's 100-tick endpoint history.
+
+## Version 1.10.87 Auto Mining Vein Search Ownership Update
+
+- Iteration 1: separated the eight-failure snapshot refresh threshold from whole-vein label release.
+- Iteration 2: retained the active vein while later labeled candidates in the bounded snapshot remain unsearched.
+- Iteration 3: kept independent retry cooldowns for the exact candidates already proven unreachable.
+- Iteration 4: retained vein ownership when a selected route becomes stale immediately before activation and requests a fresh snapshot.
+- Iteration 5: released the vein only after the complete candidate snapshot is exhausted without an available route.
