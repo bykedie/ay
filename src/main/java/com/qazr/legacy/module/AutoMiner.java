@@ -993,6 +993,7 @@ public final class AutoMiner {
                 followPathToOre(candidates);
             } else {
                 stopRouteMotion();
+                prepareAndMineCurrentOre();
             }
             return;
         }

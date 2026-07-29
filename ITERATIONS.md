@@ -555,3 +555,11 @@
 - Iteration 3: retained chunk-load tasks queued during early world initialization instead of discarding them.
 - Iteration 4: resumed the same queue automatically once the player snapshot became available.
 - Iteration 5: covered ready, missing-player, and missing-world scan contexts alongside both ore-cache consumers.
+
+## Version 1.10.101 Auto Mining Final Node Handoff Update
+
+- Iteration 1: reproduced the extra idle tick after a non-empty route reached its final stand node.
+- Iteration 2: stopped horizontal route motion before handing the target to endpoint mining.
+- Iteration 3: entered the existing posture, face, visibility, and exposure checks in the same tick.
+- Iteration 4: retained landing confirmation for descents and exact node-center checks for turns and vertical steps.
+- Iteration 5: covered one-node and longer completed routes alongside active and zero-node route states.

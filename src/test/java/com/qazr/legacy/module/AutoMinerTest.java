@@ -751,6 +751,7 @@ public class AutoMinerTest {
         BlockPos ore = new BlockPos(4, 20, 7);
 
         assertTrue(AutoMiner.routeEndedBeforeMining(ore, 0, 0));
+        assertTrue(AutoMiner.routeEndedBeforeMining(ore, 1, 1));
         assertTrue(AutoMiner.routeEndedBeforeMining(ore, 3, 3));
         assertFalse(AutoMiner.routeEndedBeforeMining(ore, 2, 3));
         assertFalse(AutoMiner.routeEndedBeforeMining(null, 0, 0));
