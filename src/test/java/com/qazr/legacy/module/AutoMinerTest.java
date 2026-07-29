@@ -571,6 +571,22 @@ public class AutoMinerTest {
             labeled.east(), OreType.GOLD, labels, OreType.IRON));
         assertFalse(AutoMiner.connectedToLabeledVein(
             labeled, OreType.IRON, labels, OreType.IRON));
+
+        OreVisualizer.CachedOre firstHidden = new OreVisualizer.CachedOre(
+            labeled.east(), OreType.IRON, 4.0);
+        OreVisualizer.CachedOre secondHidden = new OreVisualizer.CachedOre(
+            labeled.east(2), OreType.IRON, 9.0);
+        OreVisualizer.CachedOre unrelated = new OreVisualizer.CachedOre(
+            labeled.east(4), OreType.IRON, 25.0);
+        OreVisualizer.CachedOre wrongType = new OreVisualizer.CachedOre(
+            labeled.up(), OreType.GOLD, 1.0);
+        Set<BlockPos> extensions = AutoMiner.connectedVeinExtensions(labels, OreType.IRON,
+            Arrays.asList(unrelated, secondHidden, wrongType, firstHidden));
+        assertEquals(2, extensions.size());
+        assertTrue(extensions.contains(firstHidden.pos()));
+        assertTrue(extensions.contains(secondHidden.pos()));
+        assertFalse(extensions.contains(unrelated.pos()));
+        assertFalse(extensions.contains(wrongType.pos()));
     }
 
     @Test

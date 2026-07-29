@@ -258,6 +258,7 @@ public final class AutoMiner {
             return;
         }
         List<OreVisualizer.CachedOre> currentCandidates = currentMineCandidates();
+        extendTargetLabels(currentCandidates);
         if (!targetLabels.isEmpty() && !containsLabeledCandidate(currentCandidates, targetLabels)) {
             clearTargetLabels();
         }
@@ -2685,6 +2686,60 @@ public final class AutoMiner {
         targetLabels.putAll(labelConnectedVein(seed, type, candidates));
         targetLabelType = targetLabels.isEmpty() ? null : type;
         targetLabelsChanged();
+    }
+
+    private void extendTargetLabels(List<OreVisualizer.CachedOre> candidates) {
+        Set<BlockPos> extensions = connectedVeinExtensions(
+            targetLabels, targetLabelType, candidates);
+        if (extensions.isEmpty()) return;
+        for (BlockPos extension : extensions) {
+            targetLabels.put(extension, targetLabels.size() + 1);
+        }
+        reorderRemainingTargetLabels();
+    }
+
+    static Set<BlockPos> connectedVeinExtensions(Map<BlockPos, Integer> labels, OreType labelType,
+            List<OreVisualizer.CachedOre> candidates) {
+        Set<BlockPos> extensions = new LinkedHashSet<>();
+        if (labels == null || labels.isEmpty() || labelType == null
+                || candidates == null || candidates.isEmpty()) return extensions;
+        Set<BlockPos> available = new HashSet<>();
+        for (OreVisualizer.CachedOre candidate : candidates) {
+            if (candidate.type() == labelType && !labels.containsKey(candidate.pos())) {
+                available.add(candidate.pos().toImmutable());
+            }
+        }
+        if (available.isEmpty()) return extensions;
+        List<Map.Entry<BlockPos, Integer>> seeds = new ArrayList<>(labels.entrySet());
+        seeds.sort((left, right) -> {
+            int label = Integer.compare(left.getValue(), right.getValue());
+            return label != 0 ? label : compareBlockPositions(left.getKey(), right.getKey());
+        });
+        Deque<BlockPos> queue = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        for (Map.Entry<BlockPos, Integer> seed : seeds) {
+            BlockPos pos = seed.getKey().toImmutable();
+            queue.addLast(pos);
+            visited.add(pos);
+        }
+        BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
+        while (!queue.isEmpty()) {
+            BlockPos current = queue.removeFirst();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        neighbor.setPos(current.getX() + dx, current.getY() + dy,
+                            current.getZ() + dz);
+                        if (!available.remove(neighbor)) continue;
+                        BlockPos extension = neighbor.toImmutable();
+                        if (visited.add(extension)) queue.addLast(extension);
+                        extensions.add(extension);
+                    }
+                }
+            }
+        }
+        return extensions;
     }
 
     private void pruneTargetLabels() {

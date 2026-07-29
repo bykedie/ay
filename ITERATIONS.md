@@ -411,3 +411,11 @@
 - Iteration 3: retained all other mining stands so the route can immediately try another side or height around the same ore.
 - Iteration 4: cooled only the specific unbreakable, unreachable or already rejected exposure blocker, without adding hypothetical per-stand ray traces during path search.
 - Iteration 5: expired stand rejections after 100 ticks and retained target cooldown only after bounded path search confirms that no valid stand remains.
+
+## Version 1.10.83 Auto Mining Hidden Vein Extension Update
+
+- Iteration 1: expanded an active vein label set when later scan slices discover connected ore that is not visible yet.
+- Iteration 2: traversed the fixed 26-neighbor topology transitively, allowing a newly discovered chain of adjacent ore to join in one refresh.
+- Iteration 3: seeded expansion from every existing label so a temporarily absent candidate entry cannot split the owned vein.
+- Iteration 4: excluded unrelated positions and mismatched ore types before they can affect target ownership.
+- Iteration 5: reordered the enlarged vein by the player's current distance before direct-mining and path selection continue.
