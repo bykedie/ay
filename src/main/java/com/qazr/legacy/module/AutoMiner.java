@@ -450,6 +450,10 @@ public final class AutoMiner {
     }
 
     private void mine(MineTarget target) {
+        mine(target, false);
+    }
+
+    private void mine(MineTarget target, boolean routeBlocker) {
         selectBestPickaxe(target.pos);
         if (!target.pos.equals(miningPos) || target.type != miningType) {
             miningAttempts = 0;
@@ -470,7 +474,9 @@ public final class AutoMiner {
         miningPos = target.pos;
         miningType = target.type;
         miningAttempts++;
-        if (!hasActiveRoute() && !preserveQueuedVeinTarget(
+        boolean preserveRouteTarget = preserveQueuedRouteTarget(
+            routeBlocker, target.pos, target.type, currentOre, currentOreType);
+        if (!hasActiveRoute() && !preserveRouteTarget && !preserveQueuedVeinTarget(
                 target.pos, target.type, currentOre, currentOreType, targetLabels)) {
             currentOre = target.pos;
             currentOreType = target.type;
@@ -536,6 +542,8 @@ public final class AutoMiner {
         MineTarget routedTarget = visibleTarget(currentOre);
         if (routedTarget != null) {
             mine(routedTarget);
+        } else if (clearMiningExposureObstacle(currentOre)) {
+            delay = ModConfig.mineDelayTicks;
         } else {
             coolDownUnusableRouteTarget();
         }
@@ -1760,9 +1768,35 @@ public final class AutoMiner {
         if (ore != null) {
             if (!stableMiningPosition(miningPlayerFeet, obstacle)
                     || !withinMiningReach(eyes, obstacle, miningReach())) return false;
-            mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit));
+            mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit), true);
             return true;
         }
+        return beginClearingObstacle(obstacle, hit);
+    }
+
+    private boolean clearMiningExposureObstacle(BlockPos ore) {
+        RayTraceResult hit = rayTraceMiningExposureObstacle(miningEyes, miningPlayerFeet, ore);
+        if (hit == null) return false;
+        BlockPos obstacle = hit.getBlockPos();
+        if (temporarilyBlocked(obstacle, rejectedObstaclesUntil, mc.player.ticksExisted)) {
+            return false;
+        }
+        OreType obstacleType = targetType(obstacle);
+        if (obstacleType != null) {
+            if (!stableMiningPosition(miningPlayerFeet, obstacle)
+                    || !withinMiningReach(miningEyes, obstacle, miningReach())) return false;
+            if (!targetLabels.containsKey(obstacle) && connectedToLabeledVein(
+                    obstacle, obstacleType, targetLabels, targetLabelType)) {
+                targetLabels.put(obstacle.toImmutable(), targetLabels.size() + 1);
+                reorderRemainingTargetLabels();
+            }
+            mine(new MineTarget(obstacle.toImmutable(), obstacleType, hit.sideHit), true);
+            return true;
+        }
+        return beginClearingObstacle(obstacle, hit);
+    }
+
+    private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
         if (!obstacle.equals(clearingPos)) {
             selectBestPickaxe(obstacle);
             clearingPos = obstacle.toImmutable();
@@ -1779,6 +1813,29 @@ public final class AutoMiner {
             return false;
         }
         return true;
+    }
+
+    private RayTraceResult rayTraceMiningExposureObstacle(Vec3d eyes, BlockPos playerFeet,
+            BlockPos ore) {
+        if (eyes == null || playerFeet == null || ore == null) return null;
+        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+            RayTraceResult hit = mc.world.rayTraceBlocks(
+                eyes, blockVisibilitySample(ore, sampleIndex), false, true, false);
+            if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
+                    && miningExposureObstacleAllowed(
+                        hit.getBlockPos(), playerFeet, ore)) return hit;
+        }
+        return null;
+    }
+
+    static boolean miningExposureObstacleAllowed(BlockPos obstacle, BlockPos playerFeet,
+            BlockPos ore) {
+        if (obstacle == null || playerFeet == null || ore == null || obstacle.equals(ore)
+                || obstacle.equals(playerFeet) || obstacle.equals(playerFeet.up())
+                || obstacle.equals(playerFeet.down())) return false;
+        return Math.abs(obstacle.getX() - ore.getX()) <= 1
+            && Math.abs(obstacle.getY() - ore.getY()) <= 1
+            && Math.abs(obstacle.getZ() - ore.getZ()) <= 1;
     }
 
     private List<BlockPos> currentCorridorCells() {
@@ -2247,6 +2304,13 @@ public final class AutoMiner {
         return mined != null && queued != null && !mined.equals(queued)
             && minedType != null && minedType == queuedType && labels != null
             && labels.containsKey(mined) && labels.containsKey(queued);
+    }
+
+    static boolean preserveQueuedRouteTarget(boolean routeBlocker, BlockPos mined,
+            OreType minedType, BlockPos queued, OreType queuedType) {
+        return routeBlocker && queued != null && queuedType != null
+            && !completionOwnsWork(mined, minedType, queued, queuedType)
+            && mined != null && minedType != null;
     }
 
     static boolean completionAwaitsRoute(BlockPos routeOre, OreType routeType,

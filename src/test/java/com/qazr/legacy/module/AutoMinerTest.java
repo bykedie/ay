@@ -278,6 +278,20 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void finalMiningExposureProtectsThePlayerAndOnlyClearsNearTheOre() {
+        BlockPos feet = new BlockPos(1, 64, 0);
+        BlockPos ore = new BlockPos(0, 64, 0);
+
+        assertTrue(AutoMiner.miningExposureObstacleAllowed(ore.up(), feet, ore));
+        assertTrue(AutoMiner.miningExposureObstacleAllowed(ore.north(), feet, ore));
+        assertFalse(AutoMiner.miningExposureObstacleAllowed(ore, feet, ore));
+        assertFalse(AutoMiner.miningExposureObstacleAllowed(feet, feet, ore));
+        assertFalse(AutoMiner.miningExposureObstacleAllowed(feet.up(), feet, ore));
+        assertFalse(AutoMiner.miningExposureObstacleAllowed(feet.down(), feet, ore));
+        assertFalse(AutoMiner.miningExposureObstacleAllowed(ore.north(2), feet, ore));
+    }
+
+    @Test
     public void miningWorkAreaRequiresClearPlayerCellsAndSolidSupport() {
         assertTrue(AutoMiner.miningWorkAreaReady(true, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
@@ -814,6 +828,12 @@ public class AutoMinerTest {
             oldOre, OreType.GOLD, newOre, OreType.IRON, labels));
         assertFalse(AutoMiner.preserveQueuedVeinTarget(
             oldOre, OreType.IRON, oldOre, OreType.IRON, labels));
+        assertTrue(AutoMiner.preserveQueuedRouteTarget(
+            true, newOre, OreType.GOLD, oldOre, OreType.IRON));
+        assertFalse(AutoMiner.preserveQueuedRouteTarget(
+            true, oldOre, OreType.IRON, oldOre, OreType.IRON));
+        assertFalse(AutoMiner.preserveQueuedRouteTarget(
+            false, newOre, OreType.GOLD, oldOre, OreType.IRON));
         assertTrue(AutoMiner.completionAwaitsRoute(
             newOre, OreType.IRON, newOre, OreType.IRON, true));
         assertTrue(AutoMiner.completionAwaitsRoute(

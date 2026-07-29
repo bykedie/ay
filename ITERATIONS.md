@@ -339,3 +339,11 @@
 - Iteration 3: preserved face, edge and corner connectivity exactly, including negative-coordinate diagonal neighbors, using one reusable mutable coordinate cursor.
 - Iteration 4: retained the existing same-type and already-labeled guards before any neighborhood work.
 - Iteration 5: removed dense-vein quadratic comparisons from the per-tick direct-mining fallback without changing queue ownership.
+
+## Version 1.10.74 Auto Mining Final Exposure Update
+
+- Iteration 1: traced the seven ore sight lines again after reaching a valid mining stand instead of cooling the target when the predefined face block is already clear.
+- Iteration 2: allowed the actual breakable blocker adjacent to the ore to enter the existing tracked destruction and three-tick confirmation flow.
+- Iteration 3: reused the same hardness-based attempt budget and exact ray hit for corridor and final-exposure obstacles.
+- Iteration 4: explicitly protected the player's feet, head and supporting block, and kept the completed route target queued while any necessary ore blocker is mined.
+- Iteration 5: bounded accepted blockers to the ore's immediate 3x3x3 neighborhood so the recovery cannot tunnel through unrelated distant terrain.
