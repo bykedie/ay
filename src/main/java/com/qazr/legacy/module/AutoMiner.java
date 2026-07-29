@@ -155,6 +155,8 @@ public final class AutoMiner {
     private List<OreVisualizer.CachedOre> currentCandidateCache = java.util.Collections.emptyList();
     private int currentCandidateTickBucket = Integer.MIN_VALUE;
     private BlockPos currentCandidateFeet;
+    private List<OreVisualizer.CachedOre> extendedTargetLabelCandidates =
+        java.util.Collections.emptyList();
 
     public AutoMiner(ModuleManager modules, OreVisualizer oreVisualizer) {
         this.modules = modules;
@@ -172,6 +174,7 @@ public final class AutoMiner {
         rejectedObstaclesUntil.clear();
         rejectedScaffoldsUntil.clear();
         rejectedMiningStandsUntil.clear();
+        extendedTargetLabelCandidates = java.util.Collections.emptyList();
         invalidateCurrentCandidateCache();
         clearPendingCompletion();
         clearTargetLabels();
@@ -333,6 +336,7 @@ public final class AutoMiner {
             miningPlayerFeet = null;
             miningEyes = null;
             miningReachDistance = 0.0;
+            extendedTargetLabelCandidates = java.util.Collections.emptyList();
             invalidateCurrentCandidateCache();
             clearScaffoldAssist();
             clearPendingCompletion();
@@ -2689,6 +2693,10 @@ public final class AutoMiner {
     }
 
     private void extendTargetLabels(List<OreVisualizer.CachedOre> candidates) {
+        boolean inspect = veinExtensionSnapshotChanged(
+            extendedTargetLabelCandidates, candidates, !targetLabels.isEmpty());
+        extendedTargetLabelCandidates = candidates;
+        if (!inspect) return;
         Set<BlockPos> extensions = connectedVeinExtensions(
             targetLabels, targetLabelType, candidates);
         if (extensions.isEmpty()) return;
@@ -2696,6 +2704,11 @@ public final class AutoMiner {
             targetLabels.put(extension, targetLabels.size() + 1);
         }
         reorderRemainingTargetLabels();
+    }
+
+    static boolean veinExtensionSnapshotChanged(List<OreVisualizer.CachedOre> previous,
+            List<OreVisualizer.CachedOre> current, boolean labelsPresent) {
+        return labelsPresent && previous != current;
     }
 
     static Set<BlockPos> connectedVeinExtensions(Map<BlockPos, Integer> labels, OreType labelType,

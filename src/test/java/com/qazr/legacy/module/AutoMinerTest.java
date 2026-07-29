@@ -587,6 +587,13 @@ public class AutoMinerTest {
         assertTrue(extensions.contains(secondHidden.pos()));
         assertFalse(extensions.contains(unrelated.pos()));
         assertFalse(extensions.contains(wrongType.pos()));
+
+        List<OreVisualizer.CachedOre> snapshot = Arrays.asList(firstHidden, secondHidden);
+        assertTrue(AutoMiner.veinExtensionSnapshotChanged(
+            java.util.Collections.emptyList(), snapshot, true));
+        assertFalse(AutoMiner.veinExtensionSnapshotChanged(snapshot, snapshot, true));
+        assertFalse(AutoMiner.veinExtensionSnapshotChanged(
+            java.util.Collections.emptyList(), snapshot, false));
     }
 
     @Test

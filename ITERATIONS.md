@@ -419,3 +419,11 @@
 - Iteration 3: seeded expansion from every existing label so a temporarily absent candidate entry cannot split the owned vein.
 - Iteration 4: excluded unrelated positions and mismatched ore types before they can affect target ownership.
 - Iteration 5: reordered the enlarged vein by the player's current distance before direct-mining and path selection continue.
+
+## Version 1.10.84 Auto Mining Vein Extension Coalescing Update
+
+- Iteration 1: bound hidden-vein expansion to the identity of the bounded current-candidate snapshot.
+- Iteration 2: skipped repeated connectivity traversal while the same four-tick snapshot is reused.
+- Iteration 3: ran expansion immediately after a snapshot rebuild caused by scanning, movement or behavioral cache invalidation.
+- Iteration 4: kept label acquisition unchanged because its initial flood fill already includes every connected ore in that snapshot.
+- Iteration 5: reset snapshot ownership on reload and world unload without coupling it to unrelated path-search state.
