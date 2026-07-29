@@ -539,3 +539,11 @@
 - Iteration 3: rejected only the current ore-and-stand pair when relative position, foot room, head room, or support is invalid.
 - Iteration 4: retained alternate stand searches for the same ore instead of cooling down the entire target.
 - Iteration 5: covered valid posture, invalid relative position, and invalid work-area outcomes in the focused auto-miner tests.
+
+## Version 1.10.99 Auto Mining Blocker Ownership Update
+
+- Iteration 1: reproduced a route blocker that retained its route binding only on the first mining tick.
+- Iteration 2: stored blocker ownership alongside the active mining position and ore type.
+- Iteration 3: inherited blocker ownership only while continuing the exact same mining target.
+- Iteration 4: cleared ownership when mining state is released or a different target begins.
+- Iteration 5: covered inherited, replaced, newly requested, and ordinary mining ownership transitions.

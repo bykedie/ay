@@ -102,6 +102,7 @@ public final class AutoMiner {
     private OreType currentOreType;
     private BlockPos miningPos;
     private OreType miningType;
+    private boolean miningRouteBlocker;
     private int miningAttempts;
     private int miningAttemptBudget;
     private int miningDeadlineTick;
@@ -486,7 +487,8 @@ public final class AutoMiner {
 
     private void mine(MineTarget target, boolean routeBlocker) {
         selectBestPickaxe(target.pos);
-        if (!target.pos.equals(miningPos) || target.type != miningType) {
+        boolean sameMiningTarget = target.pos.equals(miningPos) && target.type == miningType;
+        if (!sameMiningTarget) {
             miningAttempts = 0;
             miningAttemptBudget = destructionAttemptBudget(
                 mc.world.getBlockState(target.pos).getPlayerRelativeBlockHardness(
@@ -504,9 +506,11 @@ public final class AutoMiner {
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningPos = target.pos;
         miningType = target.type;
+        miningRouteBlocker = routeBlockerOwnership(
+            sameMiningTarget, miningRouteBlocker, routeBlocker);
         miningAttempts++;
         boolean preserveRouteTarget = preserveQueuedRouteTarget(
-            routeBlocker, target.pos, target.type, currentOre, currentOreType);
+            miningRouteBlocker, target.pos, target.type, currentOre, currentOreType);
         if (!hasActiveRoute() && !preserveRouteTarget && !preserveQueuedVeinTarget(
                 target.pos, target.type, currentOre, currentOreType, targetLabels)) {
             currentOre = target.pos;
@@ -2285,6 +2289,7 @@ public final class AutoMiner {
         releasePendingQuotaReservation(miningPos, miningType);
         miningPos = null;
         miningType = null;
+        miningRouteBlocker = false;
         miningAttempts = 0;
         miningAttemptBudget = 0;
         miningDeadlineTick = 0;
@@ -2455,6 +2460,11 @@ public final class AutoMiner {
         return routeBlocker && queued != null && queuedType != null
             && !completionOwnsWork(mined, minedType, queued, queuedType)
             && mined != null && minedType != null;
+    }
+
+    static boolean routeBlockerOwnership(boolean sameTarget, boolean previousOwnership,
+            boolean requestedOwnership) {
+        return requestedOwnership || sameTarget && previousOwnership;
     }
 
     static boolean completionAwaitsRoute(BlockPos routeOre, OreType routeType,

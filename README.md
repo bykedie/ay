@@ -72,7 +72,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.10.98.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.10.99.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 
