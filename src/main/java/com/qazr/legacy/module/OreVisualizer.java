@@ -370,9 +370,15 @@ public final class OreVisualizer {
         int centerChunkX = MathHelper.floor(mc.player.posX) >> 4;
         int centerChunkZ = MathHelper.floor(mc.player.posZ) >> 4;
         int centerSection = MathHelper.clamp(MathHelper.floor(mc.player.posY) >> 4, 0, 15);
-        if (sameSeedState(seededWorld == mc.world, seededRadiusChunks, seededRange,
-                seededCenterChunkX, seededCenterChunkZ, seededCenterSection, radiusChunks,
-                cacheRange, centerChunkX, centerChunkZ, centerSection)) return;
+        boolean sameHorizontalState = sameHorizontalSeedState(seededWorld == mc.world,
+            seededRadiusChunks, seededRange, seededCenterChunkX, seededCenterChunkZ,
+            radiusChunks, cacheRange, centerChunkX, centerChunkZ);
+        if (sameHorizontalState) {
+            if (seededCenterSection == centerSection) return;
+            prioritizeRemainingSections(centerSection);
+            seededCenterSection = centerSection;
+            return;
+        }
         pruneQueue(centerChunkX, centerChunkZ, cacheRange);
         pruneScannedChunks(centerChunkX, centerChunkZ, cacheRange);
         for (int dx = -radiusChunks; dx <= radiusChunks; dx++) {
@@ -414,9 +420,16 @@ public final class OreVisualizer {
     static boolean sameSeedState(boolean sameWorld, int previousRadius, double previousRange,
             int previousChunkX, int previousChunkZ, int previousSection, int radius, double range,
             int chunkX, int chunkZ, int section) {
-        return sameWorld && previousRadius == radius && Double.compare(previousRange, range) == 0
-            && previousChunkX == chunkX && previousChunkZ == chunkZ
+        return sameHorizontalSeedState(sameWorld, previousRadius, previousRange, previousChunkX,
+            previousChunkZ, radius, range, chunkX, chunkZ)
             && previousSection == section;
+    }
+
+    static boolean sameHorizontalSeedState(boolean sameWorld, int previousRadius,
+            double previousRange, int previousChunkX, int previousChunkZ, int radius, double range,
+            int chunkX, int chunkZ) {
+        return sameWorld && previousRadius == radius && Double.compare(previousRange, range) == 0
+            && previousChunkX == chunkX && previousChunkZ == chunkZ;
     }
 
     static int chunkSearchRadius(double range) {

@@ -59,6 +59,12 @@ public class OreVisualizerTest {
             true, 3, 32.0, 10, -4, 4, 3, 32.0, 11, -4, 4));
         assertTrue(!OreVisualizer.sameSeedState(
             true, 3, 32.0, 10, -4, 4, 3, 32.0, 10, -4, 5));
+        assertTrue(OreVisualizer.sameHorizontalSeedState(
+            true, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
+        assertTrue(!OreVisualizer.sameHorizontalSeedState(
+            false, 3, 32.0, 10, -4, 3, 32.0, 10, -4));
+        assertTrue(!OreVisualizer.sameHorizontalSeedState(
+            true, 3, 32.0, 10, -4, 3, 32.0, 11, -4));
     }
 
     @Test

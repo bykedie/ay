@@ -395,3 +395,11 @@
 - Iteration 3: kept the validation cursor unchanged while deferred, so the same marker resumes when its chunk is available again.
 - Iteration 4: retained fair rotation by moving a deferred task to the end of the insertion-ordered validation queue.
 - Iteration 5: preserved the existing marker-read budget for loaded chunks because deferred tasks consume no block checks.
+
+## Version 1.10.81 Auto Mining Vertical Seed Fast Path Update
+
+- Iteration 1: separated horizontal ore-cache seed identity from the player's current vertical section.
+- Iteration 2: added a same-chunk vertical fast path that only reprioritizes unscanned section tails.
+- Iteration 3: skipped cache pruning and the full loaded-chunk radius enumeration when only height changed.
+- Iteration 4: skipped whole-queue horizontal distance sorting and validation-delay resets on the vertical-only path.
+- Iteration 5: retained the full seed refresh whenever the world, range, radius or horizontal chunk changes.
