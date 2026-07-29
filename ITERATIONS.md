@@ -579,3 +579,11 @@
 - Iteration 3: released only reservations that had not yet observed server-side block absence.
 - Iteration 4: retained later absence confirmation so a genuinely mined old target is still counted.
 - Iteration 5: covered no-current-target, same-target, changed-position, and changed-type transitions.
+
+## Version 1.10.104 Auto Mining Hazardous Cell Update
+
+- Iteration 1: reproduced replaceable fire and lava materials being accepted as route cells.
+- Iteration 2: separated replaceability from route safety in the shared passability decision.
+- Iteration 3: excluded fire and lava from A* traversal, endpoint posture, and route execution checks.
+- Iteration 4: retained water and ordinary replaceable blocks so underwater mining remains available.
+- Iteration 5: covered safe replaceable, hazardous replaceable, and solid non-replaceable cells.

@@ -323,6 +323,9 @@ public class AutoMinerTest {
 
     @Test
     public void miningWorkAreaRequiresClearPlayerCellsAndSolidSupport() {
+        assertTrue(AutoMiner.routeCellPassable(true, false));
+        assertFalse(AutoMiner.routeCellPassable(true, true));
+        assertFalse(AutoMiner.routeCellPassable(false, false));
         assertTrue(AutoMiner.miningWorkAreaReady(true, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, false, true));

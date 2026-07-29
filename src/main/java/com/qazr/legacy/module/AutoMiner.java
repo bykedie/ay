@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.function.ToIntFunction;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockFalling;
+import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -1807,7 +1808,13 @@ public final class AutoMiner {
     }
 
     private boolean isPassable(BlockPos pos) {
-        return mc.world.getBlockState(pos).getMaterial().isReplaceable();
+        Material material = mc.world.getBlockState(pos).getMaterial();
+        return routeCellPassable(material.isReplaceable(),
+            material == Material.LAVA || material == Material.FIRE);
+    }
+
+    static boolean routeCellPassable(boolean replaceable, boolean hazardous) {
+        return replaceable && !hazardous;
     }
 
     private boolean canClearForCorridor(BlockPos pos) {
