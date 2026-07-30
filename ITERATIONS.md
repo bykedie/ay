@@ -683,3 +683,11 @@
 - Iteration 3: preserved the player's physical attack state and released automatic ownership on pause, target change, disable, and world unload.
 - Iteration 4: made mining delay a confirmed block-to-block delay instead of interrupting repeated damage to the same block.
 - Iteration 5: aligned destruction deadlines with continuous ticks and covered exact crosshair ownership, completion, delay, and target-priority rules.
+
+## Version 1.10.117 Auto Mining Dynamic Hardness Update
+
+- Iteration 1: reproduced a block retaining its original fast destruction budget after mining conditions became slower.
+- Iteration 2: sampled current relative hardness while continuing the same ore or route obstacle.
+- Iteration 3: expanded the attempt budget without resetting vanilla's accumulated breaking progress.
+- Iteration 4: extended the matching deadline only by the newly required attempts and kept faster changes from shortening it.
+- Iteration 5: covered slower, faster, zero-hardness, unchanged, and integer-overflow boundary cases.

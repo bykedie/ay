@@ -885,6 +885,17 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void slowerMidBreakConditionsOnlyExpandTheRemainingDestructionBudget() {
+        assertEquals(18, AutoMiner.expandedDestructionAttemptBudget(12, 0.1F));
+        assertEquals(18, AutoMiner.expandedDestructionAttemptBudget(18, 1.0F));
+        assertEquals(240, AutoMiner.expandedDestructionAttemptBudget(18, 0.0F));
+        assertEquals(58, AutoMiner.expandedDestructionDeadlineTick(52, 12, 18));
+        assertEquals(58, AutoMiner.expandedDestructionDeadlineTick(58, 18, 12));
+        assertEquals(Integer.MAX_VALUE, AutoMiner.expandedDestructionDeadlineTick(
+            Integer.MAX_VALUE - 2, 12, 18));
+    }
+
+    @Test
     public void destructionAttemptLimitStopsOnlyAfterBudgetIsConsumed() {
         assertFalse(AutoMiner.destructionAttemptsExhausted(11, 12));
         assertTrue(AutoMiner.destructionAttemptsExhausted(12, 12));

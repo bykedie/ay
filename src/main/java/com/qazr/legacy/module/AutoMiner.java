@@ -557,6 +557,8 @@ public final class AutoMiner {
 
     private void mine(MineTarget target, boolean routeBlocker) {
         selectBestPickaxe(target.pos);
+        float relativeHardness = mc.world.getBlockState(target.pos)
+            .getPlayerRelativeBlockHardness(mc.player, mc.world, target.pos);
         boolean sameMiningTarget = target.pos.equals(miningPos) && target.type == miningType;
         boolean toolChanged = sameMiningTarget && toolChangeRequiresBreakReset(
             miningTool, mc.player.getHeldItemMainhand());
@@ -573,11 +575,15 @@ public final class AutoMiner {
                 mc.playerController.resetBlockRemoving();
             }
             miningAttempts = 0;
-            miningAttemptBudget = destructionAttemptBudget(
-                mc.world.getBlockState(target.pos).getPlayerRelativeBlockHardness(
-                    mc.player, mc.world, target.pos));
+            miningAttemptBudget = destructionAttemptBudget(relativeHardness);
             miningDeadlineTick = destructionDeadlineTick(
                 mc.player.ticksExisted, miningAttemptBudget);
+        } else {
+            int expandedBudget = expandedDestructionAttemptBudget(
+                miningAttemptBudget, relativeHardness);
+            miningDeadlineTick = expandedDestructionDeadlineTick(
+                miningDeadlineTick, miningAttemptBudget, expandedBudget);
+            miningAttemptBudget = expandedBudget;
         }
         if (destructionWorkExhausted(miningAttempts, miningAttemptBudget,
                 mc.player.ticksExisted, miningDeadlineTick)) {
@@ -2046,6 +2052,8 @@ public final class AutoMiner {
             mc.playerController.resetBlockRemoving();
         }
         selectBestPickaxe(obstacle);
+        float relativeHardness = mc.world.getBlockState(obstacle)
+            .getPlayerRelativeBlockHardness(mc.player, mc.world, obstacle);
         boolean toolChanged = sameTarget && toolChangeRequiresBreakReset(
             clearingTool, mc.player.getHeldItemMainhand());
         boolean restartDestruction = destructionStateRestarts(sameTarget, toolChanged);
@@ -2055,12 +2063,16 @@ public final class AutoMiner {
             }
             clearingPos = obstacle.toImmutable();
             clearingAttempts = 0;
-            clearingAttemptBudget = destructionAttemptBudget(
-                mc.world.getBlockState(obstacle).getPlayerRelativeBlockHardness(
-                    mc.player, mc.world, obstacle));
+            clearingAttemptBudget = destructionAttemptBudget(relativeHardness);
             clearingDeadlineTick = destructionDeadlineTick(
                 mc.player.ticksExisted, clearingAttemptBudget);
             clearingMissingTicks = 0;
+        } else {
+            int expandedBudget = expandedDestructionAttemptBudget(
+                clearingAttemptBudget, relativeHardness);
+            clearingDeadlineTick = expandedDestructionDeadlineTick(
+                clearingDeadlineTick, clearingAttemptBudget, expandedBudget);
+            clearingAttemptBudget = expandedBudget;
         }
         return restartDestruction;
     }
@@ -2580,6 +2592,16 @@ public final class AutoMiner {
         int expected = (int) Math.ceil(1.0D / relativeHardness);
         return MathHelper.clamp(expected + DESTRUCTION_ATTEMPT_GRACE,
             MIN_DESTRUCTION_ATTEMPTS, MAX_DESTRUCTION_ATTEMPTS);
+    }
+
+    static int expandedDestructionAttemptBudget(int currentBudget, float relativeHardness) {
+        return Math.max(currentBudget, destructionAttemptBudget(relativeHardness));
+    }
+
+    static int expandedDestructionDeadlineTick(int currentDeadline, int previousBudget,
+            int expandedBudget) {
+        long extension = Math.max(0, expandedBudget - Math.max(0, previousBudget));
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(0L, currentDeadline) + extension);
     }
 
     static boolean destructionAttemptsExhausted(int attempts, int budget) {
