@@ -2045,6 +2045,12 @@ public final class AutoMiner {
             && (ore ? stableMiningPosition : breakable);
     }
 
+    static boolean exposureObstacleSampleUsable(boolean allowed, boolean temporarilyBlocked,
+            boolean ore, boolean stableMiningPosition, boolean withinReach, boolean breakable) {
+        return allowed && exposureObstacleUsable(temporarilyBlocked, ore,
+            stableMiningPosition, withinReach, breakable);
+    }
+
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
         boolean restartDestruction = prepareClearingTarget(obstacle);
         if (!damageCorridorBlock(obstacle, hit, restartDestruction)) {
@@ -2092,9 +2098,18 @@ public final class AutoMiner {
         for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
             RayTraceResult hit = mc.world.rayTraceBlocks(
                 eyes, blockVisibilitySample(ore, sampleIndex), false, true, false);
-            if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
-                    && miningExposureObstacleAllowed(
-                        hit.getBlockPos(), playerFeet, ore)) return hit;
+            if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK) continue;
+            BlockPos obstacle = hit.getBlockPos();
+            boolean allowed = miningExposureObstacleAllowed(obstacle, playerFeet, ore);
+            OreType obstacleType = targetType(obstacle);
+            boolean blocked = temporarilyBlocked(
+                obstacle, rejectedObstaclesUntil, mc.player.ticksExisted);
+            boolean reachable = withinMiningReach(eyes, obstacle, miningReach());
+            boolean stable = obstacleType != null
+                && stableMiningPosition(playerFeet, obstacle);
+            boolean breakable = obstacleType == null && isBreakableBlock(obstacle);
+            if (exposureObstacleSampleUsable(allowed, blocked, obstacleType != null,
+                    stable, reachable, breakable)) return hit;
         }
         return null;
     }

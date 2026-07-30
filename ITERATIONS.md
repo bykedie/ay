@@ -731,3 +731,11 @@
 - Iteration 3: reordered every remaining labeled block from the player's current position after any labeled block is confirmed mined.
 - Iteration 4: retained route ownership, completion confirmation, quota reservations, and unrelated unlabeled completions unchanged.
 - Iteration 5: covered removed and retained label outcomes in the focused auto-miner tests.
+
+## Version 1.10.123 Auto Mining Exposure Sample Update
+
+- Iteration 1: reproduced endpoint exposure recovery accepting the first geometric ray hit before checking whether that obstacle was usable.
+- Iteration 2: applied the existing cooldown, reach, stable-position, and breakability rules to each sampled hit.
+- Iteration 3: skipped unusable early hits and continued through the remaining visibility samples.
+- Iteration 4: retained the same mining reach, protected player cells, ore eligibility, and ordinary-block harvest requirements.
+- Iteration 5: covered allowed, disallowed, breakable, and unusable sampled obstacles in the focused tests.

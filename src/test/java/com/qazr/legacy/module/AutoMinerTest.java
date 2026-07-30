@@ -299,6 +299,12 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.exposureObstacleUsable(false, false, false, true, false));
         assertFalse(AutoMiner.exposureObstacleUsable(true, false, false, true, true));
         assertFalse(AutoMiner.exposureObstacleUsable(false, false, false, false, true));
+        assertFalse(AutoMiner.exposureObstacleSampleUsable(
+            true, false, false, false, true, false));
+        assertTrue(AutoMiner.exposureObstacleSampleUsable(
+            true, false, false, false, true, true));
+        assertFalse(AutoMiner.exposureObstacleSampleUsable(
+            false, false, false, false, true, true));
 
         Map<BlockPos, AutoMiner.RejectedMiningStands> rejectedStands = new HashMap<>();
         AutoMiner.RejectedMiningStands stands =
