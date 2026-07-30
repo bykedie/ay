@@ -691,3 +691,11 @@
 - Iteration 3: expanded the attempt budget without resetting vanilla's accumulated breaking progress.
 - Iteration 4: extended the matching deadline only by the newly required attempts and kept faster changes from shortening it.
 - Iteration 5: covered slower, faster, zero-hardness, unchanged, and integer-overflow boundary cases.
+
+## Version 1.10.118 Auto Mining Tool Ownership Update
+
+- Iteration 1: reproduced combat auto-weapon selection leaving a sword active during vanilla's next continuous mining tick.
+- Iteration 2: prepared the best mining tool during the client START phase before vanilla processes held attack input.
+- Iteration 3: limited early tool preparation to a validated active ore or route obstacle.
+- Iteration 4: retained combat's later weapon selection while restoring the pickaxe before every owned mining tick.
+- Iteration 5: covered ore, obstacle, and inactive-target preparation decisions alongside the existing tool-reset tests.

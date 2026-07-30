@@ -395,6 +395,9 @@ public final class AutoMiner {
         boolean clearingTarget = target.equals(clearingPos) && !isPassable(target)
             && isBreakableBlock(target);
         if (!miningTarget && !clearingTarget) return;
+        if (automaticBreakToolPreparationRequired(miningTarget, clearingTarget)) {
+            selectBestPickaxe(target);
+        }
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
         if (!withinMiningReach(eyes, target, mc.playerController.getBlockReachDistance())) return;
         RayTraceResult hit = rayTraceExactBlock(eyes, target);
@@ -2628,6 +2631,11 @@ public final class AutoMiner {
     static boolean automaticAttackKeyDown(boolean automaticOwnership, boolean targetExists,
             boolean physicalKeyDown) {
         return physicalKeyDown || automaticOwnership && targetExists;
+    }
+
+    static boolean automaticBreakToolPreparationRequired(boolean miningTarget,
+            boolean clearingTarget) {
+        return miningTarget || clearingTarget;
     }
 
     static boolean vanillaOwnsDestructionTick(boolean automaticTickTarget, boolean sameTarget,
