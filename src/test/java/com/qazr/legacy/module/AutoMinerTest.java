@@ -1068,6 +1068,13 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void hitDelayWaitsRetryNextTickWhileRealDamageUsesTheConfiguredDelay() {
+        assertEquals(0, AutoMiner.destructionActionDelay(false, 8));
+        assertEquals(8, AutoMiner.destructionActionDelay(true, 8));
+        assertEquals(0, AutoMiner.destructionActionDelay(true, -1));
+    }
+
+    @Test
     public void changedMiningToolsRestartDestructionBudgetsForTheSameBlock() {
         assertTrue(AutoMiner.destructionStateRestarts(false, false));
         assertTrue(AutoMiner.destructionStateRestarts(false, true));

@@ -667,3 +667,11 @@
 - Iteration 3: kept the next ore or obstacle locked while the vanilla delay counts down.
 - Iteration 4: deferred swings, attempt consumption, and completion registration until breaking starts or the block is instantly removed.
 - Iteration 5: covered delayed, active, instant, and rejected destruction requests.
+
+## Version 1.10.115 Auto Mining Hit Delay Pacing Update
+
+- Iteration 1: reproduced configured mining delay stretching vanilla's five-call post-break wait for route obstacles.
+- Iteration 2: moved retry pacing into the shared destruction entry points.
+- Iteration 3: retried accepted-but-not-started destruction on the next client tick.
+- Iteration 4: retained the configured delay after actual ore or obstacle progress.
+- Iteration 5: removed path, endpoint, and collision callers that overwrote the destruction outcome's delay.

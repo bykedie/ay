@@ -534,7 +534,7 @@ public final class AutoMiner {
             sameMiningTarget, miningRouteBlocker, routeBlocker);
         if (!destructionRequestAdvanced(true,
                 mc.playerController.getIsHittingBlock(), targetStillPresent)) {
-            delay = 0;
+            delay = destructionActionDelay(false, ModConfig.mineDelayTicks);
             return;
         }
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
@@ -547,7 +547,7 @@ public final class AutoMiner {
             currentOreType = target.type;
         }
         rememberPendingCompletion(target.pos, target.type);
-        delay = ModConfig.mineDelayTicks;
+        delay = destructionActionDelay(true, ModConfig.mineDelayTicks);
     }
 
     private boolean continueMiningTarget() {
@@ -608,15 +608,12 @@ public final class AutoMiner {
                 rejectClearingObstacleAndReplan(faceNeighbor);
                 return;
             }
-            delay = ModConfig.mineDelayTicks;
             return;
         }
         MineTarget routedTarget = visibleTarget(currentOre);
         if (routedTarget != null) {
             mine(routedTarget);
-        } else if (clearMiningExposureObstacle(currentOre)) {
-            delay = ModConfig.mineDelayTicks;
-        } else {
+        } else if (!clearMiningExposureObstacle(currentOre)) {
             rejectMiningStand(currentOre, miningPlayerFeet);
             restartRouteFromCurrentPosition();
         }
@@ -874,7 +871,6 @@ public final class AutoMiner {
             rejectClearingObstacleAndReplan(clearingPos);
             return true;
         }
-        delay = ModConfig.mineDelayTicks;
         return true;
     }
 
@@ -986,7 +982,6 @@ public final class AutoMiner {
                 rejectClearingObstacleAndReplan(from.down());
                 return;
             }
-            delay = ModConfig.mineDelayTicks;
             return;
         }
         BlockPos jumpStart = actualFeet.equals(next) ? from : actualFeet;
@@ -996,7 +991,6 @@ public final class AutoMiner {
                 rejectClearingObstacleAndReplan(jumpStart.up(2));
                 return;
             }
-            delay = ModConfig.mineDelayTicks;
             return;
         }
         if (!isStandable(next)) {
@@ -1005,7 +999,6 @@ public final class AutoMiner {
                 restartRouteFromCurrentPosition();
                 return;
             }
-            delay = ModConfig.mineDelayTicks;
             return;
         }
         double dx = next.getX() + 0.5 - mc.player.posX;
@@ -1232,7 +1225,6 @@ public final class AutoMiner {
         for (BlockPos cell : routeOccupiedCells(routeStep)) {
             if (isPassable(cell)) continue;
             if (clearCorridorCell(cell, cell)) {
-                delay = ModConfig.mineDelayTicks;
                 return true;
             }
             rejectRouteObstacle(cell);
@@ -2083,8 +2075,10 @@ public final class AutoMiner {
         boolean accepted = mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         if (!accepted) return false;
         clearingTool = mc.player.getHeldItemMainhand().copy();
-        if (!destructionRequestAdvanced(true, mc.playerController.getIsHittingBlock(),
-                !isPassable(obstacle))) return true;
+        boolean advanced = destructionRequestAdvanced(true,
+            mc.playerController.getIsHittingBlock(), !isPassable(obstacle));
+        delay = destructionActionDelay(advanced, ModConfig.mineDelayTicks);
+        if (!advanced) return true;
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         clearingAttempts = nextDestructionAttemptCount(clearingAttempts, true);
         return true;
@@ -2518,6 +2512,10 @@ public final class AutoMiner {
     static boolean destructionRequestAdvanced(boolean accepted, boolean controllerHittingBlock,
             boolean targetStillPresent) {
         return accepted && (controllerHittingBlock || !targetStillPresent);
+    }
+
+    static int destructionActionDelay(boolean advanced, int configuredDelay) {
+        return advanced ? Math.max(0, configuredDelay) : 0;
     }
 
     static boolean destructionStateRestarts(boolean sameTarget, boolean toolChanged) {
