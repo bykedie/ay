@@ -34,6 +34,7 @@ Auto mining uses `pathRange` for both target acquisition and route planning. Eac
 
 Locked mining, route-endpoint, active obstacle, and scaffold targets append eight inset corner rays only after the center and six face-center samples miss. Ordinary candidate discovery keeps the seven-sample fast path.
 The selected ray hit point is retained through destruction, so rotation stays aimed at the exposed face or corner instead of returning to an occluded block center.
+When several labeled vein blocks obstruct the locked target, the lowest invisible label wins; equal labels fall back to the nearest sampled hit point.
 
 Vanilla's post-break hit delay keeps the next ore or route obstacle locked without consuming destruction attempts or registering a false completion until block breaking actually starts. Hit-delay countdowns retry every tick; the configured mining delay applies only after real destruction progress.
 
@@ -77,7 +78,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.10.125.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.10.126.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

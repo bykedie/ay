@@ -3368,6 +3368,8 @@ public final class AutoMiner {
     private RayTraceResult rayTraceTarget(Vec3d eyes, BlockPos pos, OreType type,
             boolean allowLabeledBlocker, boolean includeCorners) {
         RayTraceResult labeledBlocker = null;
+        int labeledBlockerLabel = Integer.MAX_VALUE;
+        double labeledBlockerDistanceSq = Double.POSITIVE_INFINITY;
         int sampleCount = includeCorners
             ? LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT : BLOCK_VISIBILITY_SAMPLE_COUNT;
         for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
@@ -3375,11 +3377,18 @@ public final class AutoMiner {
             RayTraceResult hit = mc.world.rayTraceBlocks(eyes, sample, false, true, false);
             if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
                     && pos.equals(hit.getBlockPos())) return hit;
-            if (labeledBlocker == null && allowLabeledBlocker && hit != null
+            if (allowLabeledBlocker && hit != null
                     && hit.typeOfHit == RayTraceResult.Type.BLOCK
                     && isLabeledVeinBlocker(pos, hit.getBlockPos(), type,
                         targetType(hit.getBlockPos()), targetLabels)) {
-                labeledBlocker = hit;
+                int label = targetLabels.getOrDefault(hit.getBlockPos(), Integer.MAX_VALUE);
+                double distanceSq = eyes.squareDistanceTo(hit.hitVec);
+                if (betterLabeledBlocker(label, distanceSq,
+                        labeledBlockerLabel, labeledBlockerDistanceSq)) {
+                    labeledBlocker = hit;
+                    labeledBlockerLabel = label;
+                    labeledBlockerDistanceSq = distanceSq;
+                }
             }
         }
         return labeledBlocker;
@@ -3390,6 +3399,11 @@ public final class AutoMiner {
         return desired != null && hit != null && !desired.equals(hit)
             && desiredType != null && desiredType == hitType
             && labels != null && labels.containsKey(desired) && labels.containsKey(hit);
+    }
+
+    static boolean betterLabeledBlocker(int label, double distanceSq,
+            int bestLabel, double bestDistanceSq) {
+        return label != bestLabel ? label < bestLabel : distanceSq < bestDistanceSq;
     }
 
     static boolean visibilityContextReady(BlockPos playerFeet, Vec3d eyes, double reach) {

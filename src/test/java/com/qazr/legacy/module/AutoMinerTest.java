@@ -606,6 +606,10 @@ public class AutoMinerTest {
             OreType.GOLD, labels));
         assertFalse(AutoMiner.isLabeledVeinBlocker(desired, desired.west(), OreType.IRON,
             OreType.IRON, labels));
+        assertTrue(AutoMiner.betterLabeledBlocker(2, 9.0, 3, 1.0));
+        assertFalse(AutoMiner.betterLabeledBlocker(3, 1.0, 2, 9.0));
+        assertTrue(AutoMiner.betterLabeledBlocker(2, 4.0, 2, 9.0));
+        assertFalse(AutoMiner.betterLabeledBlocker(2, 9.0, 2, 4.0));
     }
 
     @Test

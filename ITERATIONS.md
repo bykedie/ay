@@ -755,3 +755,11 @@
 - Iteration 3: aimed every non-vanilla-owned destruction request at that exposed point.
 - Iteration 4: kept block-center fallback behavior for compatibility paths without a hit vector.
 - Iteration 5: covered exposed-point preference and center fallback in the focused auto-miner tests.
+
+## Version 1.10.126 Auto Mining Blocker Order Update
+
+- Iteration 1: reproduced multiple labeled vein blockers being selected by visibility-sample traversal order.
+- Iteration 2: preserved an exact hit on the requested ore as the highest-priority result.
+- Iteration 3: ranked fallback vein blockers by their existing invisible sequence label.
+- Iteration 4: used eye-to-hit distance only when candidate blockers share the same label.
+- Iteration 5: covered lower-label and equal-label blocker comparisons in the focused tests.
