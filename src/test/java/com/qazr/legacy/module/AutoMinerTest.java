@@ -813,6 +813,28 @@ public class AutoMinerTest {
         List<OreVisualizer.CachedOre> pathSnapshot = Arrays.asList(
             new OreVisualizer.CachedOre(new BlockPos(1, 20, 0), OreType.IRON, 1.0));
         assertTrue(AutoMiner.reusePathCandidateSnapshot(pathSnapshot));
+        OreVisualizer.CachedOre first = pathSnapshot.get(0);
+        OreVisualizer.CachedOre second = new OreVisualizer.CachedOre(
+            new BlockPos(3, 20, 0), OreType.IRON, 9.0);
+        OreVisualizer.CachedOre newlyCloser = new OreVisualizer.CachedOre(
+            new BlockPos(2, 20, 0), OreType.IRON, 4.0);
+        List<OreVisualizer.CachedOre> twoTargetSnapshot = Arrays.asList(first, second);
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 0,
+            Arrays.asList(newlyCloser, first, second)));
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 1,
+            Arrays.asList(first, newlyCloser, second)));
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 1,
+            Arrays.asList(first)));
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 0,
+            Arrays.asList(first, newlyCloser, second)));
+        assertFalse(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 0,
+            Arrays.asList(second, first)));
+        assertFalse(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 2,
+            Arrays.asList(first, second, newlyCloser)));
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 2,
+            Arrays.asList(first, newlyCloser, second)));
+        assertTrue(AutoMiner.pathCandidateSnapshotNeedsRefresh(twoTargetSnapshot, 2,
+            Arrays.asList(newlyCloser)));
         BlockPos feet = new BlockPos(1, 64, 1);
         assertTrue(AutoMiner.reusePathCandidateSnapshot(pathSnapshot, feet, feet));
         assertFalse(AutoMiner.reusePathCandidateSnapshot(pathSnapshot, feet, feet.east()));

@@ -771,3 +771,11 @@
 - Iteration 3: pre-refreshed the vanilla crosshair only after a valid target, reach check, and exact block ray were established.
 - Iteration 4: withheld automatic attack-key ownership when an edge blocker or entity replaced the requested block under the vanilla crosshair.
 - Iteration 5: retained the existing direct mining, tool selection, physical attack-key, and END-tick ownership behavior.
+
+## Version 1.10.128 Auto Mining Candidate Frontier Update
+
+- Iteration 1: reproduced a same-feet path snapshot continuing to search an older distant ore after a nearer candidate entered the refreshed cache.
+- Iteration 2: compared refreshed candidates against the current unprocessed snapshot frontier instead of reusing solely by feet cell.
+- Iteration 3: rebuilt the batch when its next candidate disappeared or a newly discovered candidate moved ahead of it.
+- Iteration 4: preserved completed comparisons when a lower-priority candidate was merely appended behind the old batch.
+- Iteration 5: limited content comparison to actual candidate-cache object changes so stable ticks keep constant-time snapshot checks.

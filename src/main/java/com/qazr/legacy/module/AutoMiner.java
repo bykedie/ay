@@ -132,6 +132,7 @@ public final class AutoMiner {
     private long pathRetrySelectionRevision = Long.MIN_VALUE;
     private int pathCandidateOffset;
     private List<OreVisualizer.CachedOre> pathCandidateBatch = java.util.Collections.emptyList();
+    private List<OreVisualizer.CachedOre> pathCandidateSource = java.util.Collections.emptyList();
     private BlockPos pathCandidateFeet;
     private PathTarget pendingPathTarget;
     private final Set<BlockPos> pendingFailedPathTargets = new HashSet<>();
@@ -309,10 +310,7 @@ public final class AutoMiner {
             return;
         }
         if (ModConfig.mineScaffoldAssist && beginScaffoldAssist(currentCandidates)) return;
-        List<OreVisualizer.CachedOre> pathCandidates = reusePathCandidateSnapshot(
-            pathCandidateBatch, pathCandidateFeet, miningPlayerFeet)
-                ? pathCandidateBatch : currentCandidates;
-        followPathToOre(pathCandidates);
+        followPathToOre(currentCandidates);
     }
 
     @SubscribeEvent
@@ -1353,12 +1351,19 @@ public final class AutoMiner {
     }
 
     private PathTarget findNearestPathTarget(List<OreVisualizer.CachedOre> candidates) {
-        if (!pathCandidateBatch.isEmpty() && !reusePathCandidateSnapshot(
-                pathCandidateBatch, pathCandidateFeet, miningPlayerFeet)) {
-            resetPathCandidateBatch();
+        if (!pathCandidateBatch.isEmpty()) {
+            boolean candidateSourceChanged = pathCandidateSource != candidates;
+            if (!reusePathCandidateSnapshot(pathCandidateBatch, pathCandidateFeet, miningPlayerFeet)
+                    || candidateSourceChanged && pathCandidateSnapshotNeedsRefresh(
+                        pathCandidateBatch, pathCandidateOffset, candidates)) {
+                resetPathCandidateBatch();
+            } else if (candidateSourceChanged) {
+                pathCandidateSource = candidates;
+            }
         }
         if (pathCandidateBatch.isEmpty()) {
             pathCandidateBatch = snapshotPathCandidates(candidates, MAX_CACHED_TARGETS);
+            pathCandidateSource = candidates;
             pathCandidateFeet = miningPlayerFeet == null ? null : miningPlayerFeet.toImmutable();
             pathCandidateOffset = 0;
         }
@@ -1517,6 +1522,48 @@ public final class AutoMiner {
             BlockPos snapshotFeet, BlockPos currentFeet) {
         return reusePathCandidateSnapshot(snapshot)
             && java.util.Objects.equals(snapshotFeet, currentFeet);
+    }
+
+    static boolean pathCandidateSnapshotNeedsRefresh(
+            List<OreVisualizer.CachedOre> snapshot, int nextOffset,
+            List<OreVisualizer.CachedOre> current) {
+        if (snapshot == null || snapshot.isEmpty()) return false;
+        int next = MathHelper.clamp(nextOffset, 0, snapshot.size());
+        if (current == null || current.isEmpty()) return next < snapshot.size();
+        if (next < snapshot.size()
+                && indexOfPathCandidate(current, snapshot.get(next)) < 0) return true;
+        int firstRelevant = next < snapshot.size() ? next : 0;
+        int frontier = -1;
+        for (int index = firstRelevant; index < snapshot.size(); index++) {
+            frontier = Math.max(frontier,
+                indexOfPathCandidate(current, snapshot.get(index)));
+        }
+        if (frontier < 0) return next >= snapshot.size();
+        for (int index = 0; index < frontier; index++) {
+            if (!containsPathCandidate(snapshot, current.get(index))) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsPathCandidate(List<OreVisualizer.CachedOre> candidates,
+            OreVisualizer.CachedOre requested) {
+        if (candidates == null || requested == null) return false;
+        for (OreVisualizer.CachedOre candidate : candidates) {
+            if (candidate != null && candidate.type() == requested.type()
+                    && candidate.pos().equals(requested.pos())) return true;
+        }
+        return false;
+    }
+
+    private static int indexOfPathCandidate(List<OreVisualizer.CachedOre> candidates,
+            OreVisualizer.CachedOre requested) {
+        if (candidates == null || requested == null) return -1;
+        for (int index = 0; index < candidates.size(); index++) {
+            OreVisualizer.CachedOre candidate = candidates.get(index);
+            if (candidate != null && candidate.type() == requested.type()
+                    && candidate.pos().equals(requested.pos())) return index;
+        }
+        return -1;
     }
 
     static boolean temporarilyBlocked(BlockPos candidate, Map<BlockPos, Integer> blockedUntil,
@@ -2797,6 +2844,7 @@ public final class AutoMiner {
     private void resetPathCandidateBatch() {
         pathCandidateOffset = 0;
         pathCandidateBatch = java.util.Collections.emptyList();
+        pathCandidateSource = java.util.Collections.emptyList();
         pathCandidateFeet = null;
         pendingPathTarget = null;
         pendingPathTargetScore = Integer.MAX_VALUE;
