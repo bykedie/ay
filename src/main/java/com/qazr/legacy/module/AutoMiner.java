@@ -1948,6 +1948,10 @@ public final class AutoMiner {
 
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
         if (!obstacle.equals(clearingPos)) {
+            if (clearingControllerResetRequired(clearingPos, obstacle)
+                    && mc.playerController != null) {
+                mc.playerController.resetBlockRemoving();
+            }
             selectBestPickaxe(obstacle);
             clearingPos = obstacle.toImmutable();
             clearingAttempts = 0;
@@ -2332,11 +2336,19 @@ public final class AutoMiner {
     }
 
     private void clearClearingTarget() {
+        if (clearingControllerResetRequired(clearingPos, null)
+                && mc.playerController != null) {
+            mc.playerController.resetBlockRemoving();
+        }
         clearingPos = null;
         clearingAttempts = 0;
         clearingAttemptBudget = 0;
         clearingDeadlineTick = 0;
         clearingMissingTicks = 0;
+    }
+
+    static boolean clearingControllerResetRequired(BlockPos current, BlockPos requested) {
+        return current != null && !current.equals(requested);
     }
 
     private void clearMiningTarget() {

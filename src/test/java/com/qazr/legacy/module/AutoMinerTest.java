@@ -1035,6 +1035,17 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void changingOrReleasingClearingStateCancelsVanillaBreakingProgress() {
+        BlockPos obstacle = new BlockPos(4, 20, 7);
+
+        assertFalse(AutoMiner.clearingControllerResetRequired(obstacle, obstacle));
+        assertTrue(AutoMiner.clearingControllerResetRequired(obstacle, obstacle.east()));
+        assertTrue(AutoMiner.clearingControllerResetRequired(obstacle, null));
+        assertFalse(AutoMiner.clearingControllerResetRequired(null, obstacle));
+        assertFalse(AutoMiner.clearingControllerResetRequired(null, null));
+    }
+
+    @Test
     public void routeOwnsItsTargetFromTheFirstNodeUntilArrival() {
         BlockPos ore = new BlockPos(5, 20, 0);
 

@@ -635,3 +635,11 @@
 - Iteration 3: reset old breaking progress before switching to a different ore or route blocker.
 - Iteration 4: retained uninterrupted progress while continuing the exact same block and ore type.
 - Iteration 5: covered complete, changed, released, partial, and empty mining states.
+
+## Version 1.10.111 Auto Mining Clearing Progress Update
+
+- Iteration 1: reproduced ordinary route obstacles retaining vanilla breaking progress after release.
+- Iteration 2: reset old progress before switching the active clearing position.
+- Iteration 3: reset progress when clearing is cancelled or confirmed complete.
+- Iteration 4: retained uninterrupted progress while continuing the exact same obstacle.
+- Iteration 5: covered same, changed, released, newly requested, and empty clearing states.
