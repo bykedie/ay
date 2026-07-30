@@ -515,13 +515,17 @@ public final class AutoMiner {
             return;
         }
         face(target.pos);
-        mc.playerController.onPlayerDamageBlock(target.pos, target.side);
+        boolean accepted = mc.playerController.onPlayerDamageBlock(target.pos, target.side);
+        if (!accepted) {
+            rejectMiningTarget(target.pos, target.type);
+            return;
+        }
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningPos = target.pos;
         miningType = target.type;
         miningRouteBlocker = routeBlockerOwnership(
             sameMiningTarget, miningRouteBlocker, routeBlocker);
-        miningAttempts++;
+        miningAttempts = nextDestructionAttemptCount(miningAttempts, true);
         boolean preserveRouteTarget = preserveQueuedRouteTarget(
             miningRouteBlocker, target.pos, target.type, currentOre, currentOreType);
         if (!hasActiveRoute() && !preserveRouteTarget && !preserveQueuedVeinTarget(
@@ -2052,9 +2056,10 @@ public final class AutoMiner {
                 || !obstacle.equals(hit.getBlockPos())) return false;
         selectBestPickaxe(obstacle);
         face(obstacle);
-        mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
+        boolean accepted = mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
+        if (!accepted) return false;
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
-        clearingAttempts++;
+        clearingAttempts = nextDestructionAttemptCount(clearingAttempts, true);
         return true;
     }
 
@@ -2475,6 +2480,10 @@ public final class AutoMiner {
 
     static boolean destructionAttemptsExhausted(int attempts, int budget) {
         return budget > 0 && attempts >= budget;
+    }
+
+    static int nextDestructionAttemptCount(int attempts, boolean accepted) {
+        return accepted ? attempts + 1 : attempts;
     }
 
     static int destructionDeadlineTick(int startTick, int attemptBudget, int actionDelayTicks) {

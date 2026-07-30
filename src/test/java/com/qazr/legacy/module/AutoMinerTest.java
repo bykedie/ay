@@ -1046,6 +1046,14 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void rejectedVanillaDamageRequestsDoNotAdvanceDestructionAttempts() {
+        assertEquals(8, AutoMiner.nextDestructionAttemptCount(7, true));
+        assertEquals(7, AutoMiner.nextDestructionAttemptCount(7, false));
+        assertEquals(1, AutoMiner.nextDestructionAttemptCount(0, true));
+        assertEquals(0, AutoMiner.nextDestructionAttemptCount(0, false));
+    }
+
+    @Test
     public void routeOwnsItsTargetFromTheFirstNodeUntilArrival() {
         BlockPos ore = new BlockPos(5, 20, 0);
 

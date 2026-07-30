@@ -643,3 +643,11 @@
 - Iteration 3: reset progress when clearing is cancelled or confirmed complete.
 - Iteration 4: retained uninterrupted progress while continuing the exact same obstacle.
 - Iteration 5: covered same, changed, released, newly requested, and empty clearing states.
+
+## Version 1.10.112 Auto Mining Damage Acceptance Update
+
+- Iteration 1: confirmed Forge 1.12.2 returns false when the client controller rejects block damage.
+- Iteration 2: required accepted damage before advancing ore destruction attempts.
+- Iteration 3: prevented rejected ore requests from swinging or creating completion confirmation.
+- Iteration 4: applied the same acceptance gate to ordinary route obstacles.
+- Iteration 5: covered accepted and rejected attempt progression from zero and active counts.
