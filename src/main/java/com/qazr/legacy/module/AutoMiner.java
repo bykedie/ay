@@ -401,9 +401,15 @@ public final class AutoMiner {
         boolean withinReach = withinMiningReach(
             eyes, target, mc.playerController.getBlockReachDistance());
         RayTraceResult hit = withinReach ? rayTraceExactBlock(eyes, target) : null;
-        if (!automaticBreakToolPreparationRequired(validTarget, withinReach, hit != null)) return;
+        boolean exactCrosshair = false;
+        if (validTarget && withinReach && hit != null && mc.entityRenderer != null) {
+            face(hit.hitVec);
+            mc.entityRenderer.getMouseOver(1.0F);
+            exactCrosshair = target.equals(currentCrosshairBlock());
+        }
+        if (!automaticBreakToolPreparationRequired(
+                validTarget, withinReach, hit != null, exactCrosshair)) return;
         selectBestPickaxe(target);
-        face(hit.hitVec);
         int keyCode = mc.gameSettings.keyBindAttack.getKeyCode();
         if (keyCode == 0) return;
         boolean physicalDown = GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
@@ -2664,8 +2670,8 @@ public final class AutoMiner {
     }
 
     static boolean automaticBreakToolPreparationRequired(boolean validTarget,
-            boolean withinReach, boolean exactHit) {
-        return validTarget && withinReach && exactHit;
+            boolean withinReach, boolean exactHit, boolean exactCrosshair) {
+        return validTarget && withinReach && exactHit && exactCrosshair;
     }
 
     static boolean vanillaOwnsDestructionTick(boolean automaticTickTarget, boolean sameTarget,

@@ -763,3 +763,11 @@
 - Iteration 3: ranked fallback vein blockers by their existing invisible sequence label.
 - Iteration 4: used eye-to-hit distance only when candidate blockers share the same label.
 - Iteration 5: covered lower-label and equal-label blocker comparisons in the focused tests.
+
+## Version 1.10.127 Auto Mining Crosshair Ownership Update
+
+- Iteration 1: decompiled Forge 1.12.2 client tick input and confirmed that a non-block crosshair resets vanilla breaking progress.
+- Iteration 2: reproduced the missing ownership condition with a focused test requiring the final vanilla crosshair to match the scheduled block.
+- Iteration 3: pre-refreshed the vanilla crosshair only after a valid target, reach check, and exact block ray were established.
+- Iteration 4: withheld automatic attack-key ownership when an edge blocker or entity replaced the requested block under the vanilla crosshair.
+- Iteration 5: retained the existing direct mining, tool selection, physical attack-key, and END-tick ownership behavior.
