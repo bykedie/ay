@@ -699,3 +699,11 @@
 - Iteration 3: limited early tool preparation to a validated active ore or route obstacle.
 - Iteration 4: retained combat's later weapon selection while restoring the pickaxe before every owned mining tick.
 - Iteration 5: covered ore, obstacle, and inactive-target preparation decisions alongside the existing tool-reset tests.
+
+## Version 1.10.119 Auto Mining Tool Reach Gate Update
+
+- Iteration 1: reproduced a stale active target switching back to a pickaxe before reach and visibility were revalidated.
+- Iteration 2: reused the exact START-phase reach check before changing the selected hotbar slot.
+- Iteration 3: required an exact ray trace to the owned ore or route obstacle before tool preparation.
+- Iteration 4: left unreachable, newly obstructed, and inactive targets without automatic hotbar changes.
+- Iteration 5: covered valid, out-of-reach, occluded, and inactive preparation decisions.

@@ -1102,9 +1102,10 @@ public class AutoMinerTest {
             ore, OreType.IRON, obstacle));
         assertEquals(ore, AutoMiner.activeDestructionTarget(ore, OreType.IRON, null));
         assertEquals(null, AutoMiner.activeDestructionTarget(ore, null, null));
-        assertTrue(AutoMiner.automaticBreakToolPreparationRequired(true, false));
-        assertTrue(AutoMiner.automaticBreakToolPreparationRequired(false, true));
-        assertFalse(AutoMiner.automaticBreakToolPreparationRequired(false, false));
+        assertTrue(AutoMiner.automaticBreakToolPreparationRequired(true, true, true));
+        assertFalse(AutoMiner.automaticBreakToolPreparationRequired(false, true, true));
+        assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, false, true));
+        assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, true, false));
     }
 
     @Test

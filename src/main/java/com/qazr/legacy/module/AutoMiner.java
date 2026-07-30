@@ -394,14 +394,14 @@ public final class AutoMiner {
             && stableMiningPosition(playerNavigationFeetCell(), target);
         boolean clearingTarget = target.equals(clearingPos) && !isPassable(target)
             && isBreakableBlock(target);
-        if (!miningTarget && !clearingTarget) return;
-        if (automaticBreakToolPreparationRequired(miningTarget, clearingTarget)) {
-            selectBestPickaxe(target);
-        }
+        boolean validTarget = miningTarget || clearingTarget;
+        if (!validTarget) return;
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        if (!withinMiningReach(eyes, target, mc.playerController.getBlockReachDistance())) return;
-        RayTraceResult hit = rayTraceExactBlock(eyes, target);
-        if (hit == null) return;
+        boolean withinReach = withinMiningReach(
+            eyes, target, mc.playerController.getBlockReachDistance());
+        RayTraceResult hit = withinReach ? rayTraceExactBlock(eyes, target) : null;
+        if (!automaticBreakToolPreparationRequired(validTarget, withinReach, hit != null)) return;
+        selectBestPickaxe(target);
         face(hit.hitVec);
         int keyCode = mc.gameSettings.keyBindAttack.getKeyCode();
         if (keyCode == 0) return;
@@ -2633,9 +2633,9 @@ public final class AutoMiner {
         return physicalKeyDown || automaticOwnership && targetExists;
     }
 
-    static boolean automaticBreakToolPreparationRequired(boolean miningTarget,
-            boolean clearingTarget) {
-        return miningTarget || clearingTarget;
+    static boolean automaticBreakToolPreparationRequired(boolean validTarget,
+            boolean withinReach, boolean exactHit) {
+        return validTarget && withinReach && exactHit;
     }
 
     static boolean vanillaOwnsDestructionTick(boolean automaticTickTarget, boolean sameTarget,
