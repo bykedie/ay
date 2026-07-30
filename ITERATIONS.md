@@ -715,3 +715,11 @@
 - Iteration 3: stopped active mining, clearing, route motion, and synthetic attack ownership as soon as input became unavailable.
 - Iteration 4: resumed through normal fresh target selection after focus returned instead of retaining stale destruction state.
 - Iteration 5: covered focused gameplay, open-screen pause, and unfocused-window pause decisions.
+
+## Version 1.10.121 Auto Mining Direct Endpoint Update
+
+- Iteration 1: reproduced a reached endpoint rejecting its current stand before checking an already visible ore.
+- Iteration 2: sampled the real reach, ray trace, and stable mining relationship before applying work-area fallback.
+- Iteration 3: allowed a directly mineable ore to proceed when a low ceiling makes only the endpoint work-area check fail.
+- Iteration 4: retained alternate-stand replanning for unstable geometry and for targets that still cannot be hit.
+- Iteration 5: covered ready, unstable, obstructed, and directly mineable endpoint decisions in the focused tests.

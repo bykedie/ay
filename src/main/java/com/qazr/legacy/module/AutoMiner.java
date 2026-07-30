@@ -675,9 +675,15 @@ public final class AutoMiner {
         boolean stablePosition = stableMiningPosition(miningPlayerFeet, currentOre);
         boolean workAreaReady = miningWorkAreaReady(isPassable(miningPlayerFeet),
             isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet));
-        if (endpointRequiresAlternateStand(stablePosition, workAreaReady)) {
+        MineTarget routedTarget = visibleTarget(currentOre);
+        if (endpointRequiresAlternateStand(
+                stablePosition, workAreaReady, routedTarget != null)) {
             rejectMiningStand(currentOre, miningPlayerFeet);
             restartRouteFromCurrentPosition();
+            return;
+        }
+        if (routedTarget != null) {
+            mine(routedTarget);
             return;
         }
         BlockPos faceNeighbor = miningFaceNeighbor(miningPlayerFeet, currentOre);
@@ -693,10 +699,7 @@ public final class AutoMiner {
             }
             return;
         }
-        MineTarget routedTarget = visibleTarget(currentOre);
-        if (routedTarget != null) {
-            mine(routedTarget);
-        } else if (!clearMiningExposureObstacle(currentOre)) {
+        if (!clearMiningExposureObstacle(currentOre)) {
             rejectMiningStand(currentOre, miningPlayerFeet);
             restartRouteFromCurrentPosition();
         }
@@ -1836,8 +1839,9 @@ public final class AutoMiner {
         return feetClear && headClear && supported;
     }
 
-    static boolean endpointRequiresAlternateStand(boolean stablePosition, boolean workAreaReady) {
-        return !stablePosition || !workAreaReady;
+    static boolean endpointRequiresAlternateStand(boolean stablePosition, boolean workAreaReady,
+            boolean targetDirectlyMineable) {
+        return !stablePosition || !workAreaReady && !targetDirectlyMineable;
     }
 
     static List<BlockPos> reconstruct(Map<BlockPos, BlockPos> previous, BlockPos goal) {

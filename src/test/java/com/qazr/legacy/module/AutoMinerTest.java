@@ -340,9 +340,10 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.miningWorkAreaReady(false, true, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, false, true));
         assertFalse(AutoMiner.miningWorkAreaReady(true, true, false));
-        assertFalse(AutoMiner.endpointRequiresAlternateStand(true, true));
-        assertTrue(AutoMiner.endpointRequiresAlternateStand(false, true));
-        assertTrue(AutoMiner.endpointRequiresAlternateStand(true, false));
+        assertFalse(AutoMiner.endpointRequiresAlternateStand(true, true, false));
+        assertTrue(AutoMiner.endpointRequiresAlternateStand(false, true, false));
+        assertTrue(AutoMiner.endpointRequiresAlternateStand(true, false, false));
+        assertFalse(AutoMiner.endpointRequiresAlternateStand(true, false, true));
         assertTrue(AutoMiner.routeSupportShapeUsable(true, true, false, false));
         assertTrue(AutoMiner.routeSupportShapeUsable(true, false, true, false));
         assertFalse(AutoMiner.routeSupportShapeUsable(true, false, true, true));
