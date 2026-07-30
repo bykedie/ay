@@ -1003,6 +1003,12 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void completingAnyLabeledVeinBlockReordersTheRemainingTargets() {
+        assertTrue(AutoMiner.completionReordersTargetLabels(true));
+        assertFalse(AutoMiner.completionReordersTargetLabels(false));
+    }
+
+    @Test
     public void routeCollisionCellsCoverThePlayersHeadAndBothSidesAtABoundary() {
         AxisAlignedBB current = new AxisAlignedBB(0.85, 64.0, 0.2, 1.45, 65.8, 0.8);
         AxisAlignedBB swept = AutoMiner.routeStepBounds(current, 0.18, 0.0);

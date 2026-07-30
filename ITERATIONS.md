@@ -723,3 +723,11 @@
 - Iteration 3: allowed a directly mineable ore to proceed when a low ceiling makes only the endpoint work-area check fail.
 - Iteration 4: retained alternate-stand replanning for unstable geometry and for targets that still cannot be hit.
 - Iteration 5: covered ready, unstable, obstructed, and directly mineable endpoint decisions in the focused tests.
+
+## Version 1.10.122 Auto Mining Vein Handoff Update
+
+- Iteration 1: reproduced a completed labeled route blocker leaving the remaining vein in its old distance order.
+- Iteration 2: tracked whether completion actually removed an invisible vein label instead of inferring it from route ownership.
+- Iteration 3: reordered every remaining labeled block from the player's current position after any labeled block is confirmed mined.
+- Iteration 4: retained route ownership, completion confirmation, quota reservations, and unrelated unlabeled completions unchanged.
+- Iteration 5: covered removed and retained label outcomes in the focused auto-miner tests.

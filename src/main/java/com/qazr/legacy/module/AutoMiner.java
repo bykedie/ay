@@ -495,12 +495,14 @@ public final class AutoMiner {
             lastMinedType = pending.type;
             rejectedMiningStandsUntil.remove(pending.pos);
             oreVisualizer.reconcileMarker(pending.pos, remainingType);
-            if (targetLabels.remove(pending.pos) != null) targetLabelsChanged();
+            boolean removedTargetLabel = targetLabels.remove(pending.pos) != null;
             boolean ownsCurrentWork = completionOwnsWork(pending.pos, pending.type,
                 currentOre, currentOreType);
             boolean ownsMiningWork = completionOwnsWork(pending.pos, pending.type,
                 miningPos, miningType);
-            if (ownsCurrentWork) reorderRemainingTargetLabels();
+            if (completionReordersTargetLabels(removedTargetLabel)) {
+                reorderRemainingTargetLabels();
+            }
             if (targetLabels.isEmpty()) targetLabelType = null;
             if (ownsCurrentWork) clearPath();
             else if (ownsMiningWork) clearMiningTarget();
@@ -2754,6 +2756,10 @@ public final class AutoMiner {
         return ownsCurrentWork || ownsBoundRoute;
     }
 
+    static boolean completionReordersTargetLabels(boolean removedTargetLabel) {
+        return removedTargetLabel;
+    }
+
     static int pendingCompletionEvictionPriority(boolean sameWorld, boolean expired,
             boolean reservesQuota, boolean ownsWork) {
         if (!sameWorld || expired) return 0;
@@ -3211,7 +3217,10 @@ public final class AutoMiner {
     }
 
     private void reorderRemainingTargetLabels() {
-        if (targetLabels.size() < 2 || mc.player == null) return;
+        if (targetLabels.size() < 2 || mc.player == null) {
+            targetLabelsChanged();
+            return;
+        }
         Map<BlockPos, Double> distances = new HashMap<>();
         for (BlockPos pos : targetLabels.keySet()) {
             distances.put(pos, mc.player.getDistanceSqToCenter(pos));
