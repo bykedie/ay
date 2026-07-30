@@ -7,6 +7,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.init.Bootstrap;
+import net.minecraft.init.Items;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -1051,6 +1055,36 @@ public class AutoMinerTest {
         assertEquals(7, AutoMiner.nextDestructionAttemptCount(7, false));
         assertEquals(1, AutoMiner.nextDestructionAttemptCount(0, true));
         assertEquals(0, AutoMiner.nextDestructionAttemptCount(0, false));
+    }
+
+    @Test
+    public void changedMiningToolsRestartDestructionBudgetsForTheSameBlock() {
+        assertTrue(AutoMiner.destructionStateRestarts(false, false));
+        assertTrue(AutoMiner.destructionStateRestarts(false, true));
+        assertTrue(AutoMiner.destructionStateRestarts(true, true));
+        assertFalse(AutoMiner.destructionStateRestarts(true, false));
+        assertFalse(AutoMiner.toolChangeRequiresBreakReset(ItemStack.EMPTY, ItemStack.EMPTY));
+    }
+
+    @Test
+    public void toolResetMatchesForgeItemIdentityTagAndDurabilityRules() {
+        Bootstrap.register();
+        ItemStack first = new ItemStack(Items.WOODEN_PICKAXE);
+        first.setItemDamage(5);
+        ItemStack moreWorn = first.copy();
+        moreWorn.setItemDamage(6);
+
+        assertFalse(AutoMiner.toolChangeRequiresBreakReset(first, moreWorn));
+        assertTrue(AutoMiner.toolChangeRequiresBreakReset(
+            first, new ItemStack(Items.STONE_PICKAXE)));
+
+        ItemStack tagged = moreWorn.copy();
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setBoolean("alternateMode", true);
+        tagged.setTagCompound(tag);
+        assertTrue(AutoMiner.toolChangeRequiresBreakReset(first, tagged));
+        assertTrue(AutoMiner.toolChangeRequiresBreakReset(first, ItemStack.EMPTY));
+        assertTrue(AutoMiner.toolChangeRequiresBreakReset(ItemStack.EMPTY, first));
     }
 
     @Test

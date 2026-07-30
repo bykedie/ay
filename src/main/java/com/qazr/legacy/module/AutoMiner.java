@@ -42,6 +42,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
+import net.minecraftforge.client.ForgeHooksClient;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -106,6 +107,7 @@ public final class AutoMiner {
     private BlockPos miningPos;
     private OreType miningType;
     private boolean miningRouteBlocker;
+    private ItemStack miningTool = ItemStack.EMPTY;
     private int miningAttempts;
     private int miningAttemptBudget;
     private int miningDeadlineTick;
@@ -114,6 +116,7 @@ public final class AutoMiner {
     private int clearingAttemptBudget;
     private int clearingDeadlineTick;
     private int clearingMissingTicks;
+    private ItemStack clearingTool = ItemStack.EMPTY;
     private final Deque<PendingCompletion> pendingCompletions = new ArrayDeque<>();
     private BlockPos lastMinedOre;
     private OreType lastMinedType;
@@ -491,15 +494,17 @@ public final class AutoMiner {
     private void mine(MineTarget target, boolean routeBlocker) {
         selectBestPickaxe(target.pos);
         boolean sameMiningTarget = target.pos.equals(miningPos) && target.type == miningType;
+        boolean toolChanged = sameMiningTarget && toolChangeRequiresBreakReset(
+            miningTool, mc.player.getHeldItemMainhand());
         boolean targetChanged = miningTargetChanged(
             miningPos, miningType, target.pos, target.type);
         boolean resetController = miningControllerResetRequired(
             miningPos, miningType, target.pos, target.type);
-        if (!sameMiningTarget) {
+        if (destructionStateRestarts(sameMiningTarget, toolChanged)) {
             if (targetChanged) {
                 releasePendingQuotaReservation(miningPos, miningType);
             }
-            if (resetController && mc.playerController != null) {
+            if ((resetController || toolChanged) && mc.playerController != null) {
                 mc.playerController.resetBlockRemoving();
             }
             miningAttempts = 0;
@@ -523,6 +528,7 @@ public final class AutoMiner {
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningPos = target.pos;
         miningType = target.type;
+        miningTool = mc.player.getHeldItemMainhand().copy();
         miningRouteBlocker = routeBlockerOwnership(
             sameMiningTarget, miningRouteBlocker, routeBlocker);
         miningAttempts = nextDestructionAttemptCount(miningAttempts, true);
@@ -851,6 +857,7 @@ public final class AutoMiner {
     private boolean continueClearingObstacle() {
         if (clearingPos == null) return false;
         if (!mc.world.isBlockLoaded(clearingPos) || isPassable(clearingPos)) return true;
+        prepareClearingTarget(clearingPos);
         if (destructionWorkExhausted(clearingAttempts, clearingAttemptBudget,
                 mc.player.ticksExisted, clearingDeadlineTick)) {
             rejectClearingObstacleAndReplan(clearingPos);
@@ -1951,12 +1958,27 @@ public final class AutoMiner {
     }
 
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
-        if (!obstacle.equals(clearingPos)) {
-            if (clearingControllerResetRequired(clearingPos, obstacle)
-                    && mc.playerController != null) {
+        prepareClearingTarget(obstacle);
+        if (!damageCorridorBlock(obstacle, hit)) {
+            clearClearingTarget();
+            return false;
+        }
+        return true;
+    }
+
+    private void prepareClearingTarget(BlockPos obstacle) {
+        boolean sameTarget = obstacle.equals(clearingPos);
+        if (!sameTarget && clearingControllerResetRequired(clearingPos, obstacle)
+                && mc.playerController != null) {
+            mc.playerController.resetBlockRemoving();
+        }
+        selectBestPickaxe(obstacle);
+        boolean toolChanged = sameTarget && toolChangeRequiresBreakReset(
+            clearingTool, mc.player.getHeldItemMainhand());
+        if (destructionStateRestarts(sameTarget, toolChanged)) {
+            if (toolChanged && mc.playerController != null) {
                 mc.playerController.resetBlockRemoving();
             }
-            selectBestPickaxe(obstacle);
             clearingPos = obstacle.toImmutable();
             clearingAttempts = 0;
             clearingAttemptBudget = destructionAttemptBudget(
@@ -1966,11 +1988,6 @@ public final class AutoMiner {
                 clearingAttemptBudget, ModConfig.mineDelayTicks);
             clearingMissingTicks = 0;
         }
-        if (!damageCorridorBlock(obstacle, hit)) {
-            clearClearingTarget();
-            return false;
-        }
-        return true;
     }
 
     private RayTraceResult rayTraceMiningExposureObstacle(Vec3d eyes, BlockPos playerFeet,
@@ -2054,11 +2071,11 @@ public final class AutoMiner {
         if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
                 || !obstacle.equals(hit.getBlockPos())) return false;
-        selectBestPickaxe(obstacle);
         face(obstacle);
         boolean accepted = mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         if (!accepted) return false;
         mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
+        clearingTool = mc.player.getHeldItemMainhand().copy();
         clearingAttempts = nextDestructionAttemptCount(clearingAttempts, true);
         return true;
     }
@@ -2350,6 +2367,7 @@ public final class AutoMiner {
         clearingAttemptBudget = 0;
         clearingDeadlineTick = 0;
         clearingMissingTicks = 0;
+        clearingTool = ItemStack.EMPTY;
     }
 
     static boolean clearingControllerResetRequired(BlockPos current, BlockPos requested) {
@@ -2365,6 +2383,7 @@ public final class AutoMiner {
         miningPos = null;
         miningType = null;
         miningRouteBlocker = false;
+        miningTool = ItemStack.EMPTY;
         miningAttempts = 0;
         miningAttemptBudget = 0;
         miningDeadlineTick = 0;
@@ -2484,6 +2503,17 @@ public final class AutoMiner {
 
     static int nextDestructionAttemptCount(int attempts, boolean accepted) {
         return accepted ? attempts + 1 : attempts;
+    }
+
+    static boolean destructionStateRestarts(boolean sameTarget, boolean toolChanged) {
+        return !sameTarget || toolChanged;
+    }
+
+    static boolean toolChangeRequiresBreakReset(ItemStack previous, ItemStack current) {
+        boolean previousEmpty = previous == null || previous.isEmpty();
+        boolean currentEmpty = current == null || current.isEmpty();
+        if (previousEmpty || currentEmpty) return previousEmpty != currentEmpty;
+        return ForgeHooksClient.shouldCauseBlockBreakReset(previous, current);
     }
 
     static int destructionDeadlineTick(int startTick, int attemptBudget, int actionDelayTicks) {

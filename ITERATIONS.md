@@ -651,3 +651,11 @@
 - Iteration 3: prevented rejected ore requests from swinging or creating completion confirmation.
 - Iteration 4: applied the same acceptance gate to ordinary route obstacles.
 - Iteration 5: covered accepted and rejected attempt progression from zero and active counts.
+
+## Version 1.10.113 Auto Mining Tool Change Update
+
+- Iteration 1: reproduced vanilla block-breaking progress restarting after a materially different tool is selected.
+- Iteration 2: captured the accepted mining tool for ore and ordinary obstacle destruction.
+- Iteration 3: used Forge 1.12.2 item identity, NBT, and damageability rules to detect progress-resetting changes.
+- Iteration 4: rebuilt the matching attempt budget and deadline whenever vanilla progress restarts.
+- Iteration 5: covered new targets, unchanged tools, durability-only changes, different items, changed NBT, and empty hands.
