@@ -747,3 +747,11 @@
 - Iteration 3: appended all eight inset corner samples only for the current mining target, route endpoint, active obstacle, and scaffold target.
 - Iteration 4: preserved the existing reach, target type, stable-position, and labeled-blocker checks for every added ray.
 - Iteration 5: covered the unchanged seven-point candidate set and the ordered fifteen-point locked-target set.
+
+## Version 1.10.125 Auto Mining Exposed Aim Update
+
+- Iteration 1: reproduced a corner-visible ore being detected and then immediately aimed back at its occluded block center.
+- Iteration 2: retained the actual ray-trace hit point alongside the ore position, type, and hit side.
+- Iteration 3: aimed every non-vanilla-owned destruction request at that exposed point.
+- Iteration 4: kept block-center fallback behavior for compatibility paths without a hit vector.
+- Iteration 5: covered exposed-point preference and center fallback in the focused auto-miner tests.

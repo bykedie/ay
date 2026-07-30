@@ -599,7 +599,7 @@ public final class AutoMiner {
         boolean vanillaOwnedTick = vanillaOwnsDestructionTick(
             automaticAttackTickMatches(automaticAttackTickTarget, currentCrosshairBlock(), target.pos),
             sameMiningTarget, restartDestruction);
-        if (!vanillaOwnedTick) face(target.pos);
+        if (!vanillaOwnedTick) face(miningAimPoint(target.pos, target.hitVec));
         boolean accepted = vanillaOwnedTick
             || mc.playerController.onPlayerDamageBlock(target.pos, target.side);
         boolean targetStillPresent = targetType(target.pos) == target.type;
@@ -2002,7 +2002,7 @@ public final class AutoMiner {
         if (ore != null) {
             if (!stableMiningPosition(miningPlayerFeet, obstacle)
                     || !withinMiningReach(eyes, obstacle, miningReach())) return false;
-            mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit), true);
+            mine(new MineTarget(obstacle.toImmutable(), ore, hit.sideHit, hit.hitVec), true);
             return true;
         }
         return beginClearingObstacle(obstacle, hit);
@@ -2027,7 +2027,8 @@ public final class AutoMiner {
                 targetLabels.put(obstacle.toImmutable(), targetLabels.size() + 1);
                 reorderRemainingTargetLabels();
             }
-            mine(new MineTarget(obstacle.toImmutable(), obstacleType, hit.sideHit), true);
+            mine(new MineTarget(
+                obstacle.toImmutable(), obstacleType, hit.sideHit, hit.hitVec), true);
             return true;
         }
         if (!exposureObstacleUsable(
@@ -3361,7 +3362,7 @@ public final class AutoMiner {
             if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
         }
         if (!stableMiningPosition(miningPlayerFeet, pos)) return null;
-        return new MineTarget(pos.toImmutable(), type, hit.sideHit);
+        return new MineTarget(pos.toImmutable(), type, hit.sideHit, hit.hitVec);
     }
 
     private RayTraceResult rayTraceTarget(Vec3d eyes, BlockPos pos, OreType type,
@@ -3401,6 +3402,10 @@ public final class AutoMiner {
 
     static Vec3d blockCenter(BlockPos pos) {
         return new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+    }
+
+    static Vec3d miningAimPoint(BlockPos pos, Vec3d hitVec) {
+        return hitVec == null ? blockCenter(pos) : hitVec;
     }
 
     static List<Vec3d> blockVisibilitySamples(BlockPos pos) {
@@ -3461,10 +3466,6 @@ public final class AutoMiner {
         double dy = eyes.y - nearestY;
         double dz = eyes.z - nearestZ;
         return dx * dx + dy * dy + dz * dz <= reach * reach;
-    }
-
-    private void face(BlockPos pos) {
-        face(new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
     }
 
     private void face(Vec3d point) {
@@ -3572,11 +3573,13 @@ public final class AutoMiner {
         private final BlockPos pos;
         private final OreType type;
         private final EnumFacing side;
+        private final Vec3d hitVec;
 
-        private MineTarget(BlockPos pos, OreType type, EnumFacing side) {
+        private MineTarget(BlockPos pos, OreType type, EnumFacing side, Vec3d hitVec) {
             this.pos = pos;
             this.type = type;
             this.side = side;
+            this.hitVec = hitVec;
         }
     }
 

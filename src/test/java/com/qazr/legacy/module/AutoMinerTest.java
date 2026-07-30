@@ -361,10 +361,13 @@ public class AutoMinerTest {
     public void miningReachUsesTheNearestPointOnTheBlock() {
         BlockPos target = new BlockPos(5, 64, 0);
         Vec3d eyes = new Vec3d(0.5, 64.5, 0.5);
+        Vec3d exposedCorner = new Vec3d(5.001, 64.999, 0.001);
 
         assertTrue(AutoMiner.withinMiningReach(eyes, target, 4.5));
         assertFalse(AutoMiner.withinMiningReach(eyes, target, 4.49));
         assertEquals(new Vec3d(5.5, 64.5, 0.5), AutoMiner.blockCenter(target));
+        assertEquals(exposedCorner, AutoMiner.miningAimPoint(target, exposedCorner));
+        assertEquals(AutoMiner.blockCenter(target), AutoMiner.miningAimPoint(target, null));
     }
 
     @Test
