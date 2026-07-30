@@ -627,3 +627,11 @@
 - Iteration 3: covered target invalidation, endpoint rejection, server displacement, and route-transition recovery callers.
 - Iteration 4: retained manual takeover through the existing motion-preserving cancellation path.
 - Iteration 5: covered positive and negative route motion for both automatic and manual reset modes.
+
+## Version 1.10.110 Auto Mining Break Progress Update
+
+- Iteration 1: reproduced lost-visibility and target-switch paths retaining vanilla block-breaking progress.
+- Iteration 2: reset the player controller whenever active mining state is released.
+- Iteration 3: reset old breaking progress before switching to a different ore or route blocker.
+- Iteration 4: retained uninterrupted progress while continuing the exact same block and ore type.
+- Iteration 5: covered complete, changed, released, partial, and empty mining states.

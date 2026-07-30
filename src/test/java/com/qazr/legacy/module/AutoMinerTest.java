@@ -1020,6 +1020,21 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void changingOrReleasingMiningStateCancelsVanillaBreakingProgress() {
+        BlockPos ore = new BlockPos(4, 20, 7);
+
+        assertFalse(AutoMiner.miningControllerResetRequired(
+            ore, OreType.IRON, ore, OreType.IRON));
+        assertTrue(AutoMiner.miningControllerResetRequired(
+            ore, OreType.IRON, ore.east(), OreType.IRON));
+        assertTrue(AutoMiner.miningControllerResetRequired(
+            ore, OreType.IRON, null, null));
+        assertTrue(AutoMiner.miningControllerResetRequired(ore, null, null, null));
+        assertTrue(AutoMiner.miningControllerResetRequired(null, OreType.IRON, null, null));
+        assertFalse(AutoMiner.miningControllerResetRequired(null, null, null, null));
+    }
+
+    @Test
     public void routeOwnsItsTargetFromTheFirstNodeUntilArrival() {
         BlockPos ore = new BlockPos(5, 20, 0);
 

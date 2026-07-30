@@ -491,9 +491,16 @@ public final class AutoMiner {
     private void mine(MineTarget target, boolean routeBlocker) {
         selectBestPickaxe(target.pos);
         boolean sameMiningTarget = target.pos.equals(miningPos) && target.type == miningType;
+        boolean targetChanged = miningTargetChanged(
+            miningPos, miningType, target.pos, target.type);
+        boolean resetController = miningControllerResetRequired(
+            miningPos, miningType, target.pos, target.type);
         if (!sameMiningTarget) {
-            if (miningTargetChanged(miningPos, miningType, target.pos, target.type)) {
+            if (targetChanged) {
                 releasePendingQuotaReservation(miningPos, miningType);
+            }
+            if (resetController && mc.playerController != null) {
+                mc.playerController.resetBlockRemoving();
             }
             miningAttempts = 0;
             miningAttemptBudget = destructionAttemptBudget(
@@ -2333,6 +2340,10 @@ public final class AutoMiner {
     }
 
     private void clearMiningTarget() {
+        if (miningControllerResetRequired(miningPos, miningType, null, null)
+                && mc.playerController != null) {
+            mc.playerController.resetBlockRemoving();
+        }
         releasePendingQuotaReservation(miningPos, miningType);
         miningPos = null;
         miningType = null;
@@ -2340,6 +2351,12 @@ public final class AutoMiner {
         miningAttempts = 0;
         miningAttemptBudget = 0;
         miningDeadlineTick = 0;
+    }
+
+    static boolean miningControllerResetRequired(BlockPos currentPos, OreType currentType,
+            BlockPos requestedPos, OreType requestedType) {
+        return (currentPos != null || currentType != null)
+            && !completionOwnsWork(currentPos, currentType, requestedPos, requestedType);
     }
 
     private void clearPendingCompletion() {
