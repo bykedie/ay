@@ -463,6 +463,7 @@ public class AutoMinerTest {
     public void directMiningSamplesTheCenterAndEveryExposedFace() {
         BlockPos ore = new BlockPos(3, 64, 7);
         List<Vec3d> samples = AutoMiner.blockVisibilitySamples(ore);
+        List<Vec3d> lockedSamples = AutoMiner.lockedTargetVisibilitySamples(ore);
 
         assertEquals(7, samples.size());
         assertEquals(new Vec3d(3.5, 64.5, 7.5), samples.get(0));
@@ -475,6 +476,10 @@ public class AutoMinerTest {
         for (int index = 0; index < samples.size(); index++) {
             assertEquals(samples.get(index), AutoMiner.blockVisibilitySample(ore, index));
         }
+        assertEquals(15, lockedSamples.size());
+        assertEquals(new Vec3d(3.001, 64.001, 7.001), lockedSamples.get(7));
+        assertEquals(new Vec3d(3.999, 64.999, 7.999), lockedSamples.get(14));
+        assertEquals(samples, lockedSamples.subList(0, samples.size()));
     }
 
     @Test

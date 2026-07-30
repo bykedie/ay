@@ -68,6 +68,7 @@ public final class AutoMiner {
     private static final int MAX_VISIBLE_TARGETS = 16;
     private static final int FIXED_LABELED_VISIBILITY_INSPECTIONS = 8;
     private static final int BLOCK_VISIBILITY_SAMPLE_COUNT = 7;
+    private static final int LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT = 15;
     private static final int MAX_STALLED_ROUTE_TICKS = 30;
     private static final int MAX_STALLED_ROUTE_REPLANS = 1;
     private static final double ROUTE_PROGRESS_EPSILON = 0.0025;
@@ -641,7 +642,7 @@ public final class AutoMiner {
             clearMiningTarget();
             return true;
         }
-        MineTarget target = visibleTarget(miningPos);
+        MineTarget target = visibleLockedTarget(miningPos);
         if (target == null) {
             clearMiningTarget();
             return false;
@@ -661,7 +662,7 @@ public final class AutoMiner {
 
     private boolean tryMineCurrentOreDirectly() {
         if (currentOre == null) return false;
-        MineTarget target = visibleTarget(currentOre);
+        MineTarget target = visibleLockedTarget(currentOre);
         if (target == null) return false;
         stopRouteMotion();
         mine(target);
@@ -677,7 +678,7 @@ public final class AutoMiner {
         boolean stablePosition = stableMiningPosition(miningPlayerFeet, currentOre);
         boolean workAreaReady = miningWorkAreaReady(isPassable(miningPlayerFeet),
             isPassable(miningPlayerFeet.up()), hasSolidSupport(miningPlayerFeet));
-        MineTarget routedTarget = visibleTarget(currentOre);
+        MineTarget routedTarget = visibleLockedTarget(currentOre);
         if (endpointRequiresAlternateStand(
                 stablePosition, workAreaReady, routedTarget != null)) {
             rejectMiningStand(currentOre, miningPlayerFeet);
@@ -741,7 +742,7 @@ public final class AutoMiner {
                 || !scaffoldRaiseMakesTargetMineable(
                     miningPlayerFeet, miningEyes, ore, miningReachDistance)) return false;
         Vec3d raisedEyes = new Vec3d(miningEyes.x, miningEyes.y + 1.0, miningEyes.z);
-        RayTraceResult hit = rayTraceTarget(raisedEyes, ore, type, false);
+        RayTraceResult hit = rayTraceTarget(raisedEyes, ore, type, false, true);
         if (hit == null
                 || scaffoldPlacementFor(miningPlayerFeet) == null
                 || findScaffoldBlock(miningPlayerFeet) < 0) return false;
@@ -776,7 +777,7 @@ public final class AutoMiner {
         if (!isPassable(scaffoldPos)) {
             double playerFeetY = mc.player.getEntityBoundingBox().minY;
             if (playerReachedScaffoldLevel(playerFeetY, scaffoldPos.getY())) {
-                MineTarget target = visibleTarget(scaffoldOre);
+                MineTarget target = visibleLockedTarget(scaffoldOre);
                 if (target == null) {
                     failScaffoldAssist();
                     return false;
@@ -2095,7 +2096,8 @@ public final class AutoMiner {
     private RayTraceResult rayTraceMiningExposureObstacle(Vec3d eyes, BlockPos playerFeet,
             BlockPos ore) {
         if (eyes == null || playerFeet == null || ore == null) return null;
-        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+        for (int sampleIndex = 0;
+                sampleIndex < LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
             RayTraceResult hit = mc.world.rayTraceBlocks(
                 eyes, blockVisibilitySample(ore, sampleIndex), false, true, false);
             if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK) continue;
@@ -2151,7 +2153,8 @@ public final class AutoMiner {
 
     private RayTraceResult rayTraceCorridorObstacle(Vec3d eyes, BlockPos desired,
             BlockPos permittedLower, List<BlockPos> corridor) {
-        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+        for (int sampleIndex = 0;
+                sampleIndex < LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
             RayTraceResult hit = mc.world.rayTraceBlocks(
                 eyes, blockVisibilitySample(desired, sampleIndex), false, true, false);
             if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
@@ -2162,7 +2165,8 @@ public final class AutoMiner {
     }
 
     private RayTraceResult rayTraceExactBlock(Vec3d eyes, BlockPos target) {
-        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+        for (int sampleIndex = 0;
+                sampleIndex < LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
             RayTraceResult hit = mc.world.rayTraceBlocks(
                 eyes, blockVisibilitySample(target, sampleIndex), false, true, false);
             if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
@@ -3331,18 +3335,24 @@ public final class AutoMiner {
     }
 
     private MineTarget visibleTarget(BlockPos pos) {
-        return visibleTarget(pos, true);
+        return visibleTarget(pos, true, false);
+    }
+
+    private MineTarget visibleLockedTarget(BlockPos pos) {
+        return visibleTarget(pos, true, true);
     }
 
     private MineTarget visibleExactTarget(BlockPos pos) {
-        return visibleTarget(pos, false);
+        return visibleTarget(pos, false, true);
     }
 
-    private MineTarget visibleTarget(BlockPos pos, boolean allowLabeledBlocker) {
+    private MineTarget visibleTarget(BlockPos pos, boolean allowLabeledBlocker,
+            boolean includeCorners) {
         OreType type = targetType(pos);
         if (type == null || !visibilityContextReady(miningPlayerFeet, miningEyes, miningReachDistance)) return null;
         if (!withinMiningReach(miningEyes, pos, miningReachDistance)) return null;
-        RayTraceResult hit = rayTraceTarget(miningEyes, pos, type, allowLabeledBlocker);
+        RayTraceResult hit = rayTraceTarget(
+            miningEyes, pos, type, allowLabeledBlocker, includeCorners);
         if (hit == null) return null;
         BlockPos hitPos = hit.getBlockPos();
         if (!pos.equals(hitPos)) {
@@ -3355,9 +3365,11 @@ public final class AutoMiner {
     }
 
     private RayTraceResult rayTraceTarget(Vec3d eyes, BlockPos pos, OreType type,
-            boolean allowLabeledBlocker) {
+            boolean allowLabeledBlocker, boolean includeCorners) {
         RayTraceResult labeledBlocker = null;
-        for (int sampleIndex = 0; sampleIndex < BLOCK_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
+        int sampleCount = includeCorners
+            ? LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT : BLOCK_VISIBILITY_SAMPLE_COUNT;
+        for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
             Vec3d sample = blockVisibilitySample(pos, sampleIndex);
             RayTraceResult hit = mc.world.rayTraceBlocks(eyes, sample, false, true, false);
             if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
@@ -3399,6 +3411,14 @@ public final class AutoMiner {
         return samples;
     }
 
+    static List<Vec3d> lockedTargetVisibilitySamples(BlockPos pos) {
+        List<Vec3d> samples = new ArrayList<>(LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT);
+        for (int index = 0; index < LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT; index++) {
+            samples.add(blockVisibilitySample(pos, index));
+        }
+        return samples;
+    }
+
     static Vec3d blockVisibilitySample(BlockPos pos, int index) {
         double x = pos.getX();
         double y = pos.getY();
@@ -3413,6 +3433,14 @@ public final class AutoMiner {
             case 4: return new Vec3d(x + 0.5, y + far, z + 0.5);
             case 5: return new Vec3d(x + 0.5, y + 0.5, z + near);
             case 6: return new Vec3d(x + 0.5, y + 0.5, z + far);
+            case 7: return new Vec3d(x + near, y + near, z + near);
+            case 8: return new Vec3d(x + near, y + near, z + far);
+            case 9: return new Vec3d(x + near, y + far, z + near);
+            case 10: return new Vec3d(x + near, y + far, z + far);
+            case 11: return new Vec3d(x + far, y + near, z + near);
+            case 12: return new Vec3d(x + far, y + near, z + far);
+            case 13: return new Vec3d(x + far, y + far, z + near);
+            case 14: return new Vec3d(x + far, y + far, z + far);
             default: throw new IndexOutOfBoundsException("visibility sample " + index);
         }
     }

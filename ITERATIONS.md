@@ -739,3 +739,11 @@
 - Iteration 3: skipped unusable early hits and continued through the remaining visibility samples.
 - Iteration 4: retained the same mining reach, protected player cells, ore eligibility, and ordinary-block harvest requirements.
 - Iteration 5: covered allowed, disallowed, breakable, and unusable sampled obstacles in the focused tests.
+
+## Version 1.10.124 Auto Mining Corner Visibility Update
+
+- Iteration 1: reproduced a locked ore exposing only a corner that none of the center or six face-center rays could reach.
+- Iteration 2: retained the seven-sample fast path for ordinary candidate discovery.
+- Iteration 3: appended all eight inset corner samples only for the current mining target, route endpoint, active obstacle, and scaffold target.
+- Iteration 4: preserved the existing reach, target type, stable-position, and labeled-blocker checks for every added ray.
+- Iteration 5: covered the unchanged seven-point candidate set and the ordered fifteen-point locked-target set.
