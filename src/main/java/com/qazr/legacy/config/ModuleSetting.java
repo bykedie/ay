@@ -182,7 +182,7 @@ public enum ModuleSetting {
             case GG_MESSAGES: return "编辑 5 条候选消息；发送时随机选择非空项，{player} 会替换为玩家名。";
             case REPLY_COOLDOWN: return "两次自动回复之间至少等待的时间，用于避免连续刷屏。";
             case REPLY_MESSAGES: return "编辑指定玩家和 5 条随机回复；留空玩家名可匹配所有玩家。";
-            case MINE_DELAY: return "两次自动挖掘操作之间额外等待的 tick 数。";
+            case MINE_DELAY: return "一个方块确认挖完后，再开始下一个挖掘目标前等待的 tick 数；不会打断同一方块的持续破坏进度。";
             case MINE_PATH_RANGE: return "自动挖矿可主动找路的最大范围。只会在客户端已加载区块内寻找指定矿石。";
             case MINE_MANUAL_PAUSE: return "检测到你自己按移动、跳跃或潜行后，自动寻路暂停的时间。0 表示不让权。";
             case MINE_VISUALIZE_PATH: return "开启后高亮当前挖掘目标，并用细线显示计划行走路线。";

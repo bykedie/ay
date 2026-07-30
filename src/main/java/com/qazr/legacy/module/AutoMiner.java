@@ -28,6 +28,8 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderGlobal;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
+import net.minecraft.client.settings.GameSettings;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemPickaxe;
@@ -117,6 +119,7 @@ public final class AutoMiner {
     private int clearingDeadlineTick;
     private int clearingMissingTicks;
     private ItemStack clearingTool = ItemStack.EMPTY;
+    private BlockPos automaticAttackTickTarget;
     private final Deque<PendingCompletion> pendingCompletions = new ArrayDeque<>();
     private BlockPos lastMinedOre;
     private OreType lastMinedType;
@@ -200,7 +203,11 @@ public final class AutoMiner {
 
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+        if (event.phase == TickEvent.Phase.START) {
+            prepareAutomaticAttackTick();
+            return;
+        }
+        restorePhysicalAttackKey();
         if (mc.player != null && mc.world != null) updateMinedCount();
         if (!modules.isEnabled(ModuleId.AUTO_MINE)) {
             if (observedEnabled) stopAutomatedWork(true);
@@ -348,6 +355,7 @@ public final class AutoMiner {
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
         if (event.getWorld().isRemote) {
+            restorePhysicalAttackKey();
             delay = 0;
             manualPause = 0;
             pathRetryDelay = 0;
@@ -370,6 +378,58 @@ public final class AutoMiner {
             clearPendingCompletion();
             supportCollisionBoxes.clear();
         }
+    }
+
+    private void prepareAutomaticAttackTick() {
+        automaticAttackTickTarget = null;
+        restorePhysicalAttackKey();
+        BlockPos target = activeDestructionTarget();
+        if (target == null) return;
+        if (!modules.isEnabled(ModuleId.AUTO_MINE) || mc.player == null || mc.world == null
+                || mc.playerController == null || mc.currentScreen != null || !mc.inGameHasFocus
+                || mc.player.isHandActive() || manualPause > 0 || manualMovementRequested()
+                || !mc.world.isBlockLoaded(target)) return;
+        boolean miningTarget = target.equals(miningPos) && miningType != null
+            && OreType.fromBlock(mc.world.getBlockState(target).getBlock()) == miningType
+            && stableMiningPosition(playerNavigationFeetCell(), target);
+        boolean clearingTarget = target.equals(clearingPos) && !isPassable(target)
+            && isBreakableBlock(target);
+        if (!miningTarget && !clearingTarget) return;
+        Vec3d eyes = mc.player.getPositionEyes(1.0F);
+        if (!withinMiningReach(eyes, target, mc.playerController.getBlockReachDistance())) return;
+        RayTraceResult hit = rayTraceExactBlock(eyes, target);
+        if (hit == null) return;
+        face(hit.hitVec);
+        int keyCode = mc.gameSettings.keyBindAttack.getKeyCode();
+        if (keyCode == 0) return;
+        boolean physicalDown = GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
+        KeyBinding.setKeyBindState(keyCode,
+            automaticAttackKeyDown(true, true, physicalDown));
+        automaticAttackTickTarget = target.toImmutable();
+    }
+
+    private BlockPos activeDestructionTarget() {
+        return activeDestructionTarget(miningPos, miningType, clearingPos);
+    }
+
+    static BlockPos activeDestructionTarget(BlockPos mining, OreType miningType,
+            BlockPos clearing) {
+        return clearing != null ? clearing : miningType != null ? mining : null;
+    }
+
+    private void restorePhysicalAttackKey() {
+        if (mc.gameSettings == null || mc.gameSettings.keyBindAttack == null) return;
+        int keyCode = mc.gameSettings.keyBindAttack.getKeyCode();
+        if (keyCode == 0) return;
+        boolean physicalDown = GameSettings.isKeyDown(mc.gameSettings.keyBindAttack);
+        KeyBinding.setKeyBindState(keyCode,
+            automaticAttackKeyDown(false, false, physicalDown));
+    }
+
+    private BlockPos currentCrosshairBlock() {
+        RayTraceResult hit = mc.objectMouseOver;
+        return hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
+            ? hit.getBlockPos() : null;
     }
 
     private void updateMinedCount() {
@@ -441,6 +501,10 @@ public final class AutoMiner {
             if (targetLabels.isEmpty()) targetLabelType = null;
             if (ownsCurrentWork) clearPath();
             else if (ownsMiningWork) clearMiningTarget();
+            if (completionDelayRequired(ownsCurrentWork, ownsMiningWork)) {
+                delay = Math.max(delay,
+                    destructionCompletionDelay(false, ModConfig.mineDelayTicks));
+            }
         }
         if (quotaAvailabilityChanged) invalidateCurrentCandidateCache();
     }
@@ -512,16 +576,20 @@ public final class AutoMiner {
             miningAttemptBudget = destructionAttemptBudget(
                 mc.world.getBlockState(target.pos).getPlayerRelativeBlockHardness(
                     mc.player, mc.world, target.pos));
-            miningDeadlineTick = destructionDeadlineTick(mc.player.ticksExisted,
-                miningAttemptBudget, ModConfig.mineDelayTicks);
+            miningDeadlineTick = destructionDeadlineTick(
+                mc.player.ticksExisted, miningAttemptBudget);
         }
         if (destructionWorkExhausted(miningAttempts, miningAttemptBudget,
                 mc.player.ticksExisted, miningDeadlineTick)) {
             rejectMiningTarget(target.pos, target.type);
             return;
         }
-        face(target.pos);
-        boolean accepted = mc.playerController.onPlayerDamageBlock(target.pos, target.side);
+        boolean vanillaOwnedTick = vanillaOwnsDestructionTick(
+            automaticAttackTickMatches(automaticAttackTickTarget, currentCrosshairBlock(), target.pos),
+            sameMiningTarget, restartDestruction);
+        if (!vanillaOwnedTick) face(target.pos);
+        boolean accepted = vanillaOwnedTick
+            || mc.playerController.onPlayerDamageBlock(target.pos, target.side);
         boolean targetStillPresent = targetType(target.pos) == target.type;
         if (!accepted) {
             rejectMiningTarget(target.pos, target.type);
@@ -534,10 +602,9 @@ public final class AutoMiner {
             sameMiningTarget, miningRouteBlocker, routeBlocker);
         if (!destructionRequestAdvanced(true,
                 mc.playerController.getIsHittingBlock(), targetStillPresent)) {
-            delay = destructionActionDelay(false, ModConfig.mineDelayTicks);
             return;
         }
-        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
+        if (!vanillaOwnedTick) mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningAttempts = nextDestructionAttemptCount(miningAttempts, true);
         boolean preserveRouteTarget = preserveQueuedRouteTarget(
             miningRouteBlocker, target.pos, target.type, currentOre, currentOreType);
@@ -547,12 +614,19 @@ public final class AutoMiner {
             currentOreType = target.type;
         }
         rememberPendingCompletion(target.pos, target.type);
-        delay = destructionActionDelay(true, ModConfig.mineDelayTicks);
     }
 
     private boolean continueMiningTarget() {
         if (miningPos == null || miningType == null) return false;
-        if (OreType.fromBlock(mc.world.getBlockState(miningPos).getBlock()) != miningType) {
+        boolean targetStillPresent = OreType.fromBlock(
+            mc.world.getBlockState(miningPos).getBlock()) == miningType;
+        if (!targetStillPresent) {
+            if (vanillaCompletedOwnedDestruction(automaticAttackTickTarget,
+                    currentCrosshairBlock(), miningPos, false)) {
+                miningAttempts = nextDestructionAttemptCount(miningAttempts, true);
+                rememberPendingCompletion(miningPos, miningType);
+                return true;
+            }
             clearMiningTarget();
             return true;
         }
@@ -861,13 +935,13 @@ public final class AutoMiner {
     private boolean continueClearingObstacle() {
         if (clearingPos == null) return false;
         if (!mc.world.isBlockLoaded(clearingPos) || isPassable(clearingPos)) return true;
-        prepareClearingTarget(clearingPos);
+        boolean restartDestruction = prepareClearingTarget(clearingPos);
         if (destructionWorkExhausted(clearingAttempts, clearingAttemptBudget,
                 mc.player.ticksExisted, clearingDeadlineTick)) {
             rejectClearingObstacleAndReplan(clearingPos);
             return true;
         }
-        if (!damageCorridorBlock(clearingPos)) {
+        if (!damageCorridorBlock(clearingPos, restartDestruction)) {
             rejectClearingObstacleAndReplan(clearingPos);
             return true;
         }
@@ -882,7 +956,7 @@ public final class AutoMiner {
             loaded, passable, clearingMissingTicks);
         if (completionAbsenceConfirmed(loaded, clearingMissingTicks)) {
             clearClearingTarget();
-            delay = 0;
+            delay = destructionCompletionDelay(false, ModConfig.mineDelayTicks);
             return false;
         }
         if (loaded && !passable) return false;
@@ -1957,15 +2031,15 @@ public final class AutoMiner {
     }
 
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
-        prepareClearingTarget(obstacle);
-        if (!damageCorridorBlock(obstacle, hit)) {
+        boolean restartDestruction = prepareClearingTarget(obstacle);
+        if (!damageCorridorBlock(obstacle, hit, restartDestruction)) {
             clearClearingTarget();
             return false;
         }
         return true;
     }
 
-    private void prepareClearingTarget(BlockPos obstacle) {
+    private boolean prepareClearingTarget(BlockPos obstacle) {
         boolean sameTarget = obstacle.equals(clearingPos);
         if (!sameTarget && clearingControllerResetRequired(clearingPos, obstacle)
                 && mc.playerController != null) {
@@ -1984,10 +2058,11 @@ public final class AutoMiner {
             clearingAttemptBudget = destructionAttemptBudget(
                 mc.world.getBlockState(obstacle).getPlayerRelativeBlockHardness(
                     mc.player, mc.world, obstacle));
-            clearingDeadlineTick = destructionDeadlineTick(mc.player.ticksExisted,
-                clearingAttemptBudget, ModConfig.mineDelayTicks);
+            clearingDeadlineTick = destructionDeadlineTick(
+                mc.player.ticksExisted, clearingAttemptBudget);
             clearingMissingTicks = 0;
         }
+        return restartDestruction;
     }
 
     private RayTraceResult rayTraceMiningExposureObstacle(Vec3d eyes, BlockPos playerFeet,
@@ -2060,26 +2135,30 @@ public final class AutoMiner {
         return null;
     }
 
-    private boolean damageCorridorBlock(BlockPos obstacle) {
+    private boolean damageCorridorBlock(BlockPos obstacle, boolean restartDestruction) {
         return damageCorridorBlock(obstacle, rayTraceExactBlock(
-            mc.player.getPositionEyes(1.0F), obstacle));
+            mc.player.getPositionEyes(1.0F), obstacle), restartDestruction);
     }
 
-    private boolean damageCorridorBlock(BlockPos obstacle, RayTraceResult hit) {
+    private boolean damageCorridorBlock(BlockPos obstacle, RayTraceResult hit,
+            boolean restartDestruction) {
         if (!isBreakableBlock(obstacle)) return false;
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
         if (!withinMiningReach(eyes, obstacle, miningReach())) return false;
         if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
                 || !obstacle.equals(hit.getBlockPos())) return false;
-        face(obstacle);
-        boolean accepted = mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
+        boolean vanillaOwnedTick = vanillaOwnsDestructionTick(
+            automaticAttackTickMatches(automaticAttackTickTarget, currentCrosshairBlock(), obstacle),
+            obstacle.equals(clearingPos), restartDestruction);
+        if (!vanillaOwnedTick) face(hit.hitVec);
+        boolean accepted = vanillaOwnedTick
+            || mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         if (!accepted) return false;
         clearingTool = mc.player.getHeldItemMainhand().copy();
         boolean advanced = destructionRequestAdvanced(true,
             mc.playerController.getIsHittingBlock(), !isPassable(obstacle));
-        delay = destructionActionDelay(advanced, ModConfig.mineDelayTicks);
         if (!advanced) return true;
-        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
+        if (!vanillaOwnedTick) mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         clearingAttempts = nextDestructionAttemptCount(clearingAttempts, true);
         return true;
     }
@@ -2362,6 +2441,7 @@ public final class AutoMiner {
     }
 
     private void clearClearingTarget() {
+        restorePhysicalAttackKey();
         if (clearingControllerResetRequired(clearingPos, null)
                 && mc.playerController != null) {
             mc.playerController.resetBlockRemoving();
@@ -2379,6 +2459,7 @@ public final class AutoMiner {
     }
 
     private void clearMiningTarget() {
+        restorePhysicalAttackKey();
         if (miningControllerResetRequired(miningPos, miningType, null, null)
                 && mc.playerController != null) {
             mc.playerController.resetBlockRemoving();
@@ -2514,8 +2595,32 @@ public final class AutoMiner {
         return accepted && (controllerHittingBlock || !targetStillPresent);
     }
 
-    static int destructionActionDelay(boolean advanced, int configuredDelay) {
-        return advanced ? Math.max(0, configuredDelay) : 0;
+    static int destructionCompletionDelay(boolean targetStillPresent, int configuredDelay) {
+        return targetStillPresent ? 0 : Math.max(0, configuredDelay);
+    }
+
+    static boolean completionDelayRequired(boolean ownsCurrentWork, boolean ownsMiningWork) {
+        return ownsCurrentWork || ownsMiningWork;
+    }
+
+    static boolean automaticAttackKeyDown(boolean automaticOwnership, boolean targetExists,
+            boolean physicalKeyDown) {
+        return physicalKeyDown || automaticOwnership && targetExists;
+    }
+
+    static boolean vanillaOwnsDestructionTick(boolean automaticTickTarget, boolean sameTarget,
+            boolean restartDestruction) {
+        return automaticTickTarget && sameTarget && !restartDestruction;
+    }
+
+    static boolean automaticAttackTickMatches(BlockPos scheduled, BlockPos crosshair,
+            BlockPos requested) {
+        return scheduled != null && scheduled.equals(requested) && scheduled.equals(crosshair);
+    }
+
+    static boolean vanillaCompletedOwnedDestruction(BlockPos scheduled, BlockPos crosshair,
+            BlockPos requested, boolean targetStillPresent) {
+        return !targetStillPresent && automaticAttackTickMatches(scheduled, crosshair, requested);
     }
 
     static boolean destructionStateRestarts(boolean sameTarget, boolean toolChanged) {
@@ -2529,9 +2634,8 @@ public final class AutoMiner {
         return ForgeHooksClient.shouldCauseBlockBreakReset(previous, current);
     }
 
-    static int destructionDeadlineTick(int startTick, int attemptBudget, int actionDelayTicks) {
-        long ticks = (long) Math.max(1, attemptBudget)
-            * (Math.max(0, actionDelayTicks) + 1L) + COMPLETION_CONFIRM_TICKS;
+    static int destructionDeadlineTick(int startTick, int attemptBudget) {
+        long ticks = (long) Math.max(1, attemptBudget) + COMPLETION_CONFIRM_TICKS;
         return (int) Math.min(Integer.MAX_VALUE, startTick + ticks);
     }
 
@@ -3270,8 +3374,11 @@ public final class AutoMiner {
     }
 
     private void face(BlockPos pos) {
+        face(new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
+    }
+
+    private void face(Vec3d point) {
         Vec3d eyes = mc.player.getPositionEyes(1.0F);
-        Vec3d point = new Vec3d(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
         double x = point.x - eyes.x;
         double y = point.y - eyes.y;
         double z = point.z - eyes.z;

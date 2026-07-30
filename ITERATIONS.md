@@ -675,3 +675,11 @@
 - Iteration 3: retried accepted-but-not-started destruction on the next client tick.
 - Iteration 4: retained the configured delay after actual ore or obstacle progress.
 - Iteration 5: removed path, endpoint, and collision callers that overwrote the destruction outcome's delay.
+
+## Version 1.10.116 Auto Mining Continuous Break Update
+
+- Iteration 1: reproduced vanilla cancelling hard-block progress when no physical attack key remained held between client ticks.
+- Iteration 2: temporarily owned the attack binding during the vanilla input phase only for the exact active ore or obstacle.
+- Iteration 3: preserved the player's physical attack state and released automatic ownership on pause, target change, disable, and world unload.
+- Iteration 4: made mining delay a confirmed block-to-block delay instead of interrupting repeated damage to the same block.
+- Iteration 5: aligned destruction deadlines with continuous ticks and covered exact crosshair ownership, completion, delay, and target-priority rules.

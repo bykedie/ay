@@ -124,7 +124,7 @@ public final class ModConfig {
         replyTarget = configuration.getString("target", "autoReply", "", "Only messages from this player trigger a reply. Empty accepts anyone.");
         replyMessages = fiveMessages(configuration.getStringList("messages", "autoReply", DEFAULT_REPLY_MESSAGES, "Random automatic replies."), DEFAULT_REPLY_MESSAGES);
         replyCooldownTicks = configuration.getInt("cooldownTicks", "autoReply", 100, 20, 1200, "Minimum delay between replies.");
-        mineDelayTicks = configuration.getInt("delayTicks", "autoMine", 2, 0, 40, "Delay between mining actions.");
+        mineDelayTicks = configuration.getInt("delayTicks", "autoMine", 2, 0, 40, "Delay after a mined block is confirmed complete.");
         mineBlocks = configuration.getStringList("blocks", "autoMine", new String[] {
             "minecraft:coal_ore", "minecraft:iron_ore", "minecraft:gold_ore",
             "minecraft:redstone_ore", "minecraft:lapis_ore", "minecraft:diamond_ore", "minecraft:emerald_ore"

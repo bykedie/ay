@@ -892,7 +892,7 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.destructionWorkExhausted(11, 12, 75, 76));
         assertTrue(AutoMiner.destructionWorkExhausted(12, 12, 75, 76));
         assertTrue(AutoMiner.destructionWorkExhausted(1, 12, 77, 76));
-        assertEquals(76, AutoMiner.destructionDeadlineTick(0, 12, 2));
+        assertEquals(52, AutoMiner.destructionDeadlineTick(0, 12));
     }
 
     @Test
@@ -1068,10 +1068,48 @@ public class AutoMinerTest {
     }
 
     @Test
-    public void hitDelayWaitsRetryNextTickWhileRealDamageUsesTheConfiguredDelay() {
-        assertEquals(0, AutoMiner.destructionActionDelay(false, 8));
-        assertEquals(8, AutoMiner.destructionActionDelay(true, 8));
-        assertEquals(0, AutoMiner.destructionActionDelay(true, -1));
+    public void sameBlockDamageContinuesEveryTickAndCompletionUsesTheConfiguredDelay() {
+        assertEquals(0, AutoMiner.destructionCompletionDelay(true, 8));
+        assertEquals(8, AutoMiner.destructionCompletionDelay(false, 8));
+        assertEquals(0, AutoMiner.destructionCompletionDelay(false, -1));
+        assertTrue(AutoMiner.completionDelayRequired(true, false));
+        assertTrue(AutoMiner.completionDelayRequired(false, true));
+        assertFalse(AutoMiner.completionDelayRequired(false, false));
+    }
+
+    @Test
+    public void automaticBreakingOwnsTheAttackKeyOnlyWhileItsTargetExists() {
+        assertTrue(AutoMiner.automaticAttackKeyDown(true, true, false));
+        assertFalse(AutoMiner.automaticAttackKeyDown(true, false, false));
+        assertTrue(AutoMiner.automaticAttackKeyDown(true, false, true));
+        assertTrue(AutoMiner.automaticAttackKeyDown(false, true, true));
+        assertFalse(AutoMiner.automaticAttackKeyDown(false, true, false));
+
+        BlockPos ore = new BlockPos(4, 20, 7);
+        BlockPos obstacle = ore.west();
+        assertEquals(obstacle, AutoMiner.activeDestructionTarget(
+            ore, OreType.IRON, obstacle));
+        assertEquals(ore, AutoMiner.activeDestructionTarget(ore, OreType.IRON, null));
+        assertEquals(null, AutoMiner.activeDestructionTarget(ore, null, null));
+    }
+
+    @Test
+    public void vanillaContinuesOwnedBreakingWithoutAnEndTickDoubleHit() {
+        assertTrue(AutoMiner.vanillaOwnsDestructionTick(true, true, false));
+        assertFalse(AutoMiner.vanillaOwnsDestructionTick(true, true, true));
+        assertFalse(AutoMiner.vanillaOwnsDestructionTick(true, false, false));
+        assertFalse(AutoMiner.vanillaOwnsDestructionTick(false, true, false));
+
+        BlockPos target = new BlockPos(4, 20, 7);
+        assertTrue(AutoMiner.automaticAttackTickMatches(target, target, target));
+        assertFalse(AutoMiner.automaticAttackTickMatches(target, target.east(), target));
+        assertFalse(AutoMiner.automaticAttackTickMatches(target, target, target.up()));
+        assertTrue(AutoMiner.vanillaCompletedOwnedDestruction(
+            target, target, target, false));
+        assertFalse(AutoMiner.vanillaCompletedOwnedDestruction(
+            target, target, target, true));
+        assertFalse(AutoMiner.vanillaCompletedOwnedDestruction(
+            target, target.east(), target, false));
     }
 
     @Test
