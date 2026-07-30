@@ -1106,6 +1106,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(false, true, true));
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, false, true));
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, true, false));
+        assertTrue(AutoMiner.automaticMiningInputAvailable(false, true));
+        assertFalse(AutoMiner.automaticMiningInputAvailable(true, true));
+        assertFalse(AutoMiner.automaticMiningInputAvailable(false, false));
     }
 
     @Test

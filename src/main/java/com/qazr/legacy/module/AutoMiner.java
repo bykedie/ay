@@ -225,7 +225,7 @@ public final class AutoMiner {
             stopAutomatedWork(true);
             delay = 0;
         }
-        if (mc.currentScreen != null) {
+        if (!automaticMiningInputAvailable(mc.currentScreen != null, mc.inGameHasFocus)) {
             stopAutomatedWork(true);
             return;
         }
@@ -2631,6 +2631,10 @@ public final class AutoMiner {
     static boolean automaticAttackKeyDown(boolean automaticOwnership, boolean targetExists,
             boolean physicalKeyDown) {
         return physicalKeyDown || automaticOwnership && targetExists;
+    }
+
+    static boolean automaticMiningInputAvailable(boolean screenOpen, boolean inGameHasFocus) {
+        return !screenOpen && inGameHasFocus;
     }
 
     static boolean automaticBreakToolPreparationRequired(boolean validTarget,

@@ -707,3 +707,11 @@
 - Iteration 3: required an exact ray trace to the owned ore or route obstacle before tool preparation.
 - Iteration 4: left unreachable, newly obstructed, and inactive targets without automatic hotbar changes.
 - Iteration 5: covered valid, out-of-reach, occluded, and inactive preparation decisions.
+
+## Version 1.10.120 Auto Mining Focus Pause Update
+
+- Iteration 1: reproduced loss of game focus releasing vanilla attack input while END-phase mining still consumed attempts.
+- Iteration 2: unified open-screen and unfocused-window handling under one automatic-input availability gate.
+- Iteration 3: stopped active mining, clearing, route motion, and synthetic attack ownership as soon as input became unavailable.
+- Iteration 4: resumed through normal fresh target selection after focus returned instead of retaining stale destruction state.
+- Iteration 5: covered focused gameplay, open-screen pause, and unfocused-window pause decisions.
