@@ -619,3 +619,11 @@
 - Iteration 3: rejected damaging support blocks before placement or inventory swapping.
 - Iteration 4: retained ordinary full blocks while continuing to reject falling and partial blocks.
 - Iteration 5: covered safe, hazardous, falling, partial, and non-solid scaffold candidates.
+
+## Version 1.10.109 Auto Mining Replan Motion Update
+
+- Iteration 1: reproduced automatic replanning paths that cleared route state without stopping old horizontal motion.
+- Iteration 2: centralized route-motion stopping in the automatic restart entry point.
+- Iteration 3: covered target invalidation, endpoint rejection, server displacement, and route-transition recovery callers.
+- Iteration 4: retained manual takeover through the existing motion-preserving cancellation path.
+- Iteration 5: covered positive and negative route motion for both automatic and manual reset modes.

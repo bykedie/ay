@@ -1007,9 +1007,16 @@ public class AutoMinerTest {
 
     @Test
     public void completedRouteHandoffStopsResidualHorizontalDrift() {
-        assertEquals(0.0, AutoMiner.routeHandoffMotion(0.04), 0.0);
-        assertEquals(0.0, AutoMiner.routeHandoffMotion(-0.04), 0.0);
-        assertEquals(0.0, AutoMiner.routeHandoffMotion(0.0), 0.0);
+        assertEquals(0.0, AutoMiner.routeResetMotion(0.04, true), 0.0);
+        assertEquals(0.0, AutoMiner.routeResetMotion(-0.04, true), 0.0);
+        assertEquals(0.0, AutoMiner.routeResetMotion(0.0, true), 0.0);
+    }
+
+    @Test
+    public void manualTakeoverPreservesHorizontalMotionWhileAutomaticReplanStopsIt() {
+        assertEquals(0.18, AutoMiner.routeResetMotion(0.18, false), 0.0);
+        assertEquals(-0.18, AutoMiner.routeResetMotion(-0.18, false), 0.0);
+        assertEquals(0.0, AutoMiner.routeResetMotion(0.18, true), 0.0);
     }
 
     @Test

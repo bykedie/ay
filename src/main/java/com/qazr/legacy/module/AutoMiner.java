@@ -910,7 +910,7 @@ public final class AutoMiner {
     private void followPathToOre(List<OreVisualizer.CachedOre> candidates) {
         OreType activeType = currentOre == null ? null : targetType(currentOre);
         if (invalidActiveRouteTarget(currentOre, activeType)) {
-            clearPath();
+            restartRouteFromCurrentPosition();
             clearTargetLabels();
         }
         if (currentOre == null || activeType == null || pathIndex >= path.size()) {
@@ -1062,8 +1062,8 @@ public final class AutoMiner {
         return Math.abs(slowed) < 0.005 ? 0.0 : slowed;
     }
 
-    static double routeHandoffMotion(double current) {
-        return 0.0;
+    static double routeResetMotion(double current, boolean stopMotion) {
+        return stopMotion ? 0.0 : current;
     }
 
     static boolean routeProgressed(double previousDistanceSq, double currentDistanceSq) {
@@ -1187,8 +1187,12 @@ public final class AutoMiner {
     }
 
     private void stopRouteMotion() {
-        mc.player.motionX = routeHandoffMotion(mc.player.motionX);
-        mc.player.motionZ = routeHandoffMotion(mc.player.motionZ);
+        resetRouteMotion(true);
+    }
+
+    private void resetRouteMotion(boolean stopMotion) {
+        mc.player.motionX = routeResetMotion(mc.player.motionX, stopMotion);
+        mc.player.motionZ = routeResetMotion(mc.player.motionZ, stopMotion);
     }
 
     private boolean routeStepClear(double motionX, double motionZ) {
@@ -2121,6 +2125,7 @@ public final class AutoMiner {
     }
 
     private void restartRouteFromCurrentPosition() {
+        stopRouteMotion();
         clearPath();
         pathRetryDelay = 0;
         delay = 0;
@@ -2311,7 +2316,7 @@ public final class AutoMiner {
     }
 
     private void stopAutomatedWork(boolean stopMotion) {
-        if (stopMotion && mc.player != null) stopRouteMotion();
+        if (mc.player != null) resetRouteMotion(stopMotion);
         if (mc.playerController != null) mc.playerController.resetBlockRemoving();
         pathRetryDelay = 0;
         invalidateCurrentCandidateCache();
