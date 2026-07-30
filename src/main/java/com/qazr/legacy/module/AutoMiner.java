@@ -810,11 +810,14 @@ public final class AutoMiner {
         Block block = ((ItemBlock) stack.getItem()).getBlock();
         return block != null && stableScaffoldBlock(
             block.getDefaultState().getMaterial().isSolid(), block instanceof BlockFalling,
-            block.getDefaultState().isFullCube()) && block.canPlaceBlockAt(mc.world, pos);
+            block.getDefaultState().isFullCube(),
+            block instanceof BlockMagma || block instanceof BlockCactus)
+            && block.canPlaceBlockAt(mc.world, pos);
     }
 
-    static boolean stableScaffoldBlock(boolean solid, boolean falling, boolean fullCube) {
-        return solid && !falling && fullCube;
+    static boolean stableScaffoldBlock(boolean solid, boolean falling, boolean fullCube,
+            boolean hazardousSupport) {
+        return solid && !falling && fullCube && !hazardousSupport;
     }
 
     private void clearScaffoldAssist() {

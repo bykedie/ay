@@ -611,3 +611,11 @@
 - Iteration 3: made zero-node and ordinary final-node handoffs follow the same stop-before-mining order.
 - Iteration 4: retained the existing posture, face-neighbor, visibility, and exposure recovery checks.
 - Iteration 5: covered positive, negative, and already-zero residual horizontal motion.
+
+## Version 1.10.108 Auto Mining Scaffold Safety Update
+
+- Iteration 1: reproduced auxiliary scaffolding accepting a full solid magma block.
+- Iteration 2: added the existing hazardous-support classification to scaffold selection.
+- Iteration 3: rejected damaging support blocks before placement or inventory swapping.
+- Iteration 4: retained ordinary full blocks while continuing to reject falling and partial blocks.
+- Iteration 5: covered safe, hazardous, falling, partial, and non-solid scaffold candidates.

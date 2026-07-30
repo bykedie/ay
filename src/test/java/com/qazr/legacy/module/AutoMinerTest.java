@@ -517,9 +517,9 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(19, 20, 64.2, 64, -0.1, false));
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.99, 64, -0.1, true));
         assertFalse(AutoMiner.shouldRetryScaffoldAscent(20, 20, 64.2, 64, 0.1, false));
-        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true));
-        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true));
-        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true));
+        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true, false));
     }
 
     @Test
@@ -551,10 +551,11 @@ public class AutoMinerTest {
 
     @Test
     public void scaffoldAssistUsesOnlyStableFullHeightBlocks() {
-        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true));
-        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true));
-        assertFalse(AutoMiner.stableScaffoldBlock(true, false, false));
-        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true));
+        assertTrue(AutoMiner.stableScaffoldBlock(true, false, true, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, false, true, true));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, true, true, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(true, false, false, false));
+        assertFalse(AutoMiner.stableScaffoldBlock(false, false, true, false));
     }
 
     @Test
