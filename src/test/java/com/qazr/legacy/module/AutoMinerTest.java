@@ -1058,6 +1058,16 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void vanillaHitDelayDoesNotPretendToStartDestroyingTheNextBlock() {
+        assertFalse(AutoMiner.destructionRequestAdvanced(true, false, true));
+        assertEquals(7, AutoMiner.nextDestructionAttemptCount(7,
+            AutoMiner.destructionRequestAdvanced(true, false, true)));
+        assertTrue(AutoMiner.destructionRequestAdvanced(true, true, true));
+        assertTrue(AutoMiner.destructionRequestAdvanced(true, false, false));
+        assertFalse(AutoMiner.destructionRequestAdvanced(false, true, false));
+    }
+
+    @Test
     public void changedMiningToolsRestartDestructionBudgetsForTheSameBlock() {
         assertTrue(AutoMiner.destructionStateRestarts(false, false));
         assertTrue(AutoMiner.destructionStateRestarts(false, true));

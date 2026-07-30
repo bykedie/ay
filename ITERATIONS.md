@@ -659,3 +659,11 @@
 - Iteration 3: used Forge 1.12.2 item identity, NBT, and damageability rules to detect progress-resetting changes.
 - Iteration 4: rebuilt the matching attempt budget and deadline whenever vanilla progress restarts.
 - Iteration 5: covered new targets, unchanged tools, durability-only changes, different items, changed NBT, and empty hands.
+
+## Version 1.10.114 Auto Mining Hit Delay Update
+
+- Iteration 1: reproduced Forge reporting an accepted damage call during vanilla's post-break hit delay without starting the next block.
+- Iteration 2: separated an accepted controller call from actual destruction progress.
+- Iteration 3: kept the next ore or obstacle locked while the vanilla delay counts down.
+- Iteration 4: deferred swings, attempt consumption, and completion registration until breaking starts or the block is instantly removed.
+- Iteration 5: covered delayed, active, instant, and rejected destruction requests.

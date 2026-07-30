@@ -500,7 +500,8 @@ public final class AutoMiner {
             miningPos, miningType, target.pos, target.type);
         boolean resetController = miningControllerResetRequired(
             miningPos, miningType, target.pos, target.type);
-        if (destructionStateRestarts(sameMiningTarget, toolChanged)) {
+        boolean restartDestruction = destructionStateRestarts(sameMiningTarget, toolChanged);
+        if (restartDestruction) {
             if (targetChanged) {
                 releasePendingQuotaReservation(miningPos, miningType);
             }
@@ -521,16 +522,22 @@ public final class AutoMiner {
         }
         face(target.pos);
         boolean accepted = mc.playerController.onPlayerDamageBlock(target.pos, target.side);
+        boolean targetStillPresent = targetType(target.pos) == target.type;
         if (!accepted) {
             rejectMiningTarget(target.pos, target.type);
             return;
         }
-        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningPos = target.pos;
         miningType = target.type;
         miningTool = mc.player.getHeldItemMainhand().copy();
         miningRouteBlocker = routeBlockerOwnership(
             sameMiningTarget, miningRouteBlocker, routeBlocker);
+        if (!destructionRequestAdvanced(true,
+                mc.playerController.getIsHittingBlock(), targetStillPresent)) {
+            delay = 0;
+            return;
+        }
+        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         miningAttempts = nextDestructionAttemptCount(miningAttempts, true);
         boolean preserveRouteTarget = preserveQueuedRouteTarget(
             miningRouteBlocker, target.pos, target.type, currentOre, currentOreType);
@@ -1975,7 +1982,8 @@ public final class AutoMiner {
         selectBestPickaxe(obstacle);
         boolean toolChanged = sameTarget && toolChangeRequiresBreakReset(
             clearingTool, mc.player.getHeldItemMainhand());
-        if (destructionStateRestarts(sameTarget, toolChanged)) {
+        boolean restartDestruction = destructionStateRestarts(sameTarget, toolChanged);
+        if (restartDestruction) {
             if (toolChanged && mc.playerController != null) {
                 mc.playerController.resetBlockRemoving();
             }
@@ -2074,8 +2082,10 @@ public final class AutoMiner {
         face(obstacle);
         boolean accepted = mc.playerController.onPlayerDamageBlock(obstacle, hit.sideHit);
         if (!accepted) return false;
-        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         clearingTool = mc.player.getHeldItemMainhand().copy();
+        if (!destructionRequestAdvanced(true, mc.playerController.getIsHittingBlock(),
+                !isPassable(obstacle))) return true;
+        mc.player.swingArm(net.minecraft.util.EnumHand.MAIN_HAND);
         clearingAttempts = nextDestructionAttemptCount(clearingAttempts, true);
         return true;
     }
@@ -2503,6 +2513,11 @@ public final class AutoMiner {
 
     static int nextDestructionAttemptCount(int attempts, boolean accepted) {
         return accepted ? attempts + 1 : attempts;
+    }
+
+    static boolean destructionRequestAdvanced(boolean accepted, boolean controllerHittingBlock,
+            boolean targetStillPresent) {
+        return accepted && (controllerHittingBlock || !targetStillPresent);
     }
 
     static boolean destructionStateRestarts(boolean sameTarget, boolean toolChanged) {
