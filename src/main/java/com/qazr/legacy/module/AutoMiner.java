@@ -1272,6 +1272,10 @@ public final class AutoMiner {
     static BlockPos routeTransitionClearance(BlockPos from, BlockPos next) {
         if (from == null || next == null) return null;
         if (next.getY() > from.getY()) return from.up(2);
+        if (next.getY() < from.getY()
+                && (next.getX() != from.getX() || next.getZ() != from.getZ())) {
+            return next.up(2);
+        }
         return routeRequiresSupportRemoval(from, next) ? from.down() : null;
     }
 
@@ -2318,7 +2322,8 @@ public final class AutoMiner {
         BlockPos previous = routeStart;
         for (int i = from; i < end; i++) {
             BlockPos feet = path.get(i);
-            if (previous != null && feet.getY() > previous.getY()) cells.add(previous.up(2));
+            BlockPos clearance = routeTransitionClearance(previous, feet);
+            if (transitionNeedsSeparateClearance(clearance, feet)) cells.add(clearance);
             cells.add(feet.up());
             cells.add(feet);
             previous = feet;

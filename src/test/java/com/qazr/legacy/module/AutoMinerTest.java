@@ -102,6 +102,8 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.routeRequiresSupportRemoval(origin, origin.up()));
         assertEquals(origin.down(), AutoMiner.routeTransitionClearance(origin, origin.down()));
         assertEquals(origin.up(2), AutoMiner.routeTransitionClearance(origin, origin.up()));
+        assertEquals(origin.east().up(),
+            AutoMiner.routeTransitionClearance(origin, origin.east().down()));
         assertEquals(null, AutoMiner.routeTransitionClearance(origin, origin.east()));
 
         assertTrue(AutoMiner.routeLandingConfirmed(false, false, -0.8));
@@ -174,8 +176,9 @@ public class AutoMinerTest {
             validation.advance();
         }
 
-        assertEquals(Arrays.asList(horizontal, ascending, horizontal.up(2), descending), checks);
-        assertEquals(Arrays.asList(true, true, false, true), traversal);
+        assertEquals(Arrays.asList(horizontal, ascending, horizontal.up(2), descending,
+            descending.up(2)), checks);
+        assertEquals(Arrays.asList(true, true, false, true, false), traversal);
         assertEquals(0, AutoMiner.pathValidationSliceBudget(-1));
         assertEquals(32, AutoMiner.pathValidationSliceBudget(32));
         assertEquals(64, AutoMiner.pathValidationSliceBudget(100));
@@ -203,10 +206,12 @@ public class AutoMinerTest {
     @Test
     public void corridorCellsKeepHeadAndFeetObstaclesInRouteOrder() {
         List<BlockPos> cells = AutoMiner.corridorCells(Arrays.asList(
-            new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), 0, 10);
+            new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), 0, 10,
+            new BlockPos(0, 64, 0));
 
         assertEquals(Arrays.asList(
-            new BlockPos(1, 64, 0), new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), cells);
+            new BlockPos(1, 65, 0), new BlockPos(1, 64, 0),
+            new BlockPos(1, 63, 0), new BlockPos(1, 62, 0)), cells);
         BlockPos start = new BlockPos(0, 64, 0);
         assertTrue(AutoMiner.reuseRouteCorridorCache(true, 2, 2, start, start));
         assertFalse(AutoMiner.reuseRouteCorridorCache(false, 2, 2, start, start));

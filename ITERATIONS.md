@@ -787,3 +787,11 @@
 - Iteration 3: retained the single-refresh fast path when the first exposed point matches the vanilla crosshair.
 - Iteration 4: added a bounded fallback across the remaining face-center and inset-corner samples after a mismatch.
 - Iteration 5: stopped at the first vanilla-exact sample and covered accepted, exhausted, and empty sample scans.
+
+## Version 1.10.130 Auto Mining Descending Clearance Update
+
+- Iteration 1: reproduced a horizontal descent being accepted without checking the player's swept head cell above the lower landing.
+- Iteration 2: required the transition clearance to include the landing cell two blocks above the feet during a sideways descent.
+- Iteration 3: made completed-path validation recheck that clearance with the existing bounded validation passes.
+- Iteration 4: reused the same transition rule in corridor generation so pre-clearing sees the obstacle before movement begins.
+- Iteration 5: preserved straight-down support removal, ascending jump clearance, level movement, and existing route ordering in focused tests.
