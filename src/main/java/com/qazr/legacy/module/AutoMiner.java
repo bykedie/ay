@@ -95,6 +95,7 @@ public final class AutoMiner {
     private final OreVisualizer oreVisualizer;
     private final EnumMap<OreType, Integer> minedCounts = new EnumMap<>(OreType.class);
     private final List<AxisAlignedBB> supportCollisionBoxes = new ArrayList<>(4);
+    private final List<AxisAlignedBB> routeCellCollisionBoxes = new ArrayList<>(4);
     private final Map<BlockPos, Integer> targetLabels = new HashMap<>();
     private final Map<BlockPos, Integer> blockedTargetsUntil = new HashMap<>();
     private BlockPos blockedTargetsOrigin;
@@ -388,6 +389,7 @@ public final class AutoMiner {
             clearScaffoldAssist();
             clearPendingCompletion();
             supportCollisionBoxes.clear();
+            routeCellCollisionBoxes.clear();
         }
     }
 
@@ -2064,8 +2066,19 @@ public final class AutoMiner {
     }
 
     private boolean isPassable(BlockPos pos) {
-        Material material = mc.world.getBlockState(pos).getMaterial();
-        return routeCellPassable(material.isReplaceable(), hazardousRouteMaterial(material));
+        IBlockState state = mc.world.getBlockState(pos);
+        Material material = state.getMaterial();
+        boolean replaceable = material.isReplaceable();
+        return routeCellPassable(replaceable, hazardousRouteMaterial(material),
+            replaceable && routeCellHasCollision(pos, state));
+    }
+
+    private boolean routeCellHasCollision(BlockPos pos, IBlockState state) {
+        AxisAlignedBB cell = new AxisAlignedBB(pos.getX() + 0.1, pos.getY(), pos.getZ() + 0.1,
+            pos.getX() + 0.9, pos.getY() + 1.0, pos.getZ() + 0.9);
+        routeCellCollisionBoxes.clear();
+        state.addCollisionBoxToList(mc.world, pos, cell, routeCellCollisionBoxes, mc.player, false);
+        return !routeCellCollisionBoxes.isEmpty();
     }
 
     private boolean isHazardousRouteCell(BlockPos pos) {
@@ -2077,7 +2090,15 @@ public final class AutoMiner {
     }
 
     static boolean routeCellPassable(boolean replaceable, boolean hazardous) {
-        return replaceable && !hazardous;
+        return routeCellPassable(replaceable, hazardous, false);
+    }
+
+    static boolean routeCellPassable(boolean replaceable, boolean hazardous, boolean colliding) {
+        return replaceable && !hazardous && !colliding;
+    }
+
+    static boolean replaceableBlockRequiresClearing(boolean replaceable, boolean colliding) {
+        return replaceable && colliding;
     }
 
     private boolean canClearForCorridor(BlockPos pos) {
@@ -2088,7 +2109,8 @@ public final class AutoMiner {
 
     private boolean isBreakableBlock(BlockPos pos) {
         IBlockState state = mc.world.getBlockState(pos);
-        if (state.getMaterial().isReplaceable()) return false;
+        if (state.getMaterial().isReplaceable()
+                && !replaceableBlockRequiresClearing(true, routeCellHasCollision(pos, state))) return false;
         if (OreType.fromBlock(state.getBlock()) != null) return false;
         if (state.getBlock().getBlockHardness(state, mc.world, pos) < 0.0F) return false;
         if (state.getBlock().canHarvestBlock(mc.world, pos, mc.player)) return true;

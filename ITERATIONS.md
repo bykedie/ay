@@ -883,3 +883,11 @@
 - Iteration 3: made the bounded second pass consume all retained traversal and jump states in one END tick.
 - Iteration 4: retained the 128-state cap and the existing restart result for truncated snapshots.
 - Iteration 5: prevented mixed final snapshots from assigning the otherwise unchanged 100-tick failed-route cooldown.
+
+## Version 1.10.142 Auto Mining Replaceable Collision Update
+
+- Iteration 1: reproduced A* accepting a two-layer snow cell that runtime collision rejected before movement.
+- Iteration 2: added the actual route-column collision shape to the replaceable-cell passability decision.
+- Iteration 3: limited collision enumeration to replaceable cells so ordinary solid-block path checks keep their existing fast path.
+- Iteration 4: allowed colliding replaceable blocks with valid hardness and tools to enter normal corridor clearing.
+- Iteration 5: preserved collision-free air, water and one-layer snow behavior while aligning planning, runtime and clearing decisions.

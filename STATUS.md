@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.141`
+- Version: `1.10.142`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 99 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 100 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: atomically validate final path failure`
+- Latest accepted change: `fix: align replaceable route collisions`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -22,11 +22,12 @@ Last updated: 2026-08-01
 - Test classes: 17
 - Tests: 186
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.141.jar`
-- SHA-256: `8DC21BC8F67740363A65865345F63F639C128A15A9667DCBC3B63CB10B3D6EF0`
+- Artifact: `build/libs/voris-hub-1.10.142.jar`
+- SHA-256: `B05C03D06F8F4C2E33F818A434EC4C7D1C1A958E8E38F3D476B4C7772B0D04A2`
 
 ## Recently Fixed
 
+- AutoMiner now checks real collision shapes for replaceable route cells and clears colliding layers instead of endlessly replanning through them.
 - AutoMiner now performs its bounded final unreachable-route validation atomically, preventing a route opened mid-pass from receiving a mixed-snapshot 100-tick cooldown.
 - AutoMiner now releases route-owned clearing before either tick phase can damage an obstacle after its loaded ore owner disappears or changes type, while preserving temporarily unloaded targets.
 - Blink now preflights the complete same-tick movement burst, omits unsafe remote critical packets, and refuses ordinary round trips that vanilla would correct before their return path.

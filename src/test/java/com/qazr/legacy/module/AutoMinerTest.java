@@ -341,6 +341,10 @@ public class AutoMinerTest {
         assertTrue(AutoMiner.routeCellPassable(true, false));
         assertFalse(AutoMiner.routeCellPassable(true, true));
         assertFalse(AutoMiner.routeCellPassable(false, false));
+        assertTrue(AutoMiner.routeCellPassable(true, false, false));
+        assertFalse(AutoMiner.routeCellPassable(true, false, true));
+        assertTrue(AutoMiner.replaceableBlockRequiresClearing(true, true));
+        assertFalse(AutoMiner.replaceableBlockRequiresClearing(true, false));
         assertTrue(AutoMiner.routeStandSafe(false, false));
         assertFalse(AutoMiner.routeStandSafe(true, false));
         assertFalse(AutoMiner.routeStandSafe(false, true));
