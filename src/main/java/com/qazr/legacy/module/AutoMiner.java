@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.IntPredicate;
 import java.util.function.ToIntFunction;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockCactus;
@@ -404,6 +405,13 @@ public final class AutoMiner {
             face(hit.hitVec);
             mc.entityRenderer.getMouseOver(1.0F);
             exactCrosshair = target.equals(currentCrosshairBlock());
+            if (!exactCrosshair) {
+                RayTraceResult alternate = rayTraceExactCrosshairBlock(eyes, target);
+                if (alternate != null) {
+                    hit = alternate;
+                    exactCrosshair = true;
+                }
+            }
         }
         if (!automaticBreakToolPreparationRequired(
                 validTarget, withinReach, hit != null, exactCrosshair)) return;
@@ -2229,6 +2237,22 @@ public final class AutoMiner {
         return null;
     }
 
+    private RayTraceResult rayTraceExactCrosshairBlock(Vec3d eyes, BlockPos target) {
+        final RayTraceResult[] accepted = {null};
+        firstAcceptedVisibilitySample(LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT, sampleIndex -> {
+            RayTraceResult hit = mc.world.rayTraceBlocks(
+                eyes, blockVisibilitySample(target, sampleIndex), false, true, false);
+            if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK
+                    || !target.equals(hit.getBlockPos())) return false;
+            face(hit.hitVec);
+            mc.entityRenderer.getMouseOver(1.0F);
+            if (!target.equals(currentCrosshairBlock())) return false;
+            accepted[0] = hit;
+            return true;
+        });
+        return accepted[0];
+    }
+
     private boolean damageCorridorBlock(BlockPos obstacle, boolean restartDestruction) {
         return damageCorridorBlock(obstacle, rayTraceExactBlock(
             mc.player.getPositionEyes(1.0F), obstacle), restartDestruction);
@@ -3474,6 +3498,14 @@ public final class AutoMiner {
 
     static Vec3d miningAimPoint(BlockPos pos, Vec3d hitVec) {
         return hitVec == null ? blockCenter(pos) : hitVec;
+    }
+
+    static int firstAcceptedVisibilitySample(int sampleCount, IntPredicate accepted) {
+        if (accepted == null) return -1;
+        for (int index = 0; index < Math.max(0, sampleCount); index++) {
+            if (accepted.test(index)) return index;
+        }
+        return -1;
     }
 
     static List<Vec3d> blockVisibilitySamples(BlockPos pos) {

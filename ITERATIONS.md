@@ -779,3 +779,11 @@
 - Iteration 3: rebuilt the batch when its next candidate disappeared or a newly discovered candidate moved ahead of it.
 - Iteration 4: preserved completed comparisons when a lower-priority candidate was merely appended behind the old batch.
 - Iteration 5: limited content comparison to actual candidate-cache object changes so stable ticks keep constant-time snapshot checks.
+
+## Version 1.10.129 Auto Mining Crosshair Sample Fallback Update
+
+- Iteration 1: ruled out premature vein-label release during the existing three-tick completion pause.
+- Iteration 2: reproduced the first custom-visible point failing vanilla crosshair ownership while a later point remained usable.
+- Iteration 3: retained the single-refresh fast path when the first exposed point matches the vanilla crosshair.
+- Iteration 4: added a bounded fallback across the remaining face-center and inset-corner samples after a mismatch.
+- Iteration 5: stopped at the first vanilla-exact sample and covered accepted, exhausted, and empty sample scans.

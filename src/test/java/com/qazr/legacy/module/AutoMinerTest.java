@@ -368,6 +368,14 @@ public class AutoMinerTest {
         assertEquals(new Vec3d(5.5, 64.5, 0.5), AutoMiner.blockCenter(target));
         assertEquals(exposedCorner, AutoMiner.miningAimPoint(target, exposedCorner));
         assertEquals(AutoMiner.blockCenter(target), AutoMiner.miningAimPoint(target, null));
+        List<Integer> inspected = new java.util.ArrayList<>();
+        assertEquals(2, AutoMiner.firstAcceptedVisibilitySample(15, index -> {
+            inspected.add(index);
+            return index == 2;
+        }));
+        assertEquals(Arrays.asList(0, 1, 2), inspected);
+        assertEquals(-1, AutoMiner.firstAcceptedVisibilitySample(3, index -> false));
+        assertEquals(-1, AutoMiner.firstAcceptedVisibilitySample(0, index -> true));
     }
 
     @Test
