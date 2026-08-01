@@ -4,30 +4,32 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.132`
+- Version: `1.10.133`
 - Branch: `main`
-- Remote state: local branch is 88 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 90 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
-- Working tree at coordination setup: clean
-- Latest commit: `08f062c fix: skip unusable auto miner corridor samples`
-- Previous commit: `6d94e07 fix: release stale auto miner route failures`
-- Previous commit: `99e8839 fix: validate descending auto miner clearance`
+- Working tree: child audit reports remain untracked under `reports/`
+- Latest accepted change: `fix: defer stale auto miner path results`
+- Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
+- Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 
 ## Last Verified Release
 
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 176
+- Tests: 178
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.132.jar`
-- SHA-256: `2D59E1137846192D3B7AB59838A0C30AC124A71C046C84D69AD0258AF0664738`
+- Artifact: `build/libs/voris-hub-1.10.133.jar`
+- SHA-256: `91B9A2513EC3C0A6172748C2448A836F5B44D2CE4F8AE1E6C50AF4DE86DD0E2A`
 
 ## Recently Fixed
 
 - Horizontal descent now validates swept head clearance consistently in A*, path validation, and corridor generation.
 - Path-search failure cooldowns are bound to the feet-cell origin and released after the player moves to a new cell.
 - Corridor ray samples now skip allowed-but-unusable early hits and continue to a usable sample.
+- Restarted A* searches now validate exhausted failure snapshots instead of treating them as immediately unreachable.
+- A second stale validation result is deferred instead of adding a reachable ore to the 100-tick failed-route cooldown.
 
 ## Known Non-Defects Already Audited
 

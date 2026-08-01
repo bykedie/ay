@@ -698,6 +698,30 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void restartedPathFailureStillRequiresStableValidation() {
+        BlockPos ore = new BlockPos(4, 64, 0);
+        BlockPos start = new BlockPos(0, 64, 0);
+        AutoMiner.PathSearch search = new AutoMiner.PathSearch(
+            ore, start, Arrays.asList(ore.west()), 100.0, 1);
+
+        AutoMiner.PathSearchResult result =
+            AutoMiner.beginExhaustedPathFailureValidation(search, false);
+
+        assertFalse(result.isComplete());
+        assertTrue(search.isValidatingFailure());
+    }
+
+    @Test
+    public void exhaustedStalePathRestartIsDeferredInsteadOfFailed() {
+        assertEquals(AutoMiner.StalePathDecision.RESTART,
+            AutoMiner.stalePathDecision(0, true));
+        assertEquals(AutoMiner.StalePathDecision.DEFER,
+            AutoMiner.stalePathDecision(1, true));
+        assertEquals(AutoMiner.StalePathDecision.DEFER,
+            AutoMiner.stalePathDecision(0, false));
+    }
+
+    @Test
     public void pathCandidateSnapshotDoesNotReorderWhilePlanning() {
         OreVisualizer.CachedOre front = new OreVisualizer.CachedOre(
             new BlockPos(5, 20, 0), OreType.IRON, 25.0);

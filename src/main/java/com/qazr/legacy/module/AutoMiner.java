@@ -1639,13 +1639,14 @@ public final class AutoMiner {
         if (result.restart) {
             PathSearch stale = pendingPathSearch;
             List<BlockPos> goals = standPositionsAround(ore);
-            if (stale.restarts < MAX_PATH_SEARCH_RESTARTS && !goals.isEmpty()) {
+            if (stalePathDecision(stale.restarts, !goals.isEmpty())
+                    == StalePathDecision.RESTART) {
                 pendingPathSearch = new PathSearch(ore, start, goals, maxDistanceSq,
                     stale.restarts + 1);
                 return PathSearchResult.pending();
             }
             pendingPathSearch = null;
-            return PathSearchResult.complete(null);
+            return PathSearchResult.pending();
         }
         if (result.complete) pendingPathSearch = null;
         return result;
@@ -1692,9 +1693,7 @@ public final class AutoMiner {
         if (!search.queue.isEmpty() && search.visited < MAX_PATH_NODES) {
             return PathSearchResult.pending();
         }
-        if (search.restarts >= MAX_PATH_SEARCH_RESTARTS) return PathSearchResult.complete(null);
-        search.beginFailureValidation(!search.queue.isEmpty());
-        return PathSearchResult.pending();
+        return beginExhaustedPathFailureValidation(search, !search.queue.isEmpty());
     }
 
     private PathSearchResult validateCompletedPathSearch(PathSearch search, int budget) {
@@ -1779,6 +1778,22 @@ public final class AutoMiner {
 
     static boolean pathValidationRequiresAnotherPass(int completedPasses) {
         return completedPasses < REQUIRED_STABLE_PATH_VALIDATION_PASSES;
+    }
+
+    enum StalePathDecision {
+        RESTART,
+        DEFER
+    }
+
+    static StalePathDecision stalePathDecision(int restarts, boolean goalsAvailable) {
+        return restarts < MAX_PATH_SEARCH_RESTARTS && goalsAvailable
+            ? StalePathDecision.RESTART : StalePathDecision.DEFER;
+    }
+
+    static PathSearchResult beginExhaustedPathFailureValidation(
+            PathSearch search, boolean exhaustive) {
+        search.beginFailureValidation(exhaustive);
+        return PathSearchResult.pending();
     }
 
     static <K> List<Map.Entry<K, Integer>> pathStateEntriesForValidation(
@@ -3773,7 +3788,7 @@ public final class AutoMiner {
         }
     }
 
-    private static final class PathSearch {
+    static final class PathSearch {
         private final BlockPos ore;
         private final BlockPos start;
         private final List<BlockPos> goals;
@@ -3804,7 +3819,7 @@ public final class AutoMiner {
             this(ore, start, goals, maxDistanceSq, 0);
         }
 
-        private PathSearch(BlockPos ore, BlockPos start, List<BlockPos> goals,
+        PathSearch(BlockPos ore, BlockPos start, List<BlockPos> goals,
                 double maxDistanceSq, int restarts) {
             this.ore = ore.toImmutable();
             this.start = start.toImmutable();
@@ -3852,6 +3867,10 @@ public final class AutoMiner {
         private boolean matches(BlockPos targetOre, BlockPos playerStart, double rangeSq) {
             return ore.equals(targetOre) && start.equals(playerStart)
                 && Double.compare(maxDistanceSq, rangeSq) == 0;
+        }
+
+        boolean isValidatingFailure() {
+            return validatingFailure;
         }
     }
 
@@ -3903,7 +3922,7 @@ public final class AutoMiner {
         }
     }
 
-    private static final class PathSearchResult {
+    static final class PathSearchResult {
         private final boolean complete;
         private final PathRoute route;
         private final boolean restart;
@@ -3924,6 +3943,10 @@ public final class AutoMiner {
 
         private static PathSearchResult restart() {
             return new PathSearchResult(false, null, true);
+        }
+
+        boolean isComplete() {
+            return complete;
         }
     }
 

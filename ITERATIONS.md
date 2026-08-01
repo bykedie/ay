@@ -811,3 +811,11 @@
 - Iteration 3: continued through the bounded visibility samples after an unusable early corridor hit.
 - Iteration 4: retained the first-sample fast path and the existing desired, permitted-lower, and planned-corridor boundary.
 - Iteration 5: covered cooled, disallowed, unreachable, unstable-ore, and usable ordinary obstacles in focused tests.
+
+## Version 1.10.133 Auto Mining Stale Path Classification Update
+
+- Iteration 1: reproduced a restarted A* search bypassing failure snapshot validation when its queue or node budget was exhausted.
+- Iteration 2: reproduced a second stale success or failure snapshot being reported as a completed unreachable result.
+- Iteration 3: routed every exhausted search through the existing bounded two-pass failure validation, including restarted searches.
+- Iteration 4: deferred restart-exhausted stale snapshots without adding their ore to the 100-tick failed-route cooldown.
+- Iteration 5: added focused state-machine regressions while preserving node budgets, one in-attempt restart, and retry pacing.
