@@ -225,7 +225,7 @@ public enum ModuleSetting {
             case BLINK_VISUALIZE: return "用红色方框标出闪现攻击本次选中的目标。";
             case BLINK_PRIORITY: return "选择按距离最近或血量最低排列闪现攻击目标。点击切换。";
             case BLINK_ATTACK_POINT: return "选择闪现攻击发包时瞄准目标的部位，用于远端旋转和命中点。";
-            case FLIGHT_MODE: return "切换 WWE Flight 的静态、原版和 Hypixel 三种模式。按住潜行会受控下降，高空关闭后仍会控制到真实接触面；生存服是否造成摔落伤害由服务端状态决定。";
+            case FLIGHT_MODE: return "切换 WWE Flight 的静态、原版和 Hypixel 三种模式。Hypixel 悬空时保留真实未接地状态；按住潜行会受控下降，高空关闭后仍会控制到真实接触面。生存服是否造成摔落伤害由服务端状态决定。";
             case FLIGHT_SPEED: return "WWE Flight 的移动速度。静态模式同时用于水平和升降，原版模式会按 WWE 的规则除以 10 后写入飞行速度；受控下降最高为 1 格/tick，并在接近地面时按剩余距离收敛。";
             case TARGET_RANGE: return "目标骨骼、方框和射线的最大绘制距离，范围为 3 到 500 格。";
             case TARGET_SKELETON: return "按目标实际渲染模型绘制人形、四足、马、蜘蛛等对应骨架。";

@@ -84,9 +84,13 @@ public final class FlightController {
 
     private void hypixelFlight() {
         mc.player.motionY = 0.0;
-        mc.player.onGround = true;
+        mc.player.onGround = hypixelPacketOnGround(mc.player.onGround);
         applyHypixelOffsets(mc.player, mc.player.ticksExisted);
         mc.player.fallDistance = 0.0F;
+    }
+
+    static boolean hypixelPacketOnGround(boolean physicallyOnGround) {
+        return physicallyOnGround;
     }
 
     private void capturePlayer() {

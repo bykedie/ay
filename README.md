@@ -38,7 +38,7 @@ When several labeled vein blocks obstruct the locked target, the lowest invisibl
 
 Vanilla's post-break hit delay keeps the next ore or route obstacle locked without consuming destruction attempts or registering a false completion until block breaking actually starts. Hit-delay countdowns retry every tick; the configured mining delay applies only after real destruction progress.
 
-For a guarded landing, keep `flight` enabled and hold Sneak until the player touches the ground, then disable flight. Descent is capped without repeatedly sending fake grounded packets, horizontal direction input remains active, fall accumulation is cleared locally, and one final grounded position is sent only when the detected collision surface is reached. This reduces fall damage but still depends on the server accepting the final movement packet.
+For a guarded landing, keep `flight` enabled and hold Sneak until the player touches the ground, then disable flight. Descent is capped without synthetic grounded packets, horizontal direction input remains active, and Hypixel mode preserves the collision-derived ground state instead of reporting a midair landing. Client fall accumulation is cleared locally, but a Survival server may still apply fall damage from distance it already accepted when real contact occurs.
 
 All modules and their detailed settings are stored in `config/qazrlegacy.cfg`. The legacy file name, internal mod ID, and `/qazr` command are retained so existing installations keep their settings and key bindings after the Voris Hub rename.
 
@@ -78,7 +78,7 @@ On Linux or macOS:
 ./gradlew clean verifyRelease
 ```
 
-The release artifact is `build/libs/voris-hub-1.10.135.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
+The release artifact is `build/libs/voris-hub-1.10.136.jar`. `verifyRelease` runs unit tests and checks final JAR metadata, required classes, and Java 8 bytecode.
 
 For a development-client smoke test, run `./gradlew runClient` (or `gradlew.bat runClient` on Windows). The build automatically corrects ForgeGradle's known legacydev `Side.BUKKIT` mapping defect and keeps build-time ASM libraries off the Minecraft 1.12 runtime classpath. This only affects the generated development cache, never the release JAR.
 

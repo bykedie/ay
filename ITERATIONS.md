@@ -835,3 +835,11 @@
 - Iteration 3: raised controlled descent from a fixed 0.35 cap to at most 1.0 block per tick and bounded the final step by the measured collision distance.
 - Iteration 4: removed the manual ground-position snap and extra grounded packet, relying on real player collision for landing state.
 - Iteration 5: retained landing control after a high-altitude disable until a real grounded or server-recognized fall-safe state, and documented that client fallDistance resets cannot erase server-side survival fall accumulation.
+
+## Version 1.10.136 Flight Hypixel Ground State Update
+
+- Iteration 1: reproduced Hypixel mode forcing `onGround=true` while the player was physically airborne.
+- Iteration 2: traced the Forge 1.12.2 END player tick into the same tick's ordinary movement packet and the server fall-settlement path.
+- Iteration 3: added a regression requiring Hypixel mode to preserve both airborne false and real-ground true states.
+- Iteration 4: removed the synthetic midair grounded state while retaining the established Hypixel offset and local motion behavior.
+- Iteration 5: clarified that this prevents an early client-triggered settlement but cannot erase fall distance already accumulated by a Survival server.

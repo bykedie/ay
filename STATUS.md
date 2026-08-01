@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.135`
+- Version: `1.10.136`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 93 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 94 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: stabilize flight landing control`
+- Latest accepted change: `fix: preserve hypixel airborne state`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -20,13 +20,14 @@ Last updated: 2026-08-01
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 178
+- Tests: 179
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.135.jar`
-- SHA-256: `03291326503E33D62E7EF06D4FF38BD287E7B54F8571BE8271B50B31BCE92CEC`
+- Artifact: `build/libs/voris-hub-1.10.136.jar`
+- SHA-256: `4A3D0339F0AD4EA5DCFBD414DF013D09DAF51377192C53AB0CC9A281BB9608DD`
 
 ## Recently Fixed
 
+- Hypixel Flight now preserves the collision-derived ground state instead of declaring an airborne player grounded and prematurely settling server-side fall distance.
 - Flight now preserves neutral vertical input when Jump and Sneak are held together.
 - Controlled descent can move at up to 1.0 block per tick and bounds the final step by the measured collision-surface distance.
 - Flight no longer snaps the player to a synthetic landing position or sends an extra grounded position packet.

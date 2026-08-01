@@ -42,6 +42,12 @@ public class FlightControllerTest {
     }
 
     @Test
+    public void hypixelPreservesPhysicalGroundState() {
+        assertEquals(false, FlightController.hypixelPacketOnGround(false));
+        assertEquals(true, FlightController.hypixelPacketOnGround(true));
+    }
+
+    @Test
     public void safeLandingDescendsQuicklyAndStopsAtTheSurface() {
         assertEquals(-1.0, FlightController.safeLandingMotion(
             -4.0, Double.POSITIVE_INFINITY, 4.0), 0.0001);
