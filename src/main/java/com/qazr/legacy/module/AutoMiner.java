@@ -261,6 +261,7 @@ public final class AutoMiner {
             manualPause--;
             return;
         }
+        cancelStaleRouteOwnedClearing();
         if (continueClearingConfirmation()) return;
         if (delay-- > 0) return;
         if (continueScaffoldAssist()) return;
@@ -400,6 +401,7 @@ public final class AutoMiner {
                     mc.currentScreen != null, mc.inGameHasFocus, mc.player.isHandActive())
                 || manualPause > 0 || manualMovementRequested()
                 || !mc.world.isBlockLoaded(target)) return;
+        if (cancelStaleRouteOwnedClearing()) return;
         boolean miningTarget = target.equals(miningPos) && miningType != null
             && OreType.fromBlock(mc.world.getBlockState(target).getBlock()) == miningType
             && stableMiningPosition(playerNavigationFeetCell(), target);
@@ -984,6 +986,23 @@ public final class AutoMiner {
             return true;
         }
         return true;
+    }
+
+    private boolean cancelStaleRouteOwnedClearing() {
+        if (clearingPos == null || currentOre == null || currentOreType == null) return false;
+        boolean routeOreLoaded = mc.world.isBlockLoaded(currentOre);
+        OreType actualType = routeOreLoaded ? targetType(currentOre) : null;
+        if (!staleRouteOwnedClearing(clearingPos, currentOre, currentOreType,
+                routeOreLoaded, actualType)) return false;
+        restartRouteFromCurrentPosition();
+        clearTargetLabels();
+        return true;
+    }
+
+    static boolean staleRouteOwnedClearing(BlockPos clearing, BlockPos routeOre,
+            OreType expectedType, boolean routeOreLoaded, OreType actualType) {
+        return clearing != null && routeOre != null && expectedType != null
+            && routeOreLoaded && expectedType != actualType;
     }
 
     private boolean continueClearingConfirmation() {

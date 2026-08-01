@@ -867,3 +867,11 @@
 - Iteration 3: reserved one ordinary client movement packet before evaluating outward, optional critical, and return positions.
 - Iteration 4: degraded an unsafe critical-assisted strike to the validated ordinary round trip.
 - Iteration 5: rejected an unsafe ordinary round trip before its first packet instead of attempting active recovery after a server correction.
+
+## Version 1.10.140 Auto Mining Clearing Ownership Update
+
+- Iteration 1: reproduced an active route obstacle continuing to receive damage after its loaded ore owner disappeared.
+- Iteration 2: distinguished a proven loaded owner change from a temporarily unloaded target chunk.
+- Iteration 3: cancelled stale clearing before START-phase automatic attack ownership could advance vanilla break progress.
+- Iteration 4: repeated the owner check before END-phase confirmation and clearing continuation.
+- Iteration 5: reused existing route, controller, label, and retry cleanup without cooling the unrelated obstacle or missing ore.

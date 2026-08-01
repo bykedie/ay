@@ -1173,6 +1173,23 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void routeClearingStopsWhenItsLoadedOreOwnerDisappears() {
+        BlockPos obstacle = new BlockPos(1, 20, 0);
+        BlockPos ore = new BlockPos(4, 20, 0);
+
+        assertTrue(AutoMiner.staleRouteOwnedClearing(
+            obstacle, ore, OreType.IRON, true, null));
+        assertTrue(AutoMiner.staleRouteOwnedClearing(
+            obstacle, ore, OreType.IRON, true, OreType.GOLD));
+        assertFalse(AutoMiner.staleRouteOwnedClearing(
+            obstacle, ore, OreType.IRON, true, OreType.IRON));
+        assertFalse(AutoMiner.staleRouteOwnedClearing(
+            obstacle, ore, OreType.IRON, false, null));
+        assertFalse(AutoMiner.staleRouteOwnedClearing(
+            null, ore, OreType.IRON, true, null));
+    }
+
+    @Test
     public void rejectedVanillaDamageRequestsDoNotAdvanceDestructionAttempts() {
         assertEquals(8, AutoMiner.nextDestructionAttemptCount(7, true));
         assertEquals(7, AutoMiner.nextDestructionAttemptCount(7, false));

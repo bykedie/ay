@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.139`
+- Version: `1.10.140`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 97 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 98 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: preflight blink movement bursts`
+- Latest accepted change: `fix: cancel stale auto miner clearing`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -20,13 +20,14 @@ Last updated: 2026-08-01
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 185
+- Tests: 186
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.139.jar`
-- SHA-256: `B602428EA66E2B79046E5802BFDFA7E5677077ACFFF2568DA6C546919F7F5C02`
+- Artifact: `build/libs/voris-hub-1.10.140.jar`
+- SHA-256: `BA706BA6FDE5EFF9467CA5DE1FF6CAB67A2943722E292386F3041C6DA9DF8AB3`
 
 ## Recently Fixed
 
+- AutoMiner now releases route-owned clearing before either tick phase can damage an obstacle after its loaded ore owner disappears or changes type, while preserving temporarily unloaded targets.
 - Blink now preflights the complete same-tick movement burst, omits unsafe remote critical packets, and refuses ordinary round trips that vanilla would correct before their return path.
 - Blink plans now reject candidate positions that vanilla 1.12.2 would discard under its entity-position distance and entity-eye visibility envelope, while continuing to search viable heights and angles.
 - Blink reachability caches now reset when the player's feet cell or Flight state changes, preventing stale red targets from suppressing valid new routes and stale green targets from outliving their planning context.
