@@ -14,6 +14,7 @@ import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.network.play.client.CPacketUseEntity;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -29,6 +30,8 @@ public final class BlinkStrike {
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
     private final Map<Integer, Integer> reachableUntil = new HashMap<>();
+    private BlockPos reachabilityFeet;
+    private boolean reachabilityFlight;
     private int delay;
 
     public BlinkStrike(ModuleManager modules) {
@@ -41,6 +44,9 @@ public final class BlinkStrike {
         if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
+        refreshReachabilityContext(new BlockPos(mc.player.posX,
+            mc.player.getEntityBoundingBox().minY, mc.player.posZ),
+            modules.isEnabled(ModuleId.FLIGHT));
         if (delay > 0) {
             delay--;
             return;
@@ -136,7 +142,23 @@ public final class BlinkStrike {
             delay = 0;
             unreachableUntil.clear();
             reachableUntil.clear();
+            reachabilityFeet = null;
+            reachabilityFlight = false;
         }
+    }
+
+    private void refreshReachabilityContext(BlockPos feet, boolean flightEnabled) {
+        if (sameReachabilityContext(reachabilityFeet, reachabilityFlight, feet, flightEnabled)) return;
+        unreachableUntil.clear();
+        reachableUntil.clear();
+        reachabilityFeet = feet == null ? null : feet.toImmutable();
+        reachabilityFlight = flightEnabled;
+    }
+
+    static boolean sameReachabilityContext(BlockPos cachedFeet, boolean cachedFlight,
+            BlockPos currentFeet, boolean currentFlight) {
+        return cachedFeet != null && cachedFeet.equals(currentFeet)
+            && cachedFlight == currentFlight;
     }
 
     private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,

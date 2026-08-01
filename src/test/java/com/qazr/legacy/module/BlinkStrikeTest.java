@@ -2,6 +2,7 @@ package com.qazr.legacy.module;
 
 import com.qazr.legacy.util.BlinkPath;
 import java.util.List;
+import net.minecraft.util.math.BlockPos;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -122,6 +123,17 @@ public class BlinkStrikeTest {
     public void scansPastBlockedPriorityTargets() {
         assertEquals(50, BlinkStrike.candidateScanLimit(1));
         assertEquals(50, BlinkStrike.candidateScanLimit(50));
+    }
+
+    @Test
+    public void reachabilityCacheIsBoundToFeetCellAndFlightState() {
+        BlockPos feet = new BlockPos(0, 64, 0);
+
+        assertEquals(true, BlinkStrike.sameReachabilityContext(feet, false, feet, false));
+        assertEquals(false, BlinkStrike.sameReachabilityContext(
+            feet, false, feet.up(2), true));
+        assertEquals(false, BlinkStrike.sameReachabilityContext(feet, false, feet, true));
+        assertEquals(false, BlinkStrike.sameReachabilityContext(null, false, feet, false));
     }
 
     @Test

@@ -843,3 +843,11 @@
 - Iteration 3: added a regression requiring Hypixel mode to preserve both airborne false and real-ground true states.
 - Iteration 4: removed the synthetic midair grounded state while retaining the established Hypixel offset and local motion behavior.
 - Iteration 5: clarified that this prevents an early client-triggered settlement but cannot erase fall distance already accumulated by a Survival server.
+
+## Version 1.10.137 Blink Reachability Context Update
+
+- Iteration 1: reproduced a ground-origin failed plan suppressing a valid Flight-height route until the 12-tick cache expired.
+- Iteration 2: reproduced the inverse stale green status after the player left the context that produced a successful plan.
+- Iteration 3: bound reachability evidence to the player's block feet cell and current Flight state.
+- Iteration 4: cleared both positive and negative evidence before delay handling whenever that context changed.
+- Iteration 5: preserved the existing planning budget, target priority, renderer fallback, route geometry, and packet execution behavior.
