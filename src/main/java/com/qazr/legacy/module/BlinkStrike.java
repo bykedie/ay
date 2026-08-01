@@ -219,7 +219,8 @@ public final class BlinkStrike {
         Vec3d currentAttackPoint = ModConfig.blinkAttackPoint.point(target);
         double directReach = directAttackReach(mc.playerController.extendedReach());
         if (CombatSupport.distanceSqToHitbox(originEyes, target.getEntityBoundingBox())
-                <= directReach * directReach && hasAttackLine(originEyes, currentAttackPoint)) {
+                <= directReach * directReach && hasAttackLine(originEyes, currentAttackPoint)
+                && serverAttackCandidateAllows(origin, target)) {
             return new StrikePlan(origin, java.util.Collections.emptyList(),
                 java.util.Collections.emptyList());
         }
@@ -243,6 +244,7 @@ public final class BlinkStrike {
             if (CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                     > ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) continue;
             if (!hasAttackLine(eyes, attackPoint)) continue;
+            if (!serverAttackCandidateAllows(candidate, target)) continue;
             for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
                 if (!isRouteClear(origin, waypoints)) continue;
                 return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep),
@@ -275,7 +277,8 @@ public final class BlinkStrike {
             targetPoint.z + predictedZ - target.posZ);
         boolean lineAndRangeValid = CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance
-            && hasAttackLine(eyes, attackPoint);
+            && hasAttackLine(eyes, attackPoint)
+            && serverAttackCandidateAllows(plan.destination, target);
         return strikePlanStillUsable(true, lineAndRangeValid,
             plan.waypoints.isEmpty() || isRouteClear(new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
                 plan.waypoints));
@@ -294,6 +297,29 @@ public final class BlinkStrike {
 
     private boolean hasAttackLine(Vec3d eyes, Vec3d attackPoint) {
         return mc.world.rayTraceBlocks(eyes, attackPoint, false, true, false) == null;
+    }
+
+    private boolean serverAttackCandidateAllows(BlinkPath.Point candidate,
+            EntityLivingBase target) {
+        Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
+        Vec3d targetEyes = new Vec3d(target.posX, target.posY + target.getEyeHeight(), target.posZ);
+        boolean entityEyeVisible = mc.world.rayTraceBlocks(
+            eyes, targetEyes, false, true, false) == null;
+        return serverAttackCandidateAllows(candidate, target.posX, target.posY, target.posZ,
+            entityEyeVisible);
+    }
+
+    static boolean serverAttackCandidateAllows(BlinkPath.Point candidate, double targetX,
+            double targetY, double targetZ, boolean entityEyeVisible) {
+        double dx = candidate.x - targetX;
+        double dy = candidate.y - targetY;
+        double dz = candidate.z - targetZ;
+        return serverAttackEnvelopeAllows(dx * dx + dy * dy + dz * dz, entityEyeVisible);
+    }
+
+    static boolean serverAttackEnvelopeAllows(double entityPositionDistanceSq,
+            boolean entityEyeVisible) {
+        return entityPositionDistanceSq < (entityEyeVisible ? 36.0D : 9.0D);
     }
 
     static List<List<BlinkPath.Point>> routeWaypoints(BlinkPath.Point origin, BlinkPath.Point destination) {

@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.137`
+- Version: `1.10.138`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 95 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 96 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: refresh blink reachability context`
+- Latest accepted change: `fix: validate blink server attack envelope`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -20,13 +20,14 @@ Last updated: 2026-08-01
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 180
+- Tests: 182
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.137.jar`
-- SHA-256: `4B6397D925BE37C8538B23A1217F9AB80019FA31ADA25990AE1669BAFEF0B884`
+- Artifact: `build/libs/voris-hub-1.10.138.jar`
+- SHA-256: `8ED3254597D2B6933EF25BB698141873F0AE2D5E634253908D5A8831BBC49BCA`
 
 ## Recently Fixed
 
+- Blink plans now reject candidate positions that vanilla 1.12.2 would discard under its entity-position distance and entity-eye visibility envelope, while continuing to search viable heights and angles.
 - Blink reachability caches now reset when the player's feet cell or Flight state changes, preventing stale red targets from suppressing valid new routes and stale green targets from outliving their planning context.
 - Hypixel Flight now preserves the collision-derived ground state instead of declaring an airborne player grounded and prematurely settling server-side fall distance.
 - Flight now preserves neutral vertical input when Jump and Sneak are held together.

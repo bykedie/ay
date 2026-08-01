@@ -851,3 +851,11 @@
 - Iteration 3: bound reachability evidence to the player's block feet cell and current Flight state.
 - Iteration 4: cleared both positive and negative evidence before delay handling whenever that context changed.
 - Iteration 5: preserved the existing planning budget, target priority, renderer fallback, route geometry, and packet execution behavior.
+
+## Version 1.10.138 Blink Server Attack Envelope Update
+
+- Iteration 1: reproduced a high-difference candidate passing hitbox and configured attack-point checks while vanilla rejected its entity-position distance.
+- Iteration 2: locked vanilla's strict visible `<36.0` and obstructed `<9.0` squared-distance boundaries in focused tests.
+- Iteration 3: evaluated entity-eye visibility from each candidate using the same 1.12.2 block-ray options as the server.
+- Iteration 4: applied the server-equivalent envelope to direct plans, remote candidate selection, and live plan refresh.
+- Iteration 5: retained candidate ordering and continued searching other heights and angles instead of sending a knowingly rejected attack.

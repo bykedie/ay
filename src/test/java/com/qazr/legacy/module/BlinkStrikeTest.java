@@ -143,6 +143,29 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void mirrorsVanillaServerAttackEnvelopeBoundaries() {
+        assertEquals(true, BlinkStrike.serverAttackEnvelopeAllows(35.999D, true));
+        assertEquals(false, BlinkStrike.serverAttackEnvelopeAllows(36.0D, true));
+        assertEquals(true, BlinkStrike.serverAttackEnvelopeAllows(8.999D, false));
+        assertEquals(false, BlinkStrike.serverAttackEnvelopeAllows(9.0D, false));
+
+        assertEquals(false, BlinkStrike.serverAttackEnvelopeAllows(10.8025D, false));
+        assertEquals(true, BlinkStrike.serverAttackEnvelopeAllows(3.24D, true));
+    }
+
+    @Test
+    public void skipsOriginHeightCandidateThatVanillaWouldReject() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.5);
+        List<BlinkPath.Point> candidates = BlinkStrike.candidatePositions(
+            origin, 10.81, 66.75, 0.5, 2.5);
+
+        assertEquals(false, BlinkStrike.serverAttackCandidateAllows(
+            candidates.get(0), 10.81, 66.75, 0.5, false));
+        assertEquals(true, BlinkStrike.serverAttackCandidateAllows(
+            candidates.get(8), 10.81, 66.75, 0.5, true));
+    }
+
+    @Test
     public void skipsExpiredStrikePlansInsteadOfCountingThemAsHits() {
         assertEquals(false, BlinkStrike.strikePlanStillUsable(false, true, true));
         assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false, true));
