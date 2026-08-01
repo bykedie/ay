@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.142`
+- Version: `1.10.143`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 100 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 101 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: align replaceable route collisions`
+- Latest accepted change: `fix: sneak-place auto miner scaffolds`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -20,13 +20,14 @@ Last updated: 2026-08-01
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 186
+- Tests: 187
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.142.jar`
-- SHA-256: `B05C03D06F8F4C2E33F818A434EC4C7D1C1A958E8E38F3D476B4C7772B0D04A2`
+- Artifact: `build/libs/voris-hub-1.10.143.jar`
+- SHA-256: `5EBE7386815A6808EA68A2780C14FB0B67B3A45BCFC830ACCF7DC06EF8CC47A6`
 
 ## Recently Fixed
 
+- AutoMiner scaffold assist now uses scoped synchronized sneak-place behavior, preventing interactive supports from opening a GUI instead of accepting the block.
 - AutoMiner now checks real collision shapes for replaceable route cells and clears colliding layers instead of endlessly replanning through them.
 - AutoMiner now performs its bounded final unreachable-route validation atomically, preventing a route opened mid-pass from receiving a mixed-snapshot 100-tick cooldown.
 - AutoMiner now releases route-owned clearing before either tick phase can damage an obstacle after its loaded ore owner disappears or changes type, while preserving temporarily unloaded targets.

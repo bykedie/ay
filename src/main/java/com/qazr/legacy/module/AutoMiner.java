@@ -35,6 +35,7 @@ import net.minecraft.inventory.ClickType;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemPickaxe;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.play.client.CPacketEntityAction;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -889,6 +890,7 @@ public final class AutoMiner {
     private void placeScaffold(BlockPos pos, ScaffoldPlacement placement, int sourceSlot) {
         int original = mc.player.inventory.currentItem;
         boolean swapped = sourceSlot >= 9;
+        boolean scopedSneak = scaffoldNeedsScopedSneak(mc.player.isSneaking());
         int inventorySlot = sourceSlot;
         if (swapped) {
             mc.playerController.windowClick(mc.player.inventoryContainer.windowId, inventorySlot,
@@ -898,11 +900,21 @@ public final class AutoMiner {
         try {
             mc.player.inventory.currentItem = sourceSlot;
             mc.playerController.updateController();
+            if (scopedSneak) {
+                mc.player.setSneaking(true);
+                mc.player.connection.sendPacket(new CPacketEntityAction(
+                    mc.player, CPacketEntityAction.Action.START_SNEAKING));
+            }
             Vec3d hit = scaffoldHitVec(placement.neighbor, placement.side);
             EnumActionResult result = mc.playerController.processRightClickBlock(mc.player, mc.world,
                 placement.neighbor, placement.side, hit, EnumHand.MAIN_HAND);
             if (result == EnumActionResult.SUCCESS) mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
+            if (scopedSneak) {
+                mc.player.connection.sendPacket(new CPacketEntityAction(
+                    mc.player, CPacketEntityAction.Action.STOP_SNEAKING));
+                mc.player.setSneaking(false);
+            }
             mc.player.inventory.currentItem = original;
             mc.playerController.updateController();
             if (swapped) {
@@ -910,6 +922,10 @@ public final class AutoMiner {
                     original, ClickType.SWAP, mc.player);
             }
         }
+    }
+
+    static boolean scaffoldNeedsScopedSneak(boolean alreadySneaking) {
+        return !alreadySneaking;
     }
 
     private ScaffoldPlacement scaffoldPlacementFor(BlockPos pos) {

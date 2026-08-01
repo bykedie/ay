@@ -891,3 +891,11 @@
 - Iteration 3: limited collision enumeration to replaceable cells so ordinary solid-block path checks keep their existing fast path.
 - Iteration 4: allowed colliding replaceable blocks with valid hardness and tools to enter normal corridor clearing.
 - Iteration 5: preserved collision-free air, water and one-layer snow behavior while aligning planning, runtime and clearing decisions.
+
+## Version 1.10.143 Auto Mining Scaffold Interaction Update
+
+- Iteration 1: reproduced a workbench support consuming scaffold right-click and opening its GUI without placing a block.
+- Iteration 2: identified the same activation-first behavior for other vanilla and modded interactive supports.
+- Iteration 3: synchronized a scoped START_SNEAKING action before the placement packet when the player was not already sneaking.
+- Iteration 4: restored the scoped server and local sneak state in `finally` without changing genuine user sneak input.
+- Iteration 5: retained world-state placement confirmation and existing hotbar/inventory swap restoration instead of trusting `SUCCESS`.

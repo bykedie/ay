@@ -586,6 +586,12 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void scaffoldPlacementBypassesInteractiveSupportsWithScopedSneak() {
+        assertTrue(AutoMiner.scaffoldNeedsScopedSneak(false));
+        assertFalse(AutoMiner.scaffoldNeedsScopedSneak(true));
+    }
+
+    @Test
     public void scaffoldAssistUsesOnlyStableFullHeightBlocks() {
         assertTrue(AutoMiner.stableScaffoldBlock(true, false, true, false));
         assertFalse(AutoMiner.stableScaffoldBlock(true, false, true, true));
