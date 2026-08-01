@@ -921,6 +921,24 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void corridorVisibilitySkipsUnusableEarlierSamples() {
+        List<Integer> inspected = new java.util.ArrayList<>();
+
+        assertEquals(1, AutoMiner.firstAcceptedVisibilitySample(3, index -> {
+            inspected.add(index);
+            return AutoMiner.corridorObstacleSampleUsable(
+                true, index == 0, false, false, true, true);
+        }));
+        assertEquals(Arrays.asList(0, 1), inspected);
+        assertFalse(AutoMiner.corridorObstacleSampleUsable(
+            false, false, false, false, true, true));
+        assertFalse(AutoMiner.corridorObstacleSampleUsable(
+            true, false, true, false, true, false));
+        assertFalse(AutoMiner.corridorObstacleSampleUsable(
+            true, false, false, false, false, true));
+    }
+
+    @Test
     public void staleCachedOresDoNotConsumeDirectInspectionSlots() {
         assertTrue(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.IRON));
         assertFalse(AutoMiner.cachedOreStillPresent(OreType.IRON, OreType.GOLD));

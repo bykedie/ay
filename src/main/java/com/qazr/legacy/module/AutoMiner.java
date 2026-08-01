@@ -2121,6 +2121,12 @@ public final class AutoMiner {
             stableMiningPosition, withinReach, breakable);
     }
 
+    static boolean corridorObstacleSampleUsable(boolean allowed, boolean temporarilyBlocked,
+            boolean ore, boolean stableMiningPosition, boolean withinReach, boolean breakable) {
+        return exposureObstacleSampleUsable(allowed, temporarilyBlocked, ore,
+            stableMiningPosition, withinReach, breakable);
+    }
+
     private boolean beginClearingObstacle(BlockPos obstacle, RayTraceResult hit) {
         boolean restartDestruction = prepareClearingTarget(obstacle);
         if (!damageCorridorBlock(obstacle, hit, restartDestruction)) {
@@ -2226,9 +2232,19 @@ public final class AutoMiner {
                 sampleIndex < LOCKED_TARGET_VISIBILITY_SAMPLE_COUNT; sampleIndex++) {
             RayTraceResult hit = mc.world.rayTraceBlocks(
                 eyes, blockVisibilitySample(desired, sampleIndex), false, true, false);
-            if (hit != null && hit.typeOfHit == RayTraceResult.Type.BLOCK
-                    && corridorObstacleAllowed(
-                        hit.getBlockPos(), desired, permittedLower, corridor)) return hit;
+            if (hit == null || hit.typeOfHit != RayTraceResult.Type.BLOCK) continue;
+            BlockPos obstacle = hit.getBlockPos();
+            boolean allowed = corridorObstacleAllowed(
+                obstacle, desired, permittedLower, corridor);
+            OreType obstacleType = targetType(obstacle);
+            boolean blocked = temporarilyBlocked(
+                obstacle, rejectedObstaclesUntil, mc.player.ticksExisted);
+            boolean reachable = withinMiningReach(eyes, obstacle, miningReach());
+            boolean stable = obstacleType != null
+                && stableMiningPosition(miningPlayerFeet, obstacle);
+            boolean breakable = obstacleType == null && isBreakableBlock(obstacle);
+            if (corridorObstacleSampleUsable(allowed, blocked, obstacleType != null,
+                    stable, reachable, breakable)) return hit;
         }
         return null;
     }

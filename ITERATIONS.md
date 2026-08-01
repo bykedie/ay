@@ -803,3 +803,11 @@
 - Iteration 3: released those stale failures atomically when the current feet cell no longer matched their origin.
 - Iteration 4: refreshed candidate and path-search snapshots immediately after releasing origin-bound failures.
 - Iteration 5: preserved same-origin retry pacing and kept destruction, obstacle, scaffold, and mining-stand cooldowns independent.
+
+## Version 1.10.132 Auto Mining Corridor Sample Update
+
+- Iteration 1: reproduced the first corridor ray hit ending the scan before its cooldown, reach, stability, or breakability was checked.
+- Iteration 2: applied the existing corridor membership and exposure-usability rules to every sampled hit.
+- Iteration 3: continued through the bounded visibility samples after an unusable early corridor hit.
+- Iteration 4: retained the first-sample fast path and the existing desired, permitted-lower, and planned-corridor boundary.
+- Iteration 5: covered cooled, disallowed, unreachable, unstable-ore, and usable ordinary obstacles in focused tests.
