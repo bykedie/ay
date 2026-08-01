@@ -875,3 +875,11 @@
 - Iteration 3: cancelled stale clearing before START-phase automatic attack ownership could advance vanilla break progress.
 - Iteration 4: repeated the owner check before END-phase confirmation and clearing continuation.
 - Iteration 5: reused existing route, controller, label, and retry cleanup without cooling the unrelated obstacle or missing ore.
+
+## Version 1.10.141 Auto Mining Atomic Failure Validation Update
+
+- Iteration 1: reproduced a 65-state final failure pass combining an early blocked choke with a later world tick after that choke opened.
+- Iteration 2: preserved the first 64-state validation pass as sliced work across ticks.
+- Iteration 3: made the bounded second pass consume all retained traversal and jump states in one END tick.
+- Iteration 4: retained the 128-state cap and the existing restart result for truncated snapshots.
+- Iteration 5: prevented mixed final snapshots from assigning the otherwise unchanged 100-tick failed-route cooldown.

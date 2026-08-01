@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.140`
+- Version: `1.10.141`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 98 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 99 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: cancel stale auto miner clearing`
+- Latest accepted change: `fix: atomically validate final path failure`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -22,11 +22,12 @@ Last updated: 2026-08-01
 - Test classes: 17
 - Tests: 186
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.140.jar`
-- SHA-256: `BA706BA6FDE5EFF9467CA5DE1FF6CAB67A2943722E292386F3041C6DA9DF8AB3`
+- Artifact: `build/libs/voris-hub-1.10.141.jar`
+- SHA-256: `8DC21BC8F67740363A65865345F63F639C128A15A9667DCBC3B63CB10B3D6EF0`
 
 ## Recently Fixed
 
+- AutoMiner now performs its bounded final unreachable-route validation atomically, preventing a route opened mid-pass from receiving a mixed-snapshot 100-tick cooldown.
 - AutoMiner now releases route-owned clearing before either tick phase can damage an obstacle after its loaded ore owner disappears or changes type, while preserving temporarily unloaded targets.
 - Blink now preflights the complete same-tick movement burst, omits unsafe remote critical packets, and refuses ordinary round trips that vanilla would correct before their return path.
 - Blink plans now reject candidate positions that vanilla 1.12.2 would discard under its entity-position distance and entity-eye visibility envelope, while continuing to search viable heights and angles.

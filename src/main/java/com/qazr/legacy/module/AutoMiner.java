@@ -1765,7 +1765,10 @@ public final class AutoMiner {
             }
         }
         int checked = 0;
-        int limit = pathValidationSliceBudget(budget);
+        int retainedStates = search.failureTraversalEntries.size()
+            + search.failureJumpEntries.size();
+        int limit = failureValidationSliceBudget(
+            search.failureValidationPass, budget, retainedStates);
         while (checked < limit && search.failureTraversalValidation.hasNext()) {
             Map.Entry<BlockPos, Integer> entry = search.failureTraversalValidation.next();
             checked++;
@@ -1805,6 +1808,14 @@ public final class AutoMiner {
 
     static boolean pathValidationRequiresAnotherPass(int completedPasses) {
         return completedPasses < REQUIRED_STABLE_PATH_VALIDATION_PASSES;
+    }
+
+    static int failureValidationSliceBudget(int validationPass, int requestedBudget,
+            int retainedStates) {
+        int sliced = pathValidationSliceBudget(requestedBudget);
+        if (validationPass < REQUIRED_STABLE_PATH_VALIDATION_PASSES) return sliced;
+        return Math.max(sliced, Math.min(MAX_PATH_STATES_TO_VALIDATE,
+            Math.max(0, retainedStates)));
     }
 
     enum StalePathDecision {

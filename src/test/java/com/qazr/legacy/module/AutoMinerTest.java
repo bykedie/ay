@@ -695,6 +695,9 @@ public class AutoMinerTest {
         assertEquals(1, AutoMiner.pathStateValidationCount(cached, false, 8));
         assertEquals(2, AutoMiner.pathStateValidationCount(cached, true, 8));
         assertEquals(1, AutoMiner.pathStateValidationCount(cached, true, 1));
+        assertEquals(64, AutoMiner.failureValidationSliceBudget(1, 64, 65));
+        assertEquals(65, AutoMiner.failureValidationSliceBudget(2, 64, 65));
+        assertEquals(128, AutoMiner.failureValidationSliceBudget(2, 64, 128));
     }
 
     @Test
