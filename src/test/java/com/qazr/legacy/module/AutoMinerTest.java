@@ -748,6 +748,16 @@ public class AutoMinerTest {
     }
 
     @Test
+    public void routeFailureCooldownIsReleasedAfterThePlayerChangesFeetCell() {
+        BlockPos origin = new BlockPos(0, 64, 0);
+
+        assertFalse(AutoMiner.routeFailureCooldownOriginChanged(true, origin, origin));
+        assertTrue(AutoMiner.routeFailureCooldownOriginChanged(true, origin, origin.east()));
+        assertTrue(AutoMiner.routeFailureCooldownOriginChanged(true, null, origin));
+        assertFalse(AutoMiner.routeFailureCooldownOriginChanged(false, origin, origin.east()));
+    }
+
+    @Test
     public void scaffoldFailureCooldownDoesNotHideTheMiningTarget() {
         BlockPos ore = new BlockPos(4, 23, 7);
         Map<BlockPos, Integer> blockedTargets = new HashMap<>();

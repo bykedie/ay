@@ -795,3 +795,11 @@
 - Iteration 3: made completed-path validation recheck that clearance with the existing bounded validation passes.
 - Iteration 4: reused the same transition rule in corridor generation so pre-clearing sees the obstacle before movement begins.
 - Iteration 5: preserved straight-down support removal, ascending jump clearance, level movement, and existing route ordering in focused tests.
+
+## Version 1.10.131 Auto Mining Route Failure Origin Update
+
+- Iteration 1: reproduced a failed A* target remaining hidden for the full retry window after the player moved to a different feet cell.
+- Iteration 2: recorded the navigation origin alongside target cooldowns produced only by path-search failures.
+- Iteration 3: released those stale failures atomically when the current feet cell no longer matched their origin.
+- Iteration 4: refreshed candidate and path-search snapshots immediately after releasing origin-bound failures.
+- Iteration 5: preserved same-origin retry pacing and kept destruction, obstacle, scaffold, and mining-stand cooldowns independent.

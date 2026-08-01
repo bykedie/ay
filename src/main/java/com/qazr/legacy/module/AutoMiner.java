@@ -97,6 +97,7 @@ public final class AutoMiner {
     private final List<AxisAlignedBB> supportCollisionBoxes = new ArrayList<>(4);
     private final Map<BlockPos, Integer> targetLabels = new HashMap<>();
     private final Map<BlockPos, Integer> blockedTargetsUntil = new HashMap<>();
+    private BlockPos blockedTargetsOrigin;
     private final Map<BlockPos, Integer> rejectedTargetsUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedObstaclesUntil = new HashMap<>();
     private final Map<BlockPos, Integer> rejectedScaffoldsUntil = new HashMap<>();
@@ -193,6 +194,7 @@ public final class AutoMiner {
         minedCounts.clear();
         pathRetryDelay = 0;
         blockedTargetsUntil.clear();
+        blockedTargetsOrigin = null;
         rejectedTargetsUntil.clear();
         rejectedObstaclesUntil.clear();
         rejectedScaffoldsUntil.clear();
@@ -360,6 +362,7 @@ public final class AutoMiner {
             manualPause = 0;
             pathRetryDelay = 0;
             blockedTargetsUntil.clear();
+            blockedTargetsOrigin = null;
             rejectedTargetsUntil.clear();
             rejectedObstaclesUntil.clear();
             rejectedScaffoldsUntil.clear();
@@ -2355,6 +2358,8 @@ public final class AutoMiner {
     private void coolDownUnusableRouteTarget() {
         if (mc.player != null) stopRouteMotion();
         if (currentOre != null) {
+            blockedTargetsOrigin = miningPlayerFeet == null
+                ? null : miningPlayerFeet.toImmutable();
             coolDownCandidate(blockedTargetsUntil, currentOre,
                 mc.player.ticksExisted + FAILED_ROUTE_RETRY_TICKS);
         }
@@ -2413,7 +2418,17 @@ public final class AutoMiner {
     }
 
     private void pruneBlockedTargets(int currentTick) {
-        refreshAfterCooldownExpiry(pruneExpiredTargets(blockedTargetsUntil, currentTick));
+        boolean originChanged = routeFailureCooldownOriginChanged(
+            !blockedTargetsUntil.isEmpty(), blockedTargetsOrigin, miningPlayerFeet);
+        if (originChanged) blockedTargetsUntil.clear();
+        boolean expired = pruneExpiredTargets(blockedTargetsUntil, currentTick);
+        if (blockedTargetsUntil.isEmpty()) blockedTargetsOrigin = null;
+        refreshAfterCooldownExpiry(originChanged || expired);
+    }
+
+    static boolean routeFailureCooldownOriginChanged(boolean hasFailures, BlockPos cachedOrigin,
+            BlockPos currentOrigin) {
+        return hasFailures && !java.util.Objects.equals(cachedOrigin, currentOrigin);
     }
 
     private void pruneRejectedBlocks(int currentTick) {
@@ -2513,7 +2528,11 @@ public final class AutoMiner {
         for (BlockPos target : targets) {
             changed |= extendTargetCooldown(blockedTargetsUntil, target, untilTick);
         }
-        if (changed) invalidateCurrentCandidateCache();
+        if (changed) {
+            blockedTargetsOrigin = miningPlayerFeet == null
+                ? null : miningPlayerFeet.toImmutable();
+            invalidateCurrentCandidateCache();
+        }
     }
 
     private void coolDownCandidate(Map<BlockPos, Integer> targets, BlockPos target, int untilTick) {
