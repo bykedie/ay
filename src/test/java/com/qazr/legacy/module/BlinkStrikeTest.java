@@ -166,6 +166,41 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void mirrorsVanillaSameTickMovementBudget() {
+        assertEquals(true, BlinkStrike.vanillaSameTickMoveAccepted(5, 500.0D));
+        assertEquals(false, BlinkStrike.vanillaSameTickMoveAccepted(5, 500.001D));
+        assertEquals(true, BlinkStrike.vanillaSameTickMoveAccepted(6, 100.0D));
+        assertEquals(false, BlinkStrike.vanillaSameTickMoveAccepted(6, 100.001D));
+    }
+
+    @Test
+    public void suppressesUnsafeCriticalBurstBeforeTheReturnPath() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = BlinkStrike
+            .candidatePositions(origin, 12.0, 64.0, 0.0, 2.5).get(0);
+        List<BlinkPath.Point> outward = BlinkStrike.buildPath(origin,
+            java.util.Collections.singletonList(destination), 4.0);
+
+        assertEquals(3, outward.size());
+        assertEquals(true, BlinkStrike.remoteMovementPlanAccepted(
+            origin, outward, false, 1));
+        assertEquals(false, BlinkStrike.remoteMovementPlanAccepted(
+            origin, outward, true, 1));
+    }
+
+    @Test
+    public void rejectsUnsafeOrdinaryRoundTripBeforeSendingIt() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = new BlinkPath.Point(12.0, 64.0, 0.0);
+        List<BlinkPath.Point> outward = BlinkStrike.buildPath(origin,
+            java.util.Collections.singletonList(destination), 3.0);
+
+        assertEquals(4, outward.size());
+        assertEquals(false, BlinkStrike.remoteMovementPlanAccepted(
+            origin, outward, false, 1));
+    }
+
+    @Test
     public void skipsExpiredStrikePlansInsteadOfCountingThemAsHits() {
         assertEquals(false, BlinkStrike.strikePlanStillUsable(false, true, true));
         assertEquals(false, BlinkStrike.strikePlanStillUsable(true, false, true));

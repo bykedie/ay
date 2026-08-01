@@ -24,6 +24,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class BlinkStrike {
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
+    private static final int RESERVED_MOVEMENT_PACKETS = 1;
     private static final double SURVIVAL_DIRECT_REACH = 3.0;
     private static final double CREATIVE_DIRECT_REACH = 6.0;
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -97,6 +98,9 @@ public final class BlinkStrike {
             boolean originOnGround) {
         boolean transportOnGround = transportOnGround(originOnGround);
         List<BlinkPath.Point> path = plan.path;
+        boolean critical = remoteCriticalEligible(plan.destination, originOnGround)
+            && remoteMovementPlanAccepted(origin, path, true, RESERVED_MOVEMENT_PACKETS);
+        if (!remoteMovementPlanAccepted(origin, path, critical, RESERVED_MOVEMENT_PACKETS)) return false;
         double originalMotionX = mc.player.motionX;
         double originalMotionY = mc.player.motionY;
         double originalMotionZ = mc.player.motionZ;
@@ -111,7 +115,7 @@ public final class BlinkStrike {
                 plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
             float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
             mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], transportOnGround));
-            sendRemoteCritical(plan.destination, originOnGround);
+            if (critical) sendRemoteCritical(plan.destination);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
@@ -247,8 +251,9 @@ public final class BlinkStrike {
             if (!serverAttackCandidateAllows(candidate, target)) continue;
             for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
                 if (!isRouteClear(origin, waypoints)) continue;
-                return new StrikePlan(candidate, buildPath(origin, waypoints, ModConfig.blinkStep),
-                    new ArrayList<>(waypoints));
+                List<BlinkPath.Point> path = buildPath(origin, waypoints, ModConfig.blinkStep);
+                if (!remoteMovementPlanAccepted(origin, path, false, RESERVED_MOVEMENT_PACKETS)) continue;
+                return new StrikePlan(candidate, path, new ArrayList<>(waypoints));
             }
         }
         return null;
@@ -278,7 +283,10 @@ public final class BlinkStrike {
         boolean lineAndRangeValid = CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance
             && hasAttackLine(eyes, attackPoint)
-            && serverAttackCandidateAllows(plan.destination, target);
+            && serverAttackCandidateAllows(plan.destination, target)
+            && (plan.path.isEmpty() || remoteMovementPlanAccepted(
+                new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
+                plan.path, false, RESERVED_MOVEMENT_PACKETS));
         return strikePlanStillUsable(true, lineAndRangeValid,
             plan.waypoints.isEmpty() || isRouteClear(new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
                 plan.waypoints));
@@ -320,6 +328,49 @@ public final class BlinkStrike {
     static boolean serverAttackEnvelopeAllows(double entityPositionDistanceSq,
             boolean entityEyeVisible) {
         return entityPositionDistanceSq < (entityEyeVisible ? 36.0D : 9.0D);
+    }
+
+    static boolean remoteMovementPlanAccepted(BlinkPath.Point origin,
+            List<BlinkPath.Point> outward, boolean critical, int priorMovementPackets) {
+        if (origin == null || outward == null || outward.isEmpty()) return false;
+        int ordinal = Math.max(0, priorMovementPackets);
+        for (BlinkPath.Point point : outward) {
+            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, point))) return false;
+        }
+        BlinkPath.Point destination = outward.get(outward.size() - 1);
+        if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
+        if (critical) {
+            if (!vanillaSameTickMoveAccepted(++ordinal,
+                    displacementSq(origin, destination.x, destination.y + 0.0625D, destination.z))) {
+                return false;
+            }
+            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
+            if (!vanillaSameTickMoveAccepted(++ordinal,
+                    displacementSq(origin, destination.x, destination.y + 0.0125D, destination.z))) {
+                return false;
+            }
+            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
+        }
+        for (BlinkPath.Point point : completeReturnPath(origin, outward, outward.size())) {
+            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, point))) return false;
+        }
+        return true;
+    }
+
+    static boolean vanillaSameTickMoveAccepted(int packetOrdinal, double firstGoodDisplacementSq) {
+        int multiplier = packetOrdinal > 5 ? 1 : Math.max(1, packetOrdinal);
+        return firstGoodDisplacementSq <= 100.0D * multiplier;
+    }
+
+    private static double displacementSq(BlinkPath.Point origin, BlinkPath.Point point) {
+        return displacementSq(origin, point.x, point.y, point.z);
+    }
+
+    private static double displacementSq(BlinkPath.Point origin, double x, double y, double z) {
+        double dx = x - origin.x;
+        double dy = y - origin.y;
+        double dz = z - origin.z;
+        return dx * dx + dy * dy + dz * dz;
     }
 
     static List<List<BlinkPath.Point>> routeWaypoints(BlinkPath.Point origin, BlinkPath.Point destination) {
@@ -437,10 +488,14 @@ public final class BlinkStrike {
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, onGround));
     }
 
-    private void sendRemoteCritical(BlinkPath.Point point, boolean originOnGround) {
-        if (!modules.isEnabled(ModuleId.CRITICALS) || !originOnGround) return;
+    private boolean remoteCriticalEligible(BlinkPath.Point point, boolean originOnGround) {
+        if (!modules.isEnabled(ModuleId.CRITICALS) || !originOnGround) return false;
         if (mc.player.isInWater() || mc.player.isInLava() || mc.player.isOnLadder() || mc.player.isRiding()
-                || mc.player.isPotionActive(MobEffects.BLINDNESS) || isLiquidAt(point)) return;
+                || mc.player.isPotionActive(MobEffects.BLINDNESS) || isLiquidAt(point)) return false;
+        return true;
+    }
+
+    private void sendRemoteCritical(BlinkPath.Point point) {
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0625, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, false));
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y + 0.0125, point.z, false));

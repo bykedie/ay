@@ -859,3 +859,11 @@
 - Iteration 3: evaluated entity-eye visibility from each candidate using the same 1.12.2 block-ray options as the server.
 - Iteration 4: applied the server-equivalent envelope to direct plans, remote candidate selection, and live plan refresh.
 - Iteration 5: retained candidate ordering and continued searching other heights and angles instead of sending a knowingly rejected attack.
+
+## Version 1.10.139 Blink Movement Burst Preflight Update
+
+- Iteration 1: reproduced a default 12-block Blink plus Criticals burst crossing vanilla's post-five-packet movement threshold before the return path.
+- Iteration 2: modeled the stock same-tick packet multiplier boundary and counted rotation-only packets in sequence order.
+- Iteration 3: reserved one ordinary client movement packet before evaluating outward, optional critical, and return positions.
+- Iteration 4: degraded an unsafe critical-assisted strike to the validated ordinary round trip.
+- Iteration 5: rejected an unsafe ordinary round trip before its first packet instead of attempting active recovery after a server correction.
