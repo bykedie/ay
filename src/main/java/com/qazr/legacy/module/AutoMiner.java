@@ -230,7 +230,14 @@ public final class AutoMiner {
             stopAutomatedWork(true);
             delay = 0;
         }
-        if (!automaticMiningInputAvailable(mc.currentScreen != null, mc.inGameHasFocus)) {
+        boolean handActive = mc.player.isHandActive();
+        if (!automaticMiningInputAvailable(
+                mc.currentScreen != null, mc.inGameHasFocus, handActive)) {
+            if (handActive && mc.currentScreen == null && mc.inGameHasFocus) {
+                pauseActiveWorkDeadlines();
+                stopRouteMotion();
+                return;
+            }
             stopAutomatedWork(true);
             return;
         }
@@ -389,8 +396,9 @@ public final class AutoMiner {
         BlockPos target = activeDestructionTarget();
         if (target == null) return;
         if (!modules.isEnabled(ModuleId.AUTO_MINE) || mc.player == null || mc.world == null
-                || mc.playerController == null || mc.currentScreen != null || !mc.inGameHasFocus
-                || mc.player.isHandActive() || manualPause > 0 || manualMovementRequested()
+                || mc.playerController == null || !automaticMiningInputAvailable(
+                    mc.currentScreen != null, mc.inGameHasFocus, mc.player.isHandActive())
+                || manualPause > 0 || manualMovementRequested()
                 || !mc.world.isBlockLoaded(target)) return;
         boolean miningTarget = target.equals(miningPos) && miningType != null
             && OreType.fromBlock(mc.world.getBlockState(target).getBlock()) == miningType
@@ -2791,8 +2799,22 @@ public final class AutoMiner {
         return physicalKeyDown || automaticOwnership && targetExists;
     }
 
-    static boolean automaticMiningInputAvailable(boolean screenOpen, boolean inGameHasFocus) {
-        return !screenOpen && inGameHasFocus;
+    static boolean automaticMiningInputAvailable(
+            boolean screenOpen, boolean inGameHasFocus, boolean handActive) {
+        return !screenOpen && inGameHasFocus && !handActive;
+    }
+
+    private void pauseActiveWorkDeadlines() {
+        if (miningPos != null) miningDeadlineTick = pausedWorkDeadline(miningDeadlineTick);
+        if (clearingPos != null) clearingDeadlineTick = pausedWorkDeadline(clearingDeadlineTick);
+        if (scaffoldPos != null) {
+            scaffoldStartedTick = pausedWorkDeadline(scaffoldStartedTick);
+            scaffoldNextPlaceTick = pausedWorkDeadline(scaffoldNextPlaceTick);
+        }
+    }
+
+    static int pausedWorkDeadline(int deadlineTick) {
+        return deadlineTick == Integer.MAX_VALUE ? deadlineTick : deadlineTick + 1;
     }
 
     static boolean automaticBreakToolPreparationRequired(boolean validTarget,

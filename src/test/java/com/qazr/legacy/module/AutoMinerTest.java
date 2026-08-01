@@ -1219,9 +1219,12 @@ public class AutoMinerTest {
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, false, true, true));
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, true, false, true));
         assertFalse(AutoMiner.automaticBreakToolPreparationRequired(true, true, true, false));
-        assertTrue(AutoMiner.automaticMiningInputAvailable(false, true));
-        assertFalse(AutoMiner.automaticMiningInputAvailable(true, true));
-        assertFalse(AutoMiner.automaticMiningInputAvailable(false, false));
+        assertTrue(AutoMiner.automaticMiningInputAvailable(false, true, false));
+        assertFalse(AutoMiner.automaticMiningInputAvailable(true, true, false));
+        assertFalse(AutoMiner.automaticMiningInputAvailable(false, false, false));
+        assertFalse(AutoMiner.automaticMiningInputAvailable(false, true, true));
+        assertEquals(101, AutoMiner.pausedWorkDeadline(100));
+        assertEquals(Integer.MAX_VALUE, AutoMiner.pausedWorkDeadline(Integer.MAX_VALUE));
     }
 
     @Test

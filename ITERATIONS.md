@@ -819,3 +819,11 @@
 - Iteration 3: routed every exhausted search through the existing bounded two-pass failure validation, including restarted searches.
 - Iteration 4: deferred restart-exhausted stale snapshots without adding their ore to the 100-tick failed-route cooldown.
 - Iteration 5: added focused state-machine regressions while preserving node budgets, one in-attempt restart, and retry pacing.
+
+## Version 1.10.134 Auto Mining Active Hand Pause Update
+
+- Iteration 1: reproduced START declining attack-key ownership while END still selected a pickaxe and damaged a block during active item use.
+- Iteration 2: extended the shared input predicate to cover either active hand and used it in both tick phases.
+- Iteration 3: paused route motion and all new mining, clearing, scaffold, rotation, and tool-selection work without discarding locked state.
+- Iteration 4: preserved server-side completion confirmation before the pause gate so already-finished work can settle.
+- Iteration 5: froze destruction and scaffold deadlines across paused ticks and covered the input and deadline rules with focused assertions.

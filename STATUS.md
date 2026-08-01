@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.133`
+- Version: `1.10.134`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 90 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 91 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: defer stale auto miner path results`
+- Latest accepted change: `fix: pause auto miner during item use`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 
@@ -20,8 +20,8 @@ Last updated: 2026-08-01
 - Test classes: 17
 - Tests: 178
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.133.jar`
-- SHA-256: `91B9A2513EC3C0A6172748C2448A836F5B44D2CE4F8AE1E6C50AF4DE86DD0E2A`
+- Artifact: `build/libs/voris-hub-1.10.134.jar`
+- SHA-256: `6FBC7F3687CC11A6EB737E6D2843863E1B546EA5DBCE11B67917782F76F6ADCC`
 
 ## Recently Fixed
 
@@ -30,6 +30,8 @@ Last updated: 2026-08-01
 - Corridor ray samples now skip allowed-but-unusable early hits and continue to a usable sample.
 - Restarted A* searches now validate exhausted failure snapshots instead of treating them as immediately unreachable.
 - A second stale validation result is deferred instead of adding a reachable ore to the 100-tick failed-route cooldown.
+- Active item use now pauses both START- and END-phase automatic mining work without discarding the locked target.
+- Mining, clearing, and scaffold deadlines are frozen while the player eats, draws a bow, blocks, or uses another item.
 
 ## Known Non-Defects Already Audited
 
