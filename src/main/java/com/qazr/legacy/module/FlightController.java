@@ -6,7 +6,9 @@ import com.qazr.legacy.config.ModuleId;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.util.MovementInput;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraftforge.client.event.InputUpdateEvent;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -24,9 +26,42 @@ public final class FlightController {
     private FlightMode controlledMode;
     private boolean originalFlying;
     private float originalFlySpeed;
+    private MovementInput suppressedInput;
+    private float suppressedForward;
+    private float suppressedStrafe;
+    private boolean suppressedJump;
 
     public FlightController(ModuleManager modules) {
         this.modules = modules;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onInputUpdate(InputUpdateEvent event) {
+        if (event.getEntityPlayer() != mc.player) return;
+        discardSuppressedInput();
+        boolean controlReady = mc.player != null && mc.world != null
+            && mc.player.connection != null && !mc.player.isRiding();
+        if (!controlReady || !modules.isEnabled(ModuleId.FLIGHT)
+                || ModConfig.flightMode != FlightMode.STATIC) return;
+
+        capturePlayer();
+        switchMode(FlightMode.STATIC);
+        MovementInput input = event.getMovementInput();
+        StaticFrame frame = staticFrameFor(mc.player.rotationYaw, input.moveForward,
+            input.moveStrafe, input.jump, input.sneak, ModConfig.flightSpeed);
+        mc.player.motionX = frame.motionX;
+        mc.player.motionY = frame.motionY;
+        mc.player.motionZ = frame.motionZ;
+        if (landingRequested(input.jump, input.sneak)) protectLanding(true);
+        mc.player.fallDistance = 0.0F;
+        suppressVanillaInput(input, frame);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onTickRestoreInput(TickEvent.PlayerTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && event.player == mc.player) {
+            restoreSuppressedInput();
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -54,7 +89,7 @@ public final class FlightController {
                 break;
             case STATIC:
             default:
-                staticFlight();
+                mc.player.fallDistance = 0.0F;
                 break;
         }
         protectLanding(landingRequested(mc.gameSettings.keyBindJump.isKeyDown(),
@@ -64,16 +99,6 @@ public final class FlightController {
     @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
         if (event.getWorld().isRemote) restorePlayer();
-    }
-
-    private void staticFlight() {
-        double[] horizontal = movementFor(mc.player.rotationYaw, mc.player.movementInput.moveForward,
-            mc.player.movementInput.moveStrafe, ModConfig.flightSpeed);
-        mc.player.motionX = horizontal[0];
-        mc.player.motionY = verticalMotion(mc.gameSettings.keyBindJump.isKeyDown(),
-            mc.gameSettings.keyBindSneak.isKeyDown(), ModConfig.flightSpeed);
-        mc.player.motionZ = horizontal[1];
-        mc.player.fallDistance = 0.0F;
     }
 
     private void vanillaFlight() {
@@ -113,6 +138,7 @@ public final class FlightController {
     }
 
     private void restorePlayer() {
+        restoreSuppressedInput();
         if (controlledPlayer == null) return;
         restoreFlightCapabilities();
         controlledPlayer.fallDistance = 0.0F;
@@ -175,6 +201,28 @@ public final class FlightController {
         player.motionZ = 0.0;
     }
 
+    private void suppressVanillaInput(MovementInput input, StaticFrame frame) {
+        suppressedInput = input;
+        suppressedForward = input.moveForward;
+        suppressedStrafe = input.moveStrafe;
+        suppressedJump = input.jump;
+        input.moveForward = frame.vanillaForward;
+        input.moveStrafe = frame.vanillaStrafe;
+        input.jump = frame.vanillaJump;
+    }
+
+    private void restoreSuppressedInput() {
+        if (suppressedInput == null) return;
+        suppressedInput.moveForward = suppressedForward;
+        suppressedInput.moveStrafe = suppressedStrafe;
+        suppressedInput.jump = suppressedJump;
+        discardSuppressedInput();
+    }
+
+    private void discardSuppressedInput() {
+        suppressedInput = null;
+    }
+
     static float flySpeedFor(double speed) {
         return (float) (speed / 10.0);
     }
@@ -218,6 +266,32 @@ public final class FlightController {
         double sin = Math.sin(radians);
         return new double[] {forward * speed * cos + strafe * speed * sin,
             forward * speed * sin - strafe * speed * cos};
+    }
+
+    static StaticFrame staticFrameFor(float yaw, float forward, float strafe,
+            boolean jump, boolean sneak, double speed) {
+        double[] horizontal = movementFor(yaw, forward, strafe, speed);
+        return new StaticFrame(horizontal[0], verticalMotion(jump, sneak, speed),
+            horizontal[1], 0.0F, 0.0F, false);
+    }
+
+    static final class StaticFrame {
+        final double motionX;
+        final double motionY;
+        final double motionZ;
+        final float vanillaForward;
+        final float vanillaStrafe;
+        final boolean vanillaJump;
+
+        StaticFrame(double motionX, double motionY, double motionZ,
+                float vanillaForward, float vanillaStrafe, boolean vanillaJump) {
+            this.motionX = motionX;
+            this.motionY = motionY;
+            this.motionZ = motionZ;
+            this.vanillaForward = vanillaForward;
+            this.vanillaStrafe = vanillaStrafe;
+            this.vanillaJump = vanillaJump;
+        }
     }
 
     static double hypixelOffsetForTick(int ticksExisted) {

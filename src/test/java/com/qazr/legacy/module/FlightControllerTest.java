@@ -36,6 +36,42 @@ public class FlightControllerTest {
     }
 
     @Test
+    public void staticFrameOwnsCurrentTickMovementWithoutVanillaAcceleration() {
+        FlightController.StaticFrame stopped = FlightController.staticFrameFor(
+            0.0F, 1.0F, 0.0F, false, false, 0.0);
+        assertEquals(0.0, stopped.motionX, 0.0001);
+        assertEquals(0.0, stopped.motionY, 0.0001);
+        assertEquals(0.0, stopped.motionZ, 0.0001);
+        assertEquals(0.0F, stopped.vanillaForward, 0.0F);
+        assertEquals(0.0F, stopped.vanillaStrafe, 0.0F);
+        assertEquals(false, stopped.vanillaJump);
+
+        FlightController.StaticFrame moving = FlightController.staticFrameFor(
+            0.0F, 1.0F, 0.0F, false, false, 0.4);
+        assertEquals(0.0, moving.motionX, 0.0001);
+        assertEquals(0.4, moving.motionZ, 0.0001);
+        assertEquals(0.4, Math.sqrt(moving.motionX * moving.motionX
+            + moving.motionZ * moving.motionZ), 0.0001);
+    }
+
+    @Test
+    public void staticFrameAppliesReleaseReverseAndNeutralVerticalInputImmediately() {
+        FlightController.StaticFrame released = FlightController.staticFrameFor(
+            0.0F, 0.0F, 0.0F, false, false, 0.4);
+        assertEquals(0.0, released.motionX, 0.0001);
+        assertEquals(0.0, released.motionZ, 0.0001);
+
+        FlightController.StaticFrame reversed = FlightController.staticFrameFor(
+            0.0F, -1.0F, 0.0F, false, false, 0.4);
+        assertEquals(-0.4, reversed.motionZ, 0.0001);
+
+        FlightController.StaticFrame neutral = FlightController.staticFrameFor(
+            0.0F, 0.0F, 0.0F, true, true, 0.4);
+        assertEquals(0.0, neutral.motionY, 0.0001);
+        assertEquals(false, neutral.vanillaJump);
+    }
+
+    @Test
     public void reproducesHypixelThreeTickPositionPulse() {
         assertEquals(3.0E-9, FlightController.hypixelOffsetForTick(2), 1.0E-20);
         assertEquals(0.0, FlightController.hypixelOffsetForTick(3), 0.0);

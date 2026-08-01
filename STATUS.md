@@ -4,15 +4,15 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.143`
+- Version: `1.10.144`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 101 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 102 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: sneak-place auto miner scaffolds`
+- Latest accepted change: `fix: control static flight before travel`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
-- Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
+- Current round: complete. Do not dispatch additional audit or implementation tasks.
 - Heartbeat automation `voris-hub` remains paused by user request.
 
 ## Last Verified Release
@@ -20,13 +20,14 @@ Last updated: 2026-08-01
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 187
+- Tests: 189
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.143.jar`
-- SHA-256: `5EBE7386815A6808EA68A2780C14FB0B67B3A45BCFC830ACCF7DC06EF8CC47A6`
+- Artifact: `build/libs/voris-hub-1.10.144.jar`
+- SHA-256: `A0E9DF892FE7A254B0E474B1DDD3F230D1BFFB77A69365EBCF07EDBB0F080B13`
 
 ## Recently Fixed
 
+- Static Flight now owns current-tick movement from `InputUpdateEvent`, suppressing vanilla acceleration until movement completes and restoring the user's input at PlayerTick END.
 - AutoMiner scaffold assist now uses scoped synchronized sneak-place behavior, preventing interactive supports from opening a GUI instead of accepting the block.
 - AutoMiner now checks real collision shapes for replaceable route cells and clears colliding layers instead of endlessly replanning through them.
 - AutoMiner now performs its bounded final unreachable-route validation atomically, preventing a route opened mid-pass from receiving a mixed-snapshot 100-tick cooldown.

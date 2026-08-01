@@ -899,3 +899,11 @@
 - Iteration 3: synchronized a scoped START_SNEAKING action before the placement packet when the player was not already sneaking.
 - Iteration 4: restored the scoped server and local sneak state in `finally` without changing genuine user sneak input.
 - Iteration 5: retained world-state placement confirmation and existing hotbar/inventory swap restoration instead of trusting `SUCCESS`.
+
+## Version 1.10.144 Static Flight Current-Tick Control Update
+
+- Iteration 1: reproduced speed zero still moving about 0.0196 blocks while forward was held because Static ran after vanilla movement.
+- Iteration 2: added regressions for zero speed, exact configured speed, key release, direction reversal and neutral Jump plus Sneak input.
+- Iteration 3: moved Static vector calculation to Forge `InputUpdateEvent`, after current input refresh and before current travel.
+- Iteration 4: temporarily suppressed vanilla horizontal acceleration and jump processing, then restored the input snapshot at PlayerTick END.
+- Iteration 5: preserved collision movement, landing distance checks, capability restoration and the no-fake-ground safety boundary.
