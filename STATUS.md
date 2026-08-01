@@ -12,6 +12,8 @@ Last updated: 2026-08-01
 - Latest accepted change: `fix: pause auto miner during item use`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
+- Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
+- Heartbeat automation `voris-hub` remains paused by user request.
 
 ## Last Verified Release
 

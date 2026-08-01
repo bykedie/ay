@@ -9,7 +9,7 @@
 
 ## Shared Objective
 
-Continuously improve AutoMiner from evidence until the user stops the work. Do not push.
+Continuously improve Flight, Blink Strike, and AutoMiner from evidence until the user stops the work. Do not push.
 
 ## Child Thread Contract
 
@@ -27,9 +27,10 @@ Continuously improve AutoMiner from evidence until the user stops the work. Do n
 ## Safety And Compatibility
 
 - Preserve the panel key `·` and default-unbound module keys.
-- Do not touch `ClientControls.java`, `MeleeCombat.java`, `BlinkStrike.java`, or `FlightController.java`.
+- Child threads must not edit source. The main acceptance thread may edit `FlightController.java`, `BlinkStrike.java`, and `AutoMiner.java` for accepted defects.
+- Do not touch `ClientControls.java` or `MeleeCombat.java` unless a later user request explicitly requires it.
 - Keep changes compatible with Java 8 and Forge 1.12.2.
-- Do not implement server-check bypasses, forged-position attacks, or packet flight.
+- Do not add server-check bypasses, forged-position attacks, or packet flight. Stabilize only the existing ordinary movement and attack behavior.
 - Manual edits use `apply_patch`; validation uses the Gradle wrapper.
 
 ## Evidence Standard

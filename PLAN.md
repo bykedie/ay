@@ -1,19 +1,19 @@
-# Voris Hub Parallel Audit Plan
+# Voris Hub Flight, Blink, And AutoMiner Audit Plan
 
 All child threads share the repository but have independent chat context. Each child owns exactly one report file and must not edit source.
 
 | Thread | Area | Report |
 | --- | --- | --- |
-| 01 | A* search, goal generation, and success/failure validation | `reports/thread-01-path-search.md` |
-| 02 | Route movement, collision, vertical transitions, and stall recovery | `reports/thread-02-route-runtime.md` |
-| 03 | Mining destruction controller, START/END tick ownership, and tool changes | `reports/thread-03-destruction.md` |
-| 04 | Corridor and exposure obstacle selection, ray samples, and clearing state | `reports/thread-04-clearing.md` |
-| 05 | Target labels, vein ordering, completion handoff, and quota reservations | `reports/thread-05-target-handoff.md` |
-| 06 | Scaffold assist reachability, placement, ascent, and failure recovery | `reports/thread-06-scaffold.md` |
-| 07 | Candidate caches, ore visualizer integration, scan latency, and FPS risks | `reports/thread-07-performance.md` |
-| 08 | Mining stands, target reach, exposure geometry, and overhead/underfoot cases | `reports/thread-08-reachability.md` |
-| 09 | AutoMiner test coverage audit and missing high-value regressions | `reports/thread-09-tests.md` |
-| 10 | End-to-end state-machine review and prioritized cross-component risks | `reports/thread-10-state-machine.md` |
+| 01 | Flight landing safety, fall-distance lifecycle, disable/world transitions | `reports/phase2-thread-01-flight-landing.md` |
+| 02 | Flight descent speed, vertical controls, landing responsiveness | `reports/phase2-thread-02-flight-descent.md` |
+| 03 | WWE 1.12.2 Flight reference comparison and compatible behavior gaps | `reports/phase2-thread-03-flight-reference.md` |
+| 04 | Blink path execution, correction handling, and origin recovery | `reports/phase2-thread-04-blink-recovery.md` |
+| 05 | Blink target selection, reachability, and Flight interaction | `reports/phase2-thread-05-blink-targeting.md` |
+| 06 | Blink underwater, vertical, entity-hit timing, and attack completion | `reports/phase2-thread-06-blink-hit.md` |
+| 07 | AutoMiner final failure-validation atomicity | `reports/phase2-thread-07-miner-validation.md` |
+| 08 | AutoMiner replaceable collision and snow-layer route loops | `reports/phase2-thread-08-miner-collision.md` |
+| 09 | AutoMiner clearing, scaffold, destruction ownership, and recovery | `reports/phase2-thread-09-miner-work.md` |
+| 10 | AutoMiner end-to-end target handoff, caching, FPS, and missing regressions | `reports/phase2-thread-10-miner-system.md` |
 
 ## Report Template
 
