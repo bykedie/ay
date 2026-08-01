@@ -827,3 +827,11 @@
 - Iteration 3: paused route motion and all new mining, clearing, scaffold, rotation, and tool-selection work without discarding locked state.
 - Iteration 4: preserved server-side completion confirmation before the pause gate so already-finished work can settle.
 - Iteration 5: froze destruction and scaffold deadlines across paused ticks and covered the input and deadline rules with focused assertions.
+
+## Version 1.10.135 Flight Landing Control Update
+
+- Iteration 1: reproduced Jump and Sneak resolving to neutral vertical input before the landing guard forced the same tick downward.
+- Iteration 2: restricted landing activation to Sneak without Jump so the established neutral-input contract is preserved.
+- Iteration 3: raised controlled descent from a fixed 0.35 cap to at most 1.0 block per tick and bounded the final step by the measured collision distance.
+- Iteration 4: removed the manual ground-position snap and extra grounded packet, relying on real player collision for landing state.
+- Iteration 5: retained landing control after a high-altitude disable until a real grounded or server-recognized fall-safe state, and documented that client fallDistance resets cannot erase server-side survival fall accumulation.

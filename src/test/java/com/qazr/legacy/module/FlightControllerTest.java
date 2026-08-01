@@ -16,6 +16,8 @@ public class FlightControllerTest {
         assertEquals(-0.20, FlightController.verticalMotion(false, true, 0.20), 0.0001);
         assertEquals(0.0, FlightController.verticalMotion(false, false, 0.20), 0.0001);
         assertEquals(0.0, FlightController.verticalMotion(true, true, 0.20), 0.0001);
+        assertEquals(true, FlightController.landingRequested(false, true));
+        assertEquals(false, FlightController.landingRequested(true, true));
     }
 
     @Test
@@ -40,28 +42,31 @@ public class FlightControllerTest {
     }
 
     @Test
-    public void safeLandingCapsFastDescentAndSlowsNearTheGround() {
-        assertEquals(-0.35, FlightController.safeLandingMotion(-4.0, Double.POSITIVE_INFINITY), 0.0001);
-        assertEquals(-0.35, FlightController.safeLandingMotion(0.0, Double.POSITIVE_INFINITY), 0.0001);
-        assertEquals(-0.35, FlightController.safeLandingMotion(-1.0, 3.0), 0.0001);
-        assertEquals(-0.08, FlightController.safeLandingMotion(-1.0, 0.5), 0.0001);
-        assertEquals(-0.03, FlightController.safeLandingMotion(-1.0, 0.03), 0.0001);
-        assertEquals(0.0, FlightController.safeLandingMotion(-1.0, 0.0), 0.0001);
+    public void safeLandingDescendsQuicklyAndStopsAtTheSurface() {
+        assertEquals(-1.0, FlightController.safeLandingMotion(
+            -4.0, Double.POSITIVE_INFINITY, 4.0), 0.0001);
+        assertEquals(-0.35, FlightController.safeLandingMotion(
+            0.0, Double.POSITIVE_INFINITY, 0.0), 0.0001);
+        assertEquals(-1.0, FlightController.safeLandingMotion(-1.0, 3.0, 1.0), 0.0001);
+        assertEquals(-0.5, FlightController.safeLandingMotion(-1.0, 0.5, 1.0), 0.0001);
+        assertEquals(-0.03, FlightController.safeLandingMotion(-1.0, 0.03, 1.0), 0.0001);
+        assertEquals(0.0, FlightController.safeLandingMotion(-1.0, 0.0, 1.0), 0.0001);
     }
 
     @Test
-    public void confirmsGroundOnlyWhenTheNextDescentStepCanTouchIt() {
-        assertEquals(false, FlightController.shouldConfirmLanding(Double.POSITIVE_INFINITY, -0.08));
-        assertEquals(false, FlightController.shouldConfirmLanding(0.25, -0.08));
-        assertEquals(true, FlightController.shouldConfirmLanding(0.09, -0.08));
-        assertEquals(true, FlightController.shouldConfirmLanding(0.0, 0.0));
-        assertEquals(64.0, FlightController.landingPositionY(64.09, 0.09), 0.0001);
-        assertEquals(64.0, FlightController.landingPositionY(64.0, Double.POSITIVE_INFINITY), 0.0);
-        assertEquals(true, FlightController.shouldResetLandingConfirmation(true, 0.3));
-        assertEquals(true, FlightController.shouldResetLandingConfirmation(
-            true, Double.POSITIVE_INFINITY));
-        assertEquals(false, FlightController.shouldResetLandingConfirmation(true, 0.1));
-        assertEquals(false, FlightController.shouldResetLandingConfirmation(false, 2.0));
+    public void disablingFlightKeepsControlUntilRealGroundContact() {
+        assertEquals(true, FlightController.shouldContinueLandingAfterDisable(
+            true, false, false, Double.POSITIVE_INFINITY));
+        assertEquals(true, FlightController.shouldContinueLandingAfterDisable(
+            true, false, false, 0.25));
+        assertEquals(false, FlightController.shouldContinueLandingAfterDisable(
+            true, false, false, 0.0));
+        assertEquals(false, FlightController.shouldContinueLandingAfterDisable(
+            true, true, false, Double.POSITIVE_INFINITY));
+        assertEquals(false, FlightController.shouldContinueLandingAfterDisable(
+            false, false, false, Double.POSITIVE_INFINITY));
+        assertEquals(false, FlightController.shouldContinueLandingAfterDisable(
+            true, false, true, Double.POSITIVE_INFINITY));
     }
 
     private static void assertOffset(double x, double z, double[] movement) {

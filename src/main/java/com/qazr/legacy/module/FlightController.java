@@ -6,7 +6,6 @@ import com.qazr.legacy.config.ModuleId;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
-import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
@@ -16,6 +15,8 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 public final class FlightController {
     private static final double HYPIXEL_OFFSET = 1.0E-9;
     private static final double LANDING_SEARCH_DISTANCE = 4.0;
+    private static final double DEFAULT_DESCENT_SPEED = 0.35;
+    private static final double MAX_CONTROLLED_DESCENT_SPEED = 1.0;
 
     private final Minecraft mc = Minecraft.getMinecraft();
     private final ModuleManager modules;
@@ -23,7 +24,6 @@ public final class FlightController {
     private FlightMode controlledMode;
     private boolean originalFlying;
     private float originalFlySpeed;
-    private boolean landingConfirmed;
 
     public FlightController(ModuleManager modules) {
         this.modules = modules;
@@ -32,10 +32,14 @@ public final class FlightController {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.player != mc.player) return;
-        boolean ready = modules.isEnabled(ModuleId.FLIGHT) && mc.player != null && mc.world != null
+        boolean controlReady = mc.player != null && mc.world != null
             && mc.player.connection != null && !mc.player.isRiding();
-        if (!ready) {
+        if (!controlReady) {
             restorePlayer();
+            return;
+        }
+        if (!modules.isEnabled(ModuleId.FLIGHT)) {
+            continueLandingAfterDisable();
             return;
         }
 
@@ -53,7 +57,8 @@ public final class FlightController {
                 staticFlight();
                 break;
         }
-        protectLanding(mc.gameSettings.keyBindSneak.isKeyDown());
+        protectLanding(landingRequested(mc.gameSettings.keyBindJump.isKeyDown(),
+            mc.gameSettings.keyBindSneak.isKeyDown()));
     }
 
     @SubscribeEvent
@@ -105,33 +110,45 @@ public final class FlightController {
 
     private void restorePlayer() {
         if (controlledPlayer == null) return;
-        controlledPlayer.capabilities.isFlying = originalFlying;
-        controlledPlayer.capabilities.setFlySpeed(originalFlySpeed);
+        restoreFlightCapabilities();
         controlledPlayer.fallDistance = 0.0F;
         clearMotion(controlledPlayer);
         controlledPlayer = null;
         controlledMode = null;
-        landingConfirmed = false;
+    }
+
+    private void restoreFlightCapabilities() {
+        if (controlledPlayer == null) return;
+        controlledPlayer.capabilities.isFlying = originalFlying;
+        controlledPlayer.capabilities.setFlySpeed(originalFlySpeed);
     }
 
     private void protectLanding(boolean descending) {
-        if (!descending) {
-            landingConfirmed = false;
+        if (!descending) return;
+        double distance = groundDistance(mc.player, LANDING_SEARCH_DISTANCE);
+        mc.player.motionY = safeLandingMotion(
+            mc.player.motionY, distance, ModConfig.flightSpeed);
+        mc.player.fallDistance = 0.0F;
+    }
+
+    private void continueLandingAfterDisable() {
+        if (controlledPlayer != mc.player) {
+            restorePlayer();
             return;
         }
         double distance = groundDistance(mc.player, LANDING_SEARCH_DISTANCE);
-        if (shouldResetLandingConfirmation(landingConfirmed, distance)) landingConfirmed = false;
-        mc.player.motionY = safeLandingMotion(mc.player.motionY, distance);
-        mc.player.fallDistance = 0.0F;
-        if (!landingConfirmed && shouldConfirmLanding(distance, mc.player.motionY)) {
-            mc.player.setPosition(mc.player.posX, landingPositionY(mc.player.posY, distance),
-                mc.player.posZ);
-            mc.player.motionY = 0.0;
-            mc.player.onGround = true;
-            mc.player.connection.sendPacket(new CPacketPlayer.Position(mc.player.posX,
-                mc.player.posY, mc.player.posZ, true));
-            landingConfirmed = true;
+        boolean fallSafeState = mc.player.isInWater() || mc.player.isInLava()
+            || mc.player.isOnLadder() || mc.player.isElytraFlying()
+            || mc.player.capabilities.allowFlying;
+        if (!shouldContinueLandingAfterDisable(
+                true, mc.player.onGround, fallSafeState, distance)) {
+            restorePlayer();
+            return;
         }
+        restoreFlightCapabilities();
+        mc.player.motionX = 0.0;
+        mc.player.motionZ = 0.0;
+        protectLanding(true);
     }
 
     private double groundDistance(EntityPlayerSP player, double maxDistance) {
@@ -163,29 +180,24 @@ public final class FlightController {
         return jump ? speed : -speed;
     }
 
-    static double safeLandingMotion(double requestedMotion, double groundDistance) {
-        if (!Double.isFinite(groundDistance)) return descendingMotion(requestedMotion);
+    static boolean landingRequested(boolean jump, boolean sneak) {
+        return sneak && !jump;
+    }
+
+    static double safeLandingMotion(
+            double requestedMotion, double groundDistance, double configuredSpeed) {
         if (groundDistance <= 0.001) return 0.0;
-        if (groundDistance <= 1.0) return -Math.min(0.08, groundDistance);
-        return descendingMotion(requestedMotion);
+        double requestedSpeed = requestedMotion < -0.01
+            ? -requestedMotion : Math.max(DEFAULT_DESCENT_SPEED, configuredSpeed);
+        double descentSpeed = Math.min(MAX_CONTROLLED_DESCENT_SPEED, requestedSpeed);
+        if (Double.isFinite(groundDistance)) descentSpeed = Math.min(descentSpeed, groundDistance);
+        return -descentSpeed;
     }
 
-    private static double descendingMotion(double requestedMotion) {
-        return requestedMotion < -0.01 ? Math.max(requestedMotion, -0.35) : -0.35;
-    }
-
-    static boolean shouldConfirmLanding(double groundDistance, double motionY) {
-        if (!Double.isFinite(groundDistance)) return false;
-        return groundDistance <= Math.max(0.08, Math.max(0.0, -motionY) + 0.02);
-    }
-
-    static double landingPositionY(double currentY, double groundDistance) {
-        if (!Double.isFinite(groundDistance) || groundDistance <= 0.0) return currentY;
-        return currentY - groundDistance;
-    }
-
-    static boolean shouldResetLandingConfirmation(boolean confirmed, double groundDistance) {
-        return confirmed && (!Double.isFinite(groundDistance) || groundDistance > 0.25);
+    static boolean shouldContinueLandingAfterDisable(
+            boolean controlled, boolean onGround, boolean fallSafeState, double groundDistance) {
+        return controlled && !onGround && !fallSafeState
+            && (!Double.isFinite(groundDistance) || groundDistance > 0.001);
     }
 
     static double[] movementFor(float yaw, double forward, double strafe, double speed) {

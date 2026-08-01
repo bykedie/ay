@@ -4,12 +4,12 @@ Last updated: 2026-08-01
 
 ## Current State
 
-- Version: `1.10.134`
+- Version: `1.10.135`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 91 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 93 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: pause auto miner during item use`
+- Latest accepted change: `fix: stabilize flight landing control`
 - Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
 - Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
 - Active objective: iterate Flight landing safety and descent, Blink Strike stability, and AutoMiner reliability under the main-thread acceptance workflow.
@@ -22,11 +22,15 @@ Last updated: 2026-08-01
 - Test classes: 17
 - Tests: 178
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.134.jar`
-- SHA-256: `6FBC7F3687CC11A6EB737E6D2843863E1B546EA5DBCE11B67917782F76F6ADCC`
+- Artifact: `build/libs/voris-hub-1.10.135.jar`
+- SHA-256: `03291326503E33D62E7EF06D4FF38BD287E7B54F8571BE8271B50B31BCE92CEC`
 
 ## Recently Fixed
 
+- Flight now preserves neutral vertical input when Jump and Sneak are held together.
+- Controlled descent can move at up to 1.0 block per tick and bounds the final step by the measured collision-surface distance.
+- Flight no longer snaps the player to a synthetic landing position or sends an extra grounded position packet.
+- Disabling Flight in midair retains controlled descent until real ground contact or a recognized fall-safe state. Client-side control cannot erase fall distance already accumulated by a survival server, so this is not a server-side no-fall guarantee.
 - Horizontal descent now validates swept head clearance consistently in A*, path validation, and corridor generation.
 - Path-search failure cooldowns are bound to the feet-cell origin and released after the player moves to a new cell.
 - Corridor ray samples now skip allowed-but-unusable early hits and continue to a usable sample.
