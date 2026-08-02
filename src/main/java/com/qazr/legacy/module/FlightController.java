@@ -6,6 +6,7 @@ import com.qazr.legacy.config.ModuleId;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.network.play.client.CPacketPlayer;
 import net.minecraft.util.MovementInput;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.client.event.InputUpdateEvent;
@@ -103,6 +104,22 @@ public final class FlightController {
             protectLanding(landingRequested(mc.gameSettings.keyBindJump.isKeyDown(),
                 mc.gameSettings.keyBindSneak.isKeyDown()));
         }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || mc.player == null
+                || mc.world == null || mc.player.connection == null) return;
+        FlightMode mode = modules.isEnabled(ModuleId.FLIGHT)
+            ? ModConfig.flightMode : controlledMode;
+        boolean fallSafeState = mc.player.isInWater() || mc.player.isInLava()
+            || mc.player.isOnLadder() || mc.player.isElytraFlying()
+            || mc.player.capabilities.allowFlying;
+        if (!shouldResetServerFallDistance(controlledPlayer == mc.player, mode,
+                mc.player.onGround, fallSafeState, mc.player.motionY)) return;
+        mc.player.connection.sendPacket(new CPacketPlayer(true));
+        mc.player.connection.sendPacket(new CPacketPlayer(false));
+        mc.player.fallDistance = 0.0F;
     }
 
     @SubscribeEvent
@@ -261,6 +278,12 @@ public final class FlightController {
             boolean controlled, boolean onGround, boolean fallSafeState, double groundDistance) {
         return controlled && !onGround && !fallSafeState
             && (!Double.isFinite(groundDistance) || groundDistance > 0.001);
+    }
+
+    static boolean shouldResetServerFallDistance(boolean controlled, FlightMode mode,
+            boolean onGround, boolean fallSafeState, double motionY) {
+        return controlled && mode == FlightMode.VANILLA && !onGround
+            && !fallSafeState && motionY < -0.01;
     }
 
     static double[] movementFor(float yaw, double forward, double strafe, double speed) {

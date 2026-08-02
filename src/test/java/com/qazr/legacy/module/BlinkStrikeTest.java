@@ -21,6 +21,10 @@ public class BlinkStrikeTest {
     public void groundsTransportPacketsOnlyForActuallyGroundedOrigins() {
         assertEquals(true, BlinkStrike.transportOnGround(true));
         assertEquals(false, BlinkStrike.transportOnGround(false));
+        assertEquals(true, BlinkStrike.transportOnGround(false, true));
+        assertEquals(true, BlinkStrike.releaseAirborneTransport(false, true));
+        assertEquals(false, BlinkStrike.releaseAirborneTransport(true, true));
+        assertEquals(false, BlinkStrike.releaseAirborneTransport(false, false));
         assertEquals(true, BlinkStrike.actualGrounded(true, false, false));
         assertEquals(false, BlinkStrike.actualGrounded(true, true, false));
         assertEquals(true, BlinkStrike.actualGrounded(false, true, true));
@@ -133,6 +137,8 @@ public class BlinkStrikeTest {
         assertEquals(40, BlinkStrike.routeCollisionChecks(0, 100, 40));
         assertEquals(4, BlinkStrike.routeCollisionChecks(96, 100, 40));
         assertEquals(0, BlinkStrike.routeCollisionChecks(100, 100, 40));
+        assertEquals(true, BlinkStrike.routeSamplingRequired(96, 100));
+        assertEquals(false, BlinkStrike.routeSamplingRequired(100, 100));
     }
 
     @Test
@@ -157,6 +163,69 @@ public class BlinkStrikeTest {
             feet, false, feet.up(2), true));
         assertEquals(false, BlinkStrike.sameReachabilityContext(feet, false, feet, true));
         assertEquals(false, BlinkStrike.sameReachabilityContext(null, false, feet, false));
+    }
+
+    @Test
+    public void preservesPendingPlanningAcrossMovementButNotFlightStateChanges() {
+        BlockPos feet = new BlockPos(0, 64, 0);
+
+        assertEquals(false, BlinkStrike.pendingPlanContextChanged(
+            feet, true, true));
+        assertEquals(true, BlinkStrike.pendingPlanContextChanged(
+            feet, false, true));
+        assertEquals(false, BlinkStrike.pendingPlanContextChanged(
+            null, false, false));
+    }
+
+    @Test
+    public void keepsCrossTickPlansForBoundedFlightAndGroundMovement() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+
+        assertEquals(true, BlinkStrike.planningOriginMatches(
+            origin, new BlinkPath.Point(1.0, 64.5, 0.0), 4.0));
+        assertEquals(true, BlinkStrike.planningOriginMatches(
+            origin, new BlinkPath.Point(4.0, 64.0, 0.0), 4.0));
+        assertEquals(false, BlinkStrike.planningOriginMatches(
+            origin, new BlinkPath.Point(4.01, 64.0, 0.0), 4.0));
+        assertEquals(true, BlinkStrike.destinationWithinRange(
+            new BlinkPath.Point(1.0, 64.0, 0.0),
+            new BlinkPath.Point(13.0, 64.0, 0.0), 12.0));
+        assertEquals(false, BlinkStrike.destinationWithinRange(
+            new BlinkPath.Point(0.0, 64.0, 0.0),
+            new BlinkPath.Point(13.0, 64.0, 0.0), 12.0));
+    }
+
+    @Test
+    public void rebasesTheFirstPacketWithoutBreakingConfiguredSteps() {
+        BlinkPath.Point destination = new BlinkPath.Point(12.0, 64.0, 0.0);
+        BlinkPath.Point currentOrigin = new BlinkPath.Point(-1.0, 64.0, 0.0);
+        List<BlinkPath.Point> rebased = BlinkStrike.rebasePath(currentOrigin,
+            java.util.Collections.singletonList(destination), 4.0);
+
+        BlinkPath.Point previous = currentOrigin;
+        for (BlinkPath.Point point : rebased) {
+            assertTrue(previous.distanceTo(point) <= 4.0);
+            previous = point;
+        }
+        assertEquals(12.0, previous.x, 0.0);
+        assertEquals(4, rebased.size());
+    }
+
+    @Test
+    public void directReturnSurvivesOrdinaryMovementBeforeTheBlinkBurst() {
+        BlinkPath.Point tickOrigin = new BlinkPath.Point(-0.2, 64.0, 0.0);
+        BlinkPath.Point currentOrigin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = BlinkStrike
+            .candidatePositions(currentOrigin, 15.0, 64.0, 0.0, 2.5).get(0);
+        List<BlinkPath.Point> outward = BlinkStrike.buildPath(currentOrigin,
+            java.util.Collections.singletonList(destination), 4.0);
+
+        assertEquals(true, BlinkStrike.remoteMovementPlanAccepted(
+            tickOrigin, currentOrigin, outward, true, false, true, 1));
+        List<BlinkPath.Point> returning = BlinkStrike.plannedReturnPath(
+            currentOrigin, outward, outward.size(), true);
+        assertEquals(currentOrigin, returning.get(returning.size() - 1));
+        assertEquals(1, returning.size());
     }
 
     @Test

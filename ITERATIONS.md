@@ -923,3 +923,11 @@
 - Iteration 3: aligned the complete-burst preflight with the actual packet sequence while retaining rejection for genuinely unsafe fifth-outward-packet excursions.
 - Iteration 4: removed same-height dogleg routes that collapse to the direct route and otherwise consume repeated collision samples before a useful alternative route.
 - Iteration 5: retained the 12 target-plan, 16 candidate, and 96 collision-sample per-tick budgets and added focused distant-target and route-deduplication regressions.
+
+## Version 1.10.147 Vanilla Landing And Moving Blink Update
+
+- Iteration 1: audited stock Forge 1.12.2 `processPlayer`, `handleFalling`, and `updateFallState`, confirming that client-only `fallDistance` resets cannot prevent server landing damage.
+- Iteration 2: added a post-movement `onGround=true` then `false` state pulse during controlled Vanilla descent and disable landing, while retaining Static behavior and real-contact convergence.
+- Iteration 3: stopped feet-cell movement from discarding unfinished Blink collision work; bounded origin drift now preserves absolute evidence and rechecks a path rebuilt from the current origin inside the existing 96-sample budget.
+- Iteration 4: based Blink burst preflight on the tick-start movement origin and let fully checked direct routes return directly, avoiding the stock post-five-packet threshold that rejected otherwise valid ground and flight strikes.
+- Iteration 5: carried controlled Vanilla ground state through Blink transport, restored airborne state after return, fixed completed collision cursors remaining permanently pending, and retained the 12/16/96 planning limits.

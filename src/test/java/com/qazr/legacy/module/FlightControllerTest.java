@@ -123,6 +123,20 @@ public class FlightControllerTest {
             true, false, true, Double.POSITIVE_INFINITY));
     }
 
+    @Test
+    public void resetsServerFallDistanceOnlyDuringControlledVanillaDescent() {
+        assertEquals(true, FlightController.shouldResetServerFallDistance(
+            true, FlightMode.VANILLA, false, false, -0.35));
+        assertEquals(false, FlightController.shouldResetServerFallDistance(
+            true, FlightMode.STATIC, false, false, -0.35));
+        assertEquals(false, FlightController.shouldResetServerFallDistance(
+            true, FlightMode.VANILLA, false, false, 0.0));
+        assertEquals(false, FlightController.shouldResetServerFallDistance(
+            true, FlightMode.VANILLA, true, false, -0.35));
+        assertEquals(false, FlightController.shouldResetServerFallDistance(
+            true, FlightMode.VANILLA, false, true, -0.35));
+    }
+
     private static void assertOffset(double x, double z, double[] movement) {
         assertEquals(x, movement[0], 0.0001);
         assertEquals(z, movement[1], 0.0001);

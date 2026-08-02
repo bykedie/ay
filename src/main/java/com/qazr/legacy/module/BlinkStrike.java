@@ -1,6 +1,7 @@
 package com.qazr.legacy.module;
 
 import com.qazr.legacy.config.AttackPoint;
+import com.qazr.legacy.config.FlightMode;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.util.BlinkPath;
@@ -63,6 +64,8 @@ public final class BlinkStrike {
 
         int targetLimit = ModConfig.blinkMultiTarget ? ModConfig.blinkMaxTargets : 1;
         BlinkPath.Point origin = new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ);
+        BlinkPath.Point movementOrigin = new BlinkPath.Point(mc.player.lastTickPosX,
+            mc.player.lastTickPosY, mc.player.lastTickPosZ);
         boolean originOnGround = originOnGround(origin);
         if (!originOnGround && !safeAirborneOrigin()) return;
         List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE,
@@ -89,7 +92,7 @@ public final class BlinkStrike {
                 continue;
             }
             if (remoteAttacked) continue;
-            if (strike(strike.target, origin, currentPlan, originOnGround)) {
+            if (strike(strike.target, movementOrigin, origin, currentPlan, originOnGround)) {
                 attacked = true;
                 remoteAttacked = true;
             }
@@ -102,13 +105,17 @@ public final class BlinkStrike {
         }
     }
 
-    private boolean strike(EntityLivingBase target, BlinkPath.Point origin, StrikePlan plan,
-            boolean originOnGround) {
-        boolean transportOnGround = transportOnGround(originOnGround);
+    private boolean strike(EntityLivingBase target, BlinkPath.Point movementOrigin,
+            BlinkPath.Point origin, StrikePlan plan, boolean originOnGround) {
+        boolean transportOnGround = transportOnGround(originOnGround,
+            modules.isEnabled(ModuleId.FLIGHT) && ModConfig.flightMode == FlightMode.VANILLA);
+        boolean releaseAirborne = releaseAirborneTransport(originOnGround, transportOnGround);
         List<BlinkPath.Point> path = plan.path;
         boolean critical = remoteCriticalEligible(plan.destination, originOnGround)
-            && remoteMovementPlanAccepted(origin, path, true, RESERVED_MOVEMENT_PACKETS);
-        if (!remoteMovementPlanAccepted(origin, path, critical, RESERVED_MOVEMENT_PACKETS)) return false;
+            && remoteMovementPlanAccepted(movementOrigin, origin, path, plan.directReturn,
+                true, releaseAirborne, RESERVED_MOVEMENT_PACKETS);
+        if (!remoteMovementPlanAccepted(movementOrigin, origin, path, plan.directReturn,
+                critical, releaseAirborne, RESERVED_MOVEMENT_PACKETS)) return false;
         double originalMotionX = mc.player.motionX;
         double originalMotionY = mc.player.motionY;
         double originalMotionZ = mc.player.motionZ;
@@ -131,11 +138,10 @@ public final class BlinkStrike {
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
         } finally {
-            List<BlinkPath.Point> returnPath = completeReturnPath(origin, path, sent);
-            for (int i = 0; i < returnPath.size(); i++) {
-                sendPosition(returnPath.get(i), i + 1 == returnPath.size()
-                    ? originOnGround : transportOnGround);
-            }
+            List<BlinkPath.Point> returnPath = plannedReturnPath(
+                origin, path, sent, plan.directReturn);
+            for (BlinkPath.Point point : returnPath) sendPosition(point, transportOnGround);
+            if (releaseAirborne) mc.player.connection.sendPacket(new CPacketPlayer(false));
             mc.player.fallDistance = 0.0F;
             mc.player.motionX = originalMotionX;
             mc.player.motionY = originalMotionY;
@@ -168,7 +174,9 @@ public final class BlinkStrike {
         if (sameReachabilityContext(reachabilityFeet, reachabilityFlight, feet, flightEnabled)) return;
         unreachableUntil.clear();
         reachableUntil.clear();
-        pendingPlans.clear();
+        if (pendingPlanContextChanged(reachabilityFeet, reachabilityFlight, flightEnabled)) {
+            pendingPlans.clear();
+        }
         reachabilityFeet = feet == null ? null : feet.toImmutable();
         reachabilityFlight = flightEnabled;
     }
@@ -177,6 +185,11 @@ public final class BlinkStrike {
             BlockPos currentFeet, boolean currentFlight) {
         return cachedFeet != null && cachedFeet.equals(currentFeet)
             && cachedFlight == currentFlight;
+    }
+
+    static boolean pendingPlanContextChanged(BlockPos cachedFeet, boolean cachedFlight,
+            boolean currentFlight) {
+        return cachedFeet != null && cachedFlight != currentFlight;
     }
 
     private PlanBatch planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
@@ -245,6 +258,10 @@ public final class BlinkStrike {
         return Math.min(Math.max(0, budget), Math.max(0, sampleCount - start));
     }
 
+    static boolean routeSamplingRequired(int sampleCursor, int sampleCount) {
+        return Math.max(0, sampleCursor) < Math.max(0, sampleCount);
+    }
+
     static boolean cacheUnreachablePlan(boolean complete, boolean hasPlan) {
         return complete && !hasPlan;
     }
@@ -281,36 +298,74 @@ public final class BlinkStrike {
 
         while (true) {
             if (search.routeSamples != null) {
-                int checks = routeCollisionChecks(search.routeSampleCursor,
-                    search.routeSamples.size(), budget.remainingCollisions);
-                if (checks <= 0) return PlanProgress.pending();
-                boolean blocked = false;
-                AxisAlignedBB base = mc.player.getEntityBoundingBox();
-                int end = search.routeSampleCursor + checks;
-                while (search.routeSampleCursor < end) {
-                    BlinkPath.Point point = search.routeSamples.get(search.routeSampleCursor++);
-                    budget.remainingCollisions--;
-                    AxisAlignedBB box = base.offset(point.x - search.origin.x,
-                        point.y - search.origin.y, point.z - search.origin.z).shrink(0.02);
-                    if (!mc.world.getWorldBorder().contains(box)
-                            || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
-                        blocked = true;
-                        break;
+                if (routeSamplingRequired(
+                        search.routeSampleCursor, search.routeSamples.size())) {
+                    int checks = routeCollisionChecks(search.routeSampleCursor,
+                        search.routeSamples.size(), budget.remainingCollisions);
+                    if (checks <= 0) return PlanProgress.pending();
+                    boolean blocked = false;
+                    AxisAlignedBB base = mc.player.getEntityBoundingBox().offset(
+                        search.origin.x - origin.x, search.origin.y - origin.y,
+                        search.origin.z - origin.z);
+                    int end = search.routeSampleCursor + checks;
+                    while (search.routeSampleCursor < end) {
+                        BlinkPath.Point point = search.routeSamples.get(search.routeSampleCursor++);
+                        budget.remainingCollisions--;
+                        AxisAlignedBB box = base.offset(point.x - search.origin.x,
+                            point.y - search.origin.y, point.z - search.origin.z).shrink(0.02);
+                        if (!mc.world.getWorldBorder().contains(box)
+                                || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
+                            blocked = true;
+                            break;
+                        }
+                    }
+                    if (blocked) {
+                        search.clearRoute();
+                        continue;
+                    }
+                    if (routeSamplingRequired(
+                            search.routeSampleCursor, search.routeSamples.size())) {
+                        return PlanProgress.pending();
                     }
                 }
-                if (blocked) {
-                    search.clearRoute();
-                    continue;
-                }
-                if (search.routeSampleCursor < search.routeSamples.size()) {
-                    return PlanProgress.pending();
-                }
-                if (!planDestinationStillValid(target, search.candidate)) {
+                if (!planDestinationStillValid(target, origin, search.candidate)) {
                     pendingPlans.remove(targetId);
                     return PlanProgress.pending();
                 }
-                StrikePlan plan = new StrikePlan(search.candidate, search.packetPath,
-                    new ArrayList<>(search.currentWaypoints));
+                boolean originChanged = search.origin.distanceTo(origin) > 0.0001;
+                List<BlinkPath.Point> packetPath = search.packetPath;
+                if (originChanged) {
+                    packetPath = rebasePath(origin, search.currentWaypoints, search.step);
+                    boolean directReturn = search.currentWaypoints.size() == 1;
+                    if (!remoteMovementPlanAccepted(origin, origin, packetPath, directReturn,
+                            false, RESERVED_MOVEMENT_PACKETS)) {
+                        search.clearRoute();
+                        continue;
+                    }
+                    List<BlinkPath.Point> currentSamples = rebasePath(
+                        origin, search.currentWaypoints, 0.4);
+                    if (currentSamples.size() > budget.remainingCollisions) {
+                        return PlanProgress.pending();
+                    }
+                    AxisAlignedBB currentBase = mc.player.getEntityBoundingBox();
+                    boolean currentRouteBlocked = false;
+                    for (BlinkPath.Point point : currentSamples) {
+                        budget.remainingCollisions--;
+                        AxisAlignedBB box = currentBase.offset(point.x - origin.x,
+                            point.y - origin.y, point.z - origin.z).shrink(0.02);
+                        if (!mc.world.getWorldBorder().contains(box)
+                                || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
+                            currentRouteBlocked = true;
+                            break;
+                        }
+                    }
+                    if (currentRouteBlocked) {
+                        search.clearRoute();
+                        continue;
+                    }
+                }
+                StrikePlan plan = new StrikePlan(search.candidate, packetPath,
+                    new ArrayList<>(search.currentWaypoints), search.currentWaypoints.size() == 1);
                 pendingPlans.remove(targetId);
                 return PlanProgress.complete(plan);
             }
@@ -318,8 +373,8 @@ public final class BlinkStrike {
             if (search.routes != null && search.routeIndex < search.routes.size()) {
                 search.currentWaypoints = search.routes.get(search.routeIndex++);
                 search.packetPath = buildPath(search.origin, search.currentWaypoints, search.step);
-                if (!remoteMovementPlanAccepted(search.origin, search.packetPath, false,
-                        RESERVED_MOVEMENT_PACKETS)) {
+                if (!remoteMovementPlanAccepted(search.origin, search.origin, search.packetPath,
+                        search.currentWaypoints.size() == 1, false, RESERVED_MOVEMENT_PACKETS)) {
                     search.currentWaypoints = null;
                     search.packetPath = null;
                     continue;
@@ -352,14 +407,14 @@ public final class BlinkStrike {
                 <= directReach * directReach && hasAttackLine(originEyes, currentAttackPoint)
                 && serverAttackCandidateAllows(origin, target)) {
             return new StrikePlan(origin, java.util.Collections.emptyList(),
-                java.util.Collections.emptyList());
+                java.util.Collections.emptyList(), false);
         }
         return null;
     }
 
     private boolean candidateEligible(PlanSearch search, EntityLivingBase target,
             BlinkPath.Point candidate) {
-        if (search.origin.distanceTo(candidate) > search.range) return false;
+        if (!destinationWithinRange(search.origin, candidate, search.range)) return false;
         Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
         if (CombatSupport.distanceSqToHitbox(eyes, search.predictedBox)
                 > search.attackDistance * search.attackDistance) return false;
@@ -367,8 +422,10 @@ public final class BlinkStrike {
             && serverAttackCandidateAllows(candidate, target);
     }
 
-    private boolean planDestinationStillValid(EntityLivingBase target, BlinkPath.Point destination) {
+    private boolean planDestinationStillValid(EntityLivingBase target, BlinkPath.Point origin,
+            BlinkPath.Point destination) {
         if (target == null || target.isDead || target.getHealth() <= 0.0F) return false;
+        if (!destinationWithinRange(origin, destination, ModConfig.blinkRange)) return false;
         BlinkPath.Point predicted = predictedTargetPosition(target.posX,
             target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
             ModConfig.blinkPredictTicks);
@@ -431,28 +488,60 @@ public final class BlinkStrike {
 
     static boolean remoteMovementPlanAccepted(BlinkPath.Point origin,
             List<BlinkPath.Point> outward, boolean critical, int priorMovementPackets) {
-        if (origin == null || outward == null || outward.isEmpty()) return false;
+        return remoteMovementPlanAccepted(origin, origin, outward, false, critical,
+            false, priorMovementPackets);
+    }
+
+    static boolean remoteMovementPlanAccepted(BlinkPath.Point movementOrigin,
+            BlinkPath.Point returnOrigin, List<BlinkPath.Point> outward, boolean directReturn,
+            boolean critical, int priorMovementPackets) {
+        return remoteMovementPlanAccepted(movementOrigin, returnOrigin, outward, directReturn,
+            critical, false, priorMovementPackets);
+    }
+
+    static boolean remoteMovementPlanAccepted(BlinkPath.Point movementOrigin,
+            BlinkPath.Point returnOrigin, List<BlinkPath.Point> outward, boolean directReturn,
+            boolean critical, boolean releaseAirborne, int priorMovementPackets) {
+        if (movementOrigin == null || returnOrigin == null
+                || outward == null || outward.isEmpty()) return false;
         int ordinal = Math.max(0, priorMovementPackets);
         for (BlinkPath.Point point : outward) {
-            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, point))) return false;
+            if (!vanillaSameTickMoveAccepted(
+                    ++ordinal, displacementSq(movementOrigin, point))) return false;
         }
         BlinkPath.Point destination = outward.get(outward.size() - 1);
         if (critical) {
             if (!vanillaSameTickMoveAccepted(++ordinal,
-                    displacementSq(origin, destination.x, destination.y + 0.0625D, destination.z))) {
+                    displacementSq(movementOrigin, destination.x,
+                        destination.y + 0.0625D, destination.z))) {
                 return false;
             }
-            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
+            if (!vanillaSameTickMoveAccepted(
+                    ++ordinal, displacementSq(movementOrigin, destination))) return false;
             if (!vanillaSameTickMoveAccepted(++ordinal,
-                    displacementSq(origin, destination.x, destination.y + 0.0125D, destination.z))) {
+                    displacementSq(movementOrigin, destination.x,
+                        destination.y + 0.0125D, destination.z))) {
                 return false;
             }
-            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
+            if (!vanillaSameTickMoveAccepted(
+                    ++ordinal, displacementSq(movementOrigin, destination))) return false;
         }
-        for (BlinkPath.Point point : completeReturnPath(origin, outward, outward.size())) {
-            if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, point))) return false;
+        for (BlinkPath.Point point : plannedReturnPath(
+                returnOrigin, outward, outward.size(), directReturn)) {
+            if (!vanillaSameTickMoveAccepted(
+                    ++ordinal, displacementSq(movementOrigin, point))) return false;
         }
+        if (releaseAirborne && !vanillaSameTickMoveAccepted(
+                ++ordinal, displacementSq(movementOrigin, returnOrigin))) return false;
         return true;
+    }
+
+    static List<BlinkPath.Point> plannedReturnPath(BlinkPath.Point returnOrigin,
+            List<BlinkPath.Point> outward, int sentPoints, boolean directReturn) {
+        if (directReturn && sentPoints > 0) {
+            return java.util.Collections.singletonList(returnOrigin);
+        }
+        return completeReturnPath(returnOrigin, outward, sentPoints);
     }
 
     static boolean vanillaSameTickMoveAccepted(int packetOrdinal, double firstGoodDisplacementSq) {
@@ -504,6 +593,11 @@ public final class BlinkStrike {
             previous = waypoint;
         }
         return path;
+    }
+
+    static List<BlinkPath.Point> rebasePath(BlinkPath.Point currentOrigin,
+            List<BlinkPath.Point> waypoints, double maxStep) {
+        return buildPath(currentOrigin, waypoints, maxStep);
     }
 
     static List<BlinkPath.Point> candidatePositions(BlinkPath.Point origin, double targetX, double targetY,
@@ -562,6 +656,14 @@ public final class BlinkStrike {
 
     static boolean transportOnGround(boolean originOnGround) {
         return originOnGround;
+    }
+
+    static boolean transportOnGround(boolean originOnGround, boolean vanillaFlight) {
+        return originOnGround || vanillaFlight;
+    }
+
+    static boolean releaseAirborneTransport(boolean originOnGround, boolean transportOnGround) {
+        return !originOnGround && transportOnGround;
     }
 
     private void sendPosition(BlinkPath.Point point, boolean onGround) {
@@ -637,9 +739,7 @@ public final class BlinkStrike {
         }
 
         private boolean matches(BlinkPath.Point currentOrigin) {
-            return Double.compare(origin.x, currentOrigin.x) == 0
-                && Double.compare(origin.y, currentOrigin.y) == 0
-                && Double.compare(origin.z, currentOrigin.z) == 0
+            return planningOriginMatches(origin, currentOrigin, step)
                 && Double.compare(range, ModConfig.blinkRange) == 0
                 && Double.compare(attackDistance, ModConfig.blinkAttackDistance) == 0
                 && Double.compare(step, ModConfig.blinkStep) == 0
@@ -660,6 +760,18 @@ public final class BlinkStrike {
             routes = null;
             routeIndex = 0;
         }
+    }
+
+    static boolean planningOriginMatches(BlinkPath.Point plannedOrigin,
+            BlinkPath.Point currentOrigin, double maxDrift) {
+        return plannedOrigin != null && currentOrigin != null && maxDrift >= 0.0
+            && plannedOrigin.distanceTo(currentOrigin) <= maxDrift;
+    }
+
+    static boolean destinationWithinRange(BlinkPath.Point origin,
+            BlinkPath.Point destination, double range) {
+        return origin != null && destination != null && range >= 0.0
+            && origin.distanceTo(destination) <= range;
     }
 
     private static final class PlanningWorkBudget {
@@ -704,12 +816,14 @@ public final class BlinkStrike {
         private final BlinkPath.Point destination;
         private final List<BlinkPath.Point> path;
         private final List<BlinkPath.Point> waypoints;
+        private final boolean directReturn;
 
         private StrikePlan(BlinkPath.Point destination, List<BlinkPath.Point> path,
-                List<BlinkPath.Point> waypoints) {
+                List<BlinkPath.Point> waypoints, boolean directReturn) {
             this.destination = destination;
             this.path = path;
             this.waypoints = waypoints;
+            this.directReturn = directReturn;
         }
     }
 

@@ -4,12 +4,12 @@ Last updated: 2026-08-02
 
 ## Current State
 
-- Version: `1.10.146`
+- Version: `1.10.147`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 2 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 3 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
-- Working tree after the acceptance commit: existing child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: restore distant blink strikes`
+- Working tree after the acceptance commit: existing audit reports remain untracked under `reports/`
+- Latest accepted change: `fix: stabilize flight landing and blink strikes`
 - Current Codex goal: `019fc144-e3cb-7371-8aea-519a8f355577`
 - Current round: complete after the local acceptance commit; no push was performed
 
@@ -18,32 +18,31 @@ Last updated: 2026-08-02
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 196
+- Tests: 201
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.146.jar`
-- SHA-256: `471DDA52F753A10561B09C8581AA08F071E45F238D63E5D65FEA854DB52AD19C`
+- Artifact: `build/libs/voris-hub-1.10.147.jar`
+- SHA-256: `90A2EA4A1E594CA5156A0F134C929D15168C1D5DBCEF332FEB4103D239DDC3B8`
 - Release checks: Forge 1.12.2 metadata, required classes, and Java 8 bytecode passed
 
 ## Accepted Changes
 
-- Blink's final outward position now carries the remote yaw and pitch in one `PositionRotation` packet instead of sending a separate remote rotation movement packet.
-- The complete-burst preflight now matches that packet sequence, restoring safe four-step distant round trips while retaining rejection for genuinely unsafe fifth-outward-packet excursions.
-- Same-height dogleg routes that collapse to the direct route are removed before collision sampling, preserving the 12/16/96 per-tick planning limits for distinct route evidence.
-- Flight now exposes only Static and Vanilla modes. Legacy `flight.mode=hypixel` values migrate to and are written back as `static`.
-- Flight has an independent descent speed with default `0.35` and range `0.0`-`1.0`; Static uses it separately from horizontal/ascent speed.
-- Vanilla Flight enables its capability during `InputUpdateEvent` and compensates the later vanilla Sneak subtraction before travel, giving current-tick controlled descent and surface convergence.
-- Blink Strike retains expensive planning across ticks with global limits of 12 target plans, 16 candidates, and 96 collision samples per tick.
-- Incomplete Blink searches remain pending instead of being cached as unreachable; feet-cell and Flight context changes still invalidate planning evidence.
-- AutoMiner's shared ore cache uses the higher discovery budget until an enabled ore marker exists inside `pathRange`, and restores that warm-up after the final in-range marker is removed.
-- Unfinished ore scan tasks advance by scan wave so unstarted chunks are not starved behind a repeatedly resumed nearby chunk.
-- Ore outlines have a shared RGB brightness multiplier with default `1.0` and range `0.0`-`1.0`.
+- Vanilla Flight controlled descent and disable landing now send a post-movement `onGround=true` then `false` state pair, resetting fall distance accepted by a stock Forge 1.12.2 server without leaving the player grounded.
+- Static Flight movement and packet behavior remain unchanged.
+- Vanilla Flight Blink transport carries the controlled ground state through the remote excursion and restores airborne state after returning.
+- Blink pending collision work now survives feet-cell movement while Flight-state changes still discard incompatible evidence.
+- Absolute path evidence stays tied to its original position; when the player moves within the configured packet step, the path is rebuilt from the current origin and collision-checked again inside the existing 96-sample budget.
+- Rebuilt destinations are rechecked against the current configured range and current target geometry before execution.
+- Blink movement preflight now uses the tick-start movement origin instead of assuming the normal client movement packet had zero displacement.
+- Fully checked direct routes return directly to the current origin, avoiding the stock post-five-packet threshold that rejected otherwise valid ground and airborne attacks. Dogleg routes retain their reverse path.
+- A completed collision cursor can now advance to destination/current-origin validation on the next tick instead of remaining permanently pending.
+- The global Blink planning limits remain 12 target plans, 16 candidates, and 96 collision samples per tick.
 
 ## Audited Boundaries
 
-- Forge 1.12.2 bytecode confirms `InputUpdateEvent` runs before vanilla flight's `motionY -= flySpeed * 3` and before parent travel, validating the Vanilla descent compensation.
-- AutoMiner's three-tick final completion pause remains an intentional rollback-confirmation window; no separate permanent quota, label-order, route-ownership, or completion defect was proven.
-- Blink collision samples are intentionally sliced across ticks. The destination is revalidated before a plan completes; world changes in an already checked route segment remain a residual integration risk, and restoring synchronous whole-route validation would reintroduce the reported client-thread stall.
-- Forge 1.12.2 `processPlayer` bytecode confirms `PositionRotation` consumes one movement packet and applies its coordinates and yaw/pitch together, matching the corrected Blink preflight model.
+- Forge 1.12.2 `NetHandlerPlayServer.processPlayer` passes each movement packet's vertical delta and `onGround` flag to `EntityPlayerMP.handleFalling`; `Entity.updateFallState` accumulates negative deltas and resets/settles the value on a grounded packet.
+- The Vanilla Flight reset prevents new controlled descent from accumulating fatal fall distance. It cannot erase a dangerous server-side fall distance that already existed before Flight took control without settling that existing fall.
+- Blink collision sampling remains intentionally sliced across ticks. A moved origin receives a bounded current-path recheck, but a world change in an already checked route can still invalidate one attempt after planning.
+- Extended-range attacks remain subject to modified server movement rules and anti-cheat plugins; the implementation mirrors stock Forge 1.12.2 acceptance rather than promising a universal bypass.
 
 ## Acceptance Rule
 
