@@ -48,10 +48,10 @@ public class ModuleIdTest {
     public void mapsSettingsToTheirOwningModules() {
         assertEquals(14, ModuleSetting.forModule(ModuleId.MELEE_AURA).length);
         assertEquals(17, ModuleSetting.forModule(ModuleId.BLINK_STRIKE).length);
-        assertEquals(2, ModuleSetting.forModule(ModuleId.FLIGHT).length);
+        assertEquals(3, ModuleSetting.forModule(ModuleId.FLIGHT).length);
         assertEquals(0, ModuleSetting.forModule(ModuleId.CRITICALS).length);
         assertEquals(6, ModuleSetting.forModule(ModuleId.TARGET_VISUALIZER).length);
-        assertEquals(19, ModuleSetting.forModule(ModuleId.ORE_VISUALIZER).length);
+        assertEquals(20, ModuleSetting.forModule(ModuleId.ORE_VISUALIZER).length);
         assertEquals(21, ModuleSetting.forModule(ModuleId.AUTO_MINE).length);
         assertEquals(4, ModuleSetting.forModule(ModuleId.AUTO_BRIDGE).length);
         assertEquals(3, ModuleSetting.forModule(ModuleId.AUTO_GG).length);

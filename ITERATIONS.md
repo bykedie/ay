@@ -907,3 +907,11 @@
 - Iteration 3: moved Static vector calculation to Forge `InputUpdateEvent`, after current input refresh and before current travel.
 - Iteration 4: temporarily suppressed vanilla horizontal acceleration and jump processing, then restored the input snapshot at PlayerTick END.
 - Iteration 5: preserved collision movement, landing distance checks, capability restoration and the no-fake-ground safety boundary.
+
+## Version 1.10.145 Flight, Blink, And Ore Discovery Update
+
+- Iteration 1: removed Hypixel from the user-facing Flight mode cycle and rewrote legacy `flight.mode=hypixel` values to `static`.
+- Iteration 2: added independent `descentSpeed` control, used it for Static descent, and enabled Vanilla flight before travel with compensation for vanilla's later Sneak subtraction.
+- Iteration 3: retained Blink candidate and collision planning across ticks with hard global budgets, while leaving incomplete searches uncached instead of marking them unreachable.
+- Iteration 4: made unfinished ore scans yield by scan wave and kept AutoMiner's high discovery budget active until an enabled marker exists inside `pathRange`, including after the final known marker is removed.
+- Iteration 5: added a shared ore-outline brightness multiplier and covered configuration migration, flight timing, Blink budgets, scan warm-up, scan fairness, and color scaling with focused regressions.

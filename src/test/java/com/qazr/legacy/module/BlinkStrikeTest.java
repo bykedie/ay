@@ -116,7 +116,19 @@ public class BlinkStrikeTest {
     public void boundsExpensivePathPlanningPerTick() {
         assertEquals(4, BlinkStrike.planningBudget(1));
         assertEquals(6, BlinkStrike.planningBudget(3));
-        assertEquals(50, BlinkStrike.planningBudget(50));
+        assertEquals(12, BlinkStrike.planningBudget(50));
+        assertEquals(16, BlinkStrike.candidatePlanningBudget());
+        assertEquals(96, BlinkStrike.routeCollisionBudget());
+        assertEquals(40, BlinkStrike.routeCollisionChecks(0, 100, 40));
+        assertEquals(4, BlinkStrike.routeCollisionChecks(96, 100, 40));
+        assertEquals(0, BlinkStrike.routeCollisionChecks(100, 100, 40));
+    }
+
+    @Test
+    public void incompletePlanSearchIsNotCachedAsUnreachable() {
+        assertEquals(false, BlinkStrike.cacheUnreachablePlan(false, false));
+        assertEquals(false, BlinkStrike.cacheUnreachablePlan(true, true));
+        assertEquals(true, BlinkStrike.cacheUnreachablePlan(true, false));
     }
 
     @Test

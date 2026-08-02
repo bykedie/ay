@@ -1,5 +1,6 @@
 package com.qazr.legacy.module;
 
+import com.qazr.legacy.config.AttackPoint;
 import com.qazr.legacy.config.ModConfig;
 import com.qazr.legacy.config.ModuleId;
 import com.qazr.legacy.util.BlinkPath;
@@ -23,6 +24,8 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class BlinkStrike {
     private static final int MAX_PLAN_CHECKS_PER_TICK = 12;
+    private static final int MAX_CANDIDATE_CHECKS_PER_TICK = 16;
+    private static final int MAX_COLLISION_CHECKS_PER_TICK = 96;
     private static final int UNREACHABLE_CACHE_TICKS = 12;
     private static final int RESERVED_MOVEMENT_PACKETS = 1;
     private static final double SURVIVAL_DIRECT_REACH = 3.0;
@@ -31,6 +34,7 @@ public final class BlinkStrike {
     private final ModuleManager modules;
     private final Map<Integer, Integer> unreachableUntil = new HashMap<>();
     private final Map<Integer, Integer> reachableUntil = new HashMap<>();
+    private final Map<Integer, PlanSearch> pendingPlans = new HashMap<>();
     private BlockPos reachabilityFeet;
     private boolean reachabilityFlight;
     private int delay;
@@ -42,7 +46,10 @@ public final class BlinkStrike {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) return;
+        if (!modules.isEnabled(ModuleId.BLINK_STRIKE)) {
+            pendingPlans.clear();
+            return;
+        }
         if (mc.player == null || mc.world == null || mc.playerController == null
                 || mc.player.connection == null || mc.currentScreen != null) return;
         refreshReachabilityContext(new BlockPos(mc.player.posX,
@@ -60,9 +67,10 @@ public final class BlinkStrike {
         if (!originOnGround && !safeAirborneOrigin()) return;
         List<EntityLivingBase> targets = CombatSupport.findTargets(mc, ModuleId.BLINK_STRIKE,
             candidateScanLimit(targetLimit));
-        List<PlannedStrike> strikes = planStrikes(targets, origin, targetLimit, planningBudget(targetLimit));
+        PlanBatch batch = planStrikes(targets, origin, targetLimit, planningBudget(targetLimit));
+        List<PlannedStrike> strikes = batch.strikes;
         if (strikes.isEmpty()) {
-            delay = 2;
+            if (!batch.incomplete) delay = 2;
             return;
         }
         if (ModConfig.blinkAutoWeapon) CombatSupport.selectBestWeapon(mc);
@@ -146,6 +154,7 @@ public final class BlinkStrike {
             delay = 0;
             unreachableUntil.clear();
             reachableUntil.clear();
+            pendingPlans.clear();
             reachabilityFeet = null;
             reachabilityFlight = false;
         }
@@ -155,6 +164,7 @@ public final class BlinkStrike {
         if (sameReachabilityContext(reachabilityFeet, reachabilityFlight, feet, flightEnabled)) return;
         unreachableUntil.clear();
         reachableUntil.clear();
+        pendingPlans.clear();
         reachabilityFeet = feet == null ? null : feet.toImmutable();
         reachabilityFlight = flightEnabled;
     }
@@ -165,19 +175,28 @@ public final class BlinkStrike {
             && cachedFlight == currentFlight;
     }
 
-    private List<PlannedStrike> planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
+    private PlanBatch planStrikes(List<EntityLivingBase> targets, BlinkPath.Point origin,
             int targetLimit, int planningBudget) {
         List<PlannedStrike> result = new ArrayList<>();
         int tick = mc.player.ticksExisted;
         pruneUnreachableCache(tick);
+        pendingPlans.entrySet().removeIf(entry -> entry.getValue().lastUsedTick < tick - UNREACHABLE_CACHE_TICKS);
+        PlanningWorkBudget workBudget = new PlanningWorkBudget(
+            candidatePlanningBudget(), routeCollisionBudget());
         int checked = 0;
+        boolean incomplete = false;
         for (EntityLivingBase target : targets) {
             if (result.size() >= targetLimit || checked >= planningBudget) break;
             Integer blockedUntil = unreachableUntil.get(target.getEntityId());
             if (blockedUntil != null && blockedUntil > tick) continue;
             checked++;
-            StrikePlan plan = findStrikePlan(target, origin);
-            if (plan == null) {
+            PlanProgress progress = advanceStrikePlan(target, origin, workBudget, tick);
+            if (!progress.complete) {
+                incomplete = true;
+                break;
+            }
+            StrikePlan plan = progress.plan;
+            if (cacheUnreachablePlan(progress.complete, plan != null)) {
                 unreachableUntil.put(target.getEntityId(), tick + UNREACHABLE_CACHE_TICKS);
                 reachableUntil.remove(target.getEntityId());
                 continue;
@@ -187,7 +206,7 @@ public final class BlinkStrike {
                 ModConfig.blinkDelayTicks + 2));
             result.add(new PlannedStrike(target, plan));
         }
-        return result;
+        return new PlanBatch(result, incomplete);
     }
 
     private void pruneUnreachableCache(int tick) {
@@ -206,8 +225,24 @@ public final class BlinkStrike {
 
     static int planningBudget(int requestedTargets) {
         int requested = Math.max(1, Math.min(50, requestedTargets));
-        if (requested <= 6) return Math.min(MAX_PLAN_CHECKS_PER_TICK, Math.max(4, requested * 2));
-        return Math.min(50, requested * 2);
+        return Math.min(MAX_PLAN_CHECKS_PER_TICK, Math.max(4, requested * 2));
+    }
+
+    static int candidatePlanningBudget() {
+        return MAX_CANDIDATE_CHECKS_PER_TICK;
+    }
+
+    static int routeCollisionBudget() {
+        return MAX_COLLISION_CHECKS_PER_TICK;
+    }
+
+    static int routeCollisionChecks(int sampleCursor, int sampleCount, int budget) {
+        int start = Math.max(0, Math.min(sampleCursor, Math.max(0, sampleCount)));
+        return Math.min(Math.max(0, budget), Math.max(0, sampleCount - start));
+    }
+
+    static boolean cacheUnreachablePlan(boolean complete, boolean hasPlan) {
+        return complete && !hasPlan;
     }
 
     static int candidateScanLimit(int requestedTargets) {
@@ -218,7 +253,94 @@ public final class BlinkStrike {
         return creativeExtendedReach ? CREATIVE_DIRECT_REACH : SURVIVAL_DIRECT_REACH;
     }
 
-    private StrikePlan findStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
+    private PlanProgress advanceStrikePlan(EntityLivingBase target, BlinkPath.Point origin,
+            PlanningWorkBudget budget, int tick) {
+        int targetId = target.getEntityId();
+        if (target.isDead || target.getHealth() <= 0.0F) {
+            pendingPlans.remove(targetId);
+            return PlanProgress.complete(null);
+        }
+        PlanSearch search = pendingPlans.get(targetId);
+        if (search == null || !search.matches(origin)) {
+            search = new PlanSearch(target, origin);
+            pendingPlans.put(targetId, search);
+        }
+        search.lastUsedTick = tick;
+        if (!search.directChecked) {
+            search.directChecked = true;
+            StrikePlan direct = directStrikePlan(target, origin);
+            if (direct != null) {
+                pendingPlans.remove(targetId);
+                return PlanProgress.complete(direct);
+            }
+        }
+
+        while (true) {
+            if (search.routeSamples != null) {
+                int checks = routeCollisionChecks(search.routeSampleCursor,
+                    search.routeSamples.size(), budget.remainingCollisions);
+                if (checks <= 0) return PlanProgress.pending();
+                boolean blocked = false;
+                AxisAlignedBB base = mc.player.getEntityBoundingBox();
+                int end = search.routeSampleCursor + checks;
+                while (search.routeSampleCursor < end) {
+                    BlinkPath.Point point = search.routeSamples.get(search.routeSampleCursor++);
+                    budget.remainingCollisions--;
+                    AxisAlignedBB box = base.offset(point.x - search.origin.x,
+                        point.y - search.origin.y, point.z - search.origin.z).shrink(0.02);
+                    if (!mc.world.getWorldBorder().contains(box)
+                            || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
+                        blocked = true;
+                        break;
+                    }
+                }
+                if (blocked) {
+                    search.clearRoute();
+                    continue;
+                }
+                if (search.routeSampleCursor < search.routeSamples.size()) {
+                    return PlanProgress.pending();
+                }
+                if (!planDestinationStillValid(target, search.candidate)) {
+                    pendingPlans.remove(targetId);
+                    return PlanProgress.pending();
+                }
+                StrikePlan plan = new StrikePlan(search.candidate, search.packetPath,
+                    new ArrayList<>(search.currentWaypoints));
+                pendingPlans.remove(targetId);
+                return PlanProgress.complete(plan);
+            }
+
+            if (search.routes != null && search.routeIndex < search.routes.size()) {
+                search.currentWaypoints = search.routes.get(search.routeIndex++);
+                search.packetPath = buildPath(search.origin, search.currentWaypoints, search.step);
+                if (!remoteMovementPlanAccepted(search.origin, search.packetPath, false,
+                        RESERVED_MOVEMENT_PACKETS)) {
+                    search.currentWaypoints = null;
+                    search.packetPath = null;
+                    continue;
+                }
+                search.routeSamples = buildPath(search.origin, search.currentWaypoints, 0.4);
+                search.routeSampleCursor = 0;
+                continue;
+            }
+
+            if (search.routes != null) search.clearCandidate();
+            if (search.candidateIndex >= search.candidates.size()) {
+                pendingPlans.remove(targetId);
+                return PlanProgress.complete(null);
+            }
+            if (budget.remainingCandidates <= 0) return PlanProgress.pending();
+            budget.remainingCandidates--;
+            BlinkPath.Point candidate = search.candidates.get(search.candidateIndex++);
+            if (!candidateEligible(search, target, candidate)) continue;
+            search.candidate = candidate;
+            search.routes = routeWaypoints(search.origin, candidate);
+            search.routeIndex = 0;
+        }
+    }
+
+    private StrikePlan directStrikePlan(EntityLivingBase target, BlinkPath.Point origin) {
         Vec3d originEyes = new Vec3d(origin.x, origin.y + mc.player.getEyeHeight(), origin.z);
         Vec3d currentAttackPoint = ModConfig.blinkAttackPoint.point(target);
         double directReach = directAttackReach(mc.playerController.extendedReach());
@@ -228,68 +350,41 @@ public final class BlinkStrike {
             return new StrikePlan(origin, java.util.Collections.emptyList(),
                 java.util.Collections.emptyList());
         }
-
-        BlinkPath.Point predicted = predictedTargetPosition(target.posX,
-            target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
-            ModConfig.blinkPredictTicks);
-        double predictedX = predicted.x;
-        double predictedY = predicted.y;
-        double predictedZ = predicted.z;
-        AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
-            predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
-        Vec3d targetPoint = ModConfig.blinkAttackPoint.point(target);
-        Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
-            targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
-            targetPoint.z + predictedZ - target.posZ);
-        for (BlinkPath.Point candidate : candidatePositions(origin, predictedX, predictedY, predictedZ,
-                ModConfig.blinkAttackDistance)) {
-            if (origin.distanceTo(candidate) > ModConfig.blinkRange) continue;
-            Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
-            if (CombatSupport.distanceSqToHitbox(eyes, predictedBox)
-                    > ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance) continue;
-            if (!hasAttackLine(eyes, attackPoint)) continue;
-            if (!serverAttackCandidateAllows(candidate, target)) continue;
-            for (List<BlinkPath.Point> waypoints : routeWaypoints(origin, candidate)) {
-                if (!isRouteClear(origin, waypoints)) continue;
-                List<BlinkPath.Point> path = buildPath(origin, waypoints, ModConfig.blinkStep);
-                if (!remoteMovementPlanAccepted(origin, path, false, RESERVED_MOVEMENT_PACKETS)) continue;
-                return new StrikePlan(candidate, path, new ArrayList<>(waypoints));
-            }
-        }
         return null;
     }
 
-    private StrikePlan refreshStrikePlan(EntityLivingBase target, BlinkPath.Point origin, StrikePlan planned) {
-        if (target == null || target.isDead || target.getHealth() <= 0.0F) return null;
-        if (planStillValid(target, planned)) return planned;
-        return findStrikePlan(target, origin);
+    private boolean candidateEligible(PlanSearch search, EntityLivingBase target,
+            BlinkPath.Point candidate) {
+        if (search.origin.distanceTo(candidate) > search.range) return false;
+        Vec3d eyes = new Vec3d(candidate.x, candidate.y + mc.player.getEyeHeight(), candidate.z);
+        if (CombatSupport.distanceSqToHitbox(eyes, search.predictedBox)
+                > search.attackDistance * search.attackDistance) return false;
+        return hasAttackLine(eyes, search.attackPoint)
+            && serverAttackCandidateAllows(candidate, target);
     }
 
-    private boolean planStillValid(EntityLivingBase target, StrikePlan plan) {
-        if (plan == null || plan.destination == null) return false;
+    private boolean planDestinationStillValid(EntityLivingBase target, BlinkPath.Point destination) {
+        if (target == null || target.isDead || target.getHealth() <= 0.0F) return false;
         BlinkPath.Point predicted = predictedTargetPosition(target.posX,
             target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
             ModConfig.blinkPredictTicks);
-        double predictedX = predicted.x;
-        double predictedY = predicted.y;
-        double predictedZ = predicted.z;
         AxisAlignedBB predictedBox = target.getEntityBoundingBox().offset(
-            predictedX - target.posX, predictedY - target.getEntityBoundingBox().minY, predictedZ - target.posZ);
-        Vec3d eyes = new Vec3d(plan.destination.x, plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
+            predicted.x - target.posX, predicted.y - target.getEntityBoundingBox().minY,
+            predicted.z - target.posZ);
         Vec3d targetPoint = ModConfig.blinkAttackPoint.point(target);
-        Vec3d attackPoint = new Vec3d(targetPoint.x + predictedX - target.posX,
-            targetPoint.y + predictedY - target.getEntityBoundingBox().minY,
-            targetPoint.z + predictedZ - target.posZ);
-        boolean lineAndRangeValid = CombatSupport.distanceSqToHitbox(eyes, predictedBox)
+        Vec3d attackPoint = new Vec3d(targetPoint.x + predicted.x - target.posX,
+            targetPoint.y + predicted.y - target.getEntityBoundingBox().minY,
+            targetPoint.z + predicted.z - target.posZ);
+        Vec3d eyes = new Vec3d(destination.x,
+            destination.y + mc.player.getEyeHeight(), destination.z);
+        return CombatSupport.distanceSqToHitbox(eyes, predictedBox)
                 <= ModConfig.blinkAttackDistance * ModConfig.blinkAttackDistance
             && hasAttackLine(eyes, attackPoint)
-            && serverAttackCandidateAllows(plan.destination, target)
-            && (plan.path.isEmpty() || remoteMovementPlanAccepted(
-                new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
-                plan.path, false, RESERVED_MOVEMENT_PACKETS));
-        return strikePlanStillUsable(true, lineAndRangeValid,
-            plan.waypoints.isEmpty() || isRouteClear(new BlinkPath.Point(mc.player.posX, mc.player.posY, mc.player.posZ),
-                plan.waypoints));
+            && serverAttackCandidateAllows(destination, target);
+    }
+
+    private StrikePlan refreshStrikePlan(EntityLivingBase target, BlinkPath.Point origin, StrikePlan planned) {
+        return target == null || target.isDead || target.getHealth() <= 0.0F ? null : planned;
     }
 
     static boolean strikePlanStillUsable(boolean targetAlive, boolean lineAndRangeValid,
@@ -437,26 +532,6 @@ public final class BlinkStrike {
         mc.player.rotationPitch = rotations[1];
     }
 
-    private boolean isRouteClear(BlinkPath.Point origin, List<BlinkPath.Point> waypoints) {
-        BlinkPath.Point previous = origin;
-        for (BlinkPath.Point waypoint : waypoints) {
-            if (!isSegmentClear(origin, previous, waypoint)) return false;
-            previous = waypoint;
-        }
-        return true;
-    }
-
-    private boolean isSegmentClear(BlinkPath.Point origin, BlinkPath.Point from, BlinkPath.Point destination) {
-        AxisAlignedBB base = mc.player.getEntityBoundingBox();
-        for (BlinkPath.Point point : BlinkPath.interpolate(from, destination, 0.4)) {
-            AxisAlignedBB box = base.offset(point.x - origin.x, point.y - origin.y, point.z - origin.z).shrink(0.02);
-            if (!mc.world.getWorldBorder().contains(box) || !mc.world.getCollisionBoxes(mc.player, box).isEmpty()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private boolean originOnGround(BlinkPath.Point origin) {
         AxisAlignedBB box = mc.player.getEntityBoundingBox()
             .offset(origin.x - mc.player.posX, origin.y - mc.player.posY, origin.z - mc.player.posZ)
@@ -506,6 +581,112 @@ public final class BlinkStrike {
         AxisAlignedBB remoteBox = mc.player.getEntityBoundingBox().offset(
             point.x - mc.player.posX, point.y - mc.player.posY, point.z - mc.player.posZ);
         return mc.world.containsAnyLiquid(remoteBox);
+    }
+
+    private final class PlanSearch {
+        private final BlinkPath.Point origin;
+        private final AxisAlignedBB predictedBox;
+        private final Vec3d attackPoint;
+        private final List<BlinkPath.Point> candidates;
+        private final double range;
+        private final double attackDistance;
+        private final double step;
+        private final int predictTicks;
+        private final AttackPoint configuredAttackPoint;
+        private boolean directChecked;
+        private int candidateIndex;
+        private BlinkPath.Point candidate;
+        private List<List<BlinkPath.Point>> routes;
+        private int routeIndex;
+        private List<BlinkPath.Point> currentWaypoints;
+        private List<BlinkPath.Point> packetPath;
+        private List<BlinkPath.Point> routeSamples;
+        private int routeSampleCursor;
+        private int lastUsedTick;
+
+        private PlanSearch(EntityLivingBase target, BlinkPath.Point origin) {
+            this.origin = origin;
+            this.range = ModConfig.blinkRange;
+            this.attackDistance = ModConfig.blinkAttackDistance;
+            this.step = ModConfig.blinkStep;
+            this.predictTicks = ModConfig.blinkPredictTicks;
+            this.configuredAttackPoint = ModConfig.blinkAttackPoint;
+            BlinkPath.Point predicted = predictedTargetPosition(target.posX,
+                target.getEntityBoundingBox().minY, target.posZ, target.motionX, target.motionZ,
+                predictTicks);
+            this.predictedBox = target.getEntityBoundingBox().offset(
+                predicted.x - target.posX, predicted.y - target.getEntityBoundingBox().minY,
+                predicted.z - target.posZ);
+            Vec3d targetPoint = configuredAttackPoint.point(target);
+            this.attackPoint = new Vec3d(targetPoint.x + predicted.x - target.posX,
+                targetPoint.y + predicted.y - target.getEntityBoundingBox().minY,
+                targetPoint.z + predicted.z - target.posZ);
+            this.candidates = candidatePositions(origin, predicted.x, predicted.y, predicted.z,
+                attackDistance);
+        }
+
+        private boolean matches(BlinkPath.Point currentOrigin) {
+            return Double.compare(origin.x, currentOrigin.x) == 0
+                && Double.compare(origin.y, currentOrigin.y) == 0
+                && Double.compare(origin.z, currentOrigin.z) == 0
+                && Double.compare(range, ModConfig.blinkRange) == 0
+                && Double.compare(attackDistance, ModConfig.blinkAttackDistance) == 0
+                && Double.compare(step, ModConfig.blinkStep) == 0
+                && predictTicks == ModConfig.blinkPredictTicks
+                && configuredAttackPoint == ModConfig.blinkAttackPoint;
+        }
+
+        private void clearRoute() {
+            currentWaypoints = null;
+            packetPath = null;
+            routeSamples = null;
+            routeSampleCursor = 0;
+        }
+
+        private void clearCandidate() {
+            clearRoute();
+            candidate = null;
+            routes = null;
+            routeIndex = 0;
+        }
+    }
+
+    private static final class PlanningWorkBudget {
+        private int remainingCandidates;
+        private int remainingCollisions;
+
+        private PlanningWorkBudget(int candidates, int collisions) {
+            this.remainingCandidates = Math.max(0, candidates);
+            this.remainingCollisions = Math.max(0, collisions);
+        }
+    }
+
+    private static final class PlanProgress {
+        private final boolean complete;
+        private final StrikePlan plan;
+
+        private PlanProgress(boolean complete, StrikePlan plan) {
+            this.complete = complete;
+            this.plan = plan;
+        }
+
+        private static PlanProgress pending() {
+            return new PlanProgress(false, null);
+        }
+
+        private static PlanProgress complete(StrikePlan plan) {
+            return new PlanProgress(true, plan);
+        }
+    }
+
+    private static final class PlanBatch {
+        private final List<PlannedStrike> strikes;
+        private final boolean incomplete;
+
+        private PlanBatch(List<PlannedStrike> strikes, boolean incomplete) {
+            this.strikes = strikes;
+            this.incomplete = incomplete;
+        }
     }
 
     private static final class StrikePlan {

@@ -146,8 +146,10 @@ public final class OreVisualizer {
         }
         seedLoadedChunks();
         boolean autoMineEnabled = autoMineCacheNeeded();
-        int remainingTasks = scanBudget(autoMineEnabled);
-        int remainingBlocks = scanBlockBudget(autoMineEnabled);
+        boolean cacheHasMineMarkers = autoMineEnabled
+            && hasMineMarkersInRange(ModConfig.minePathRange);
+        int remainingTasks = scanBudget(autoMineEnabled, cacheHasMineMarkers);
+        int remainingBlocks = scanBlockBudget(autoMineEnabled, cacheHasMineMarkers);
         while (remainingTasks-- > 0 && remainingBlocks > 0 && !scanQueue.isEmpty()) {
             ScanTask task = scanQueue.removeFirst();
             queuedChunks.remove(task.key);
@@ -159,6 +161,7 @@ public final class OreVisualizer {
             if (task.isComplete()) {
                 scannedChunks.add(task.key);
             } else {
+                task.scanWave++;
                 requeueScanTask(task, mc.player.posX, mc.player.posZ);
             }
         }
@@ -195,7 +198,8 @@ public final class OreVisualizer {
                     if (distanceSq(marker.pos) > rangeSq) continue;
                     Set<Long> sameType = markerSetsByType.get(marker.type);
                     if (sameType != null) addBoundaryBox(buffer, marker.pos, sameType, viewerX, viewerY, viewerZ,
-                        ModConfig.getOreColor(marker.type));
+                        brightenedColor(ModConfig.getOreColor(marker.type),
+                            ModConfig.oreVisualizerBrightness));
                 }
             }
             Tessellator.getInstance().draw();
@@ -273,7 +277,7 @@ public final class OreVisualizer {
             for (OreMarker marker : markers) {
                 if (!eligibleTypes.getOrDefault(marker.type, false)) continue;
                 double distanceSq = distanceSq(marker.pos);
-                if (distanceSq > rangeSq) continue;
+                if (!mineMarkerWithinRange(distanceSq, rangeSq)) continue;
                 double farthestCandidateDistanceSq = nearest.isEmpty()
                     ? Double.POSITIVE_INFINITY : nearest.peek().distanceSq();
                 if (distanceCannotImproveNearest(distanceSq, nearest.size(), limit,
@@ -294,6 +298,10 @@ public final class OreVisualizer {
 
     static boolean mineTypeEligible(boolean configured, boolean quotaAvailable) {
         return configured && quotaAvailable;
+    }
+
+    static boolean mineMarkerWithinRange(double distanceSq, double rangeSq) {
+        return distanceSq <= rangeSq;
     }
 
     static int compareCachedOres(CachedOre left, CachedOre right) {
@@ -424,8 +432,18 @@ public final class OreVisualizer {
         return autoMineEnabled ? AUTO_MINE_SECTIONS_PER_TICK : VISUALIZER_SECTIONS_PER_TICK;
     }
 
+    static int scanBudget(boolean autoMineEnabled, boolean cacheHasMarkers) {
+        return autoMineEnabled && !cacheHasMarkers
+            ? VISUALIZER_SECTIONS_PER_TICK : scanBudget(autoMineEnabled);
+    }
+
     static int scanBlockBudget(boolean autoMineEnabled) {
         return autoMineEnabled ? AUTO_MINE_BLOCKS_PER_TICK : VISUALIZER_BLOCKS_PER_TICK;
+    }
+
+    static int scanBlockBudget(boolean autoMineEnabled, boolean cacheHasMarkers) {
+        return autoMineEnabled && !cacheHasMarkers
+            ? VISUALIZER_BLOCKS_PER_TICK : scanBlockBudget(autoMineEnabled);
     }
 
     static int scanSliceChecks(int blockCursor, int blockCount, int budget) {
@@ -527,7 +545,8 @@ public final class OreVisualizer {
 
     private void prioritizeQueue(double playerX, double playerZ) {
         List<ScanTask> tasks = new ArrayList<>(scanQueue);
-        tasks.sort(Comparator.comparingDouble(task -> task.distanceSq(playerX, playerZ)));
+        tasks.sort(Comparator.comparingInt((ScanTask task) -> task.scanWave)
+            .thenComparingDouble(task -> task.distanceSq(playerX, playerZ)));
         scanQueue.clear();
         scanQueue.addAll(tasks);
     }
@@ -539,7 +558,9 @@ public final class OreVisualizer {
         ListIterator<ScanTask> iterator = scanQueue.listIterator();
         while (iterator.hasNext()) {
             ScanTask next = iterator.next();
-            if (next.distanceSq(playerX, playerZ) <= precedenceLimitSq) continue;
+            if (next.scanWave < task.scanWave) continue;
+            if (next.scanWave == task.scanWave
+                    && next.distanceSq(playerX, playerZ) <= precedenceLimitSq) continue;
             iterator.previous();
             iterator.add(task);
             return;
@@ -549,6 +570,10 @@ public final class OreVisualizer {
 
     static boolean scanTaskPrecedesResumed(double queuedDistanceSq, double resumedDistanceSq) {
         return queuedDistanceSq <= resumedScanPrecedenceLimitSq(resumedDistanceSq);
+    }
+
+    static boolean scanWavePrecedes(int queuedWave, int resumedWave) {
+        return queuedWave <= resumedWave;
     }
 
     static double resumedScanPrecedenceLimitSq(double resumedDistanceSq) {
@@ -590,6 +615,19 @@ public final class OreVisualizer {
         double dy = pos.getY() + 0.5 - mc.player.posY;
         double dz = pos.getZ() + 0.5 - mc.player.posZ;
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    private boolean hasMineMarkersInRange(double range) {
+        double rangeSq = range * range;
+        for (Map.Entry<Long, List<OreMarker>> entry : markersByChunk.entrySet()) {
+            if (chunkHorizontalDistanceSq(entry.getKey(), mc.player.posX, mc.player.posZ)
+                    > rangeSq) continue;
+            for (OreMarker marker : entry.getValue()) {
+                if (ModConfig.isMineOreEnabled(marker.type)
+                        && mineMarkerWithinRange(distanceSq(marker.pos), rangeSq)) return true;
+            }
+        }
+        return false;
     }
 
     static boolean chunkPossiblyInRange(long key, double playerX, double playerZ, double range) {
@@ -796,6 +834,14 @@ public final class OreVisualizer {
         addBoundaryBox(new BufferSink(buffer), pos, sameType, viewerX, viewerY, viewerZ, red, green, blue);
     }
 
+    static int brightenedColor(int color, double brightness) {
+        double multiplier = Math.max(0.0, Math.min(1.0, brightness));
+        int red = (int) Math.round(((color >> 16) & 0xFF) * multiplier);
+        int green = (int) Math.round(((color >> 8) & 0xFF) * multiplier);
+        int blue = (int) Math.round((color & 0xFF) * multiplier);
+        return red << 16 | green << 8 | blue;
+    }
+
     static int boundaryLineCount(Set<BlockPos> positions, BlockPos pos) {
         Set<Long> encoded = new HashSet<>();
         for (BlockPos block : positions) encoded.add(block.toLong());
@@ -904,6 +950,7 @@ public final class OreVisualizer {
         private int sectionCursor;
         private int blockCursor;
         private int lastScanChecks;
+        private int scanWave;
 
         private ScanTask(World world, Chunk chunk, int centerSection) {
             this.world = world;

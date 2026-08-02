@@ -54,6 +54,7 @@ public class ModConfigTest {
         assertEquals(AttackPoint.CHEST, ModConfig.blinkAttackPoint);
         assertEquals(FlightMode.STATIC, ModConfig.flightMode);
         assertEquals(1.0, ModConfig.flightSpeed, 0.001);
+        assertEquals(0.35, ModConfig.flightDescentSpeed, 0.001);
         assertFalse(ModConfig.targetVisualizer);
         assertFalse(ModConfig.oreVisualizer);
         assertFalse(ModConfig.autoBridge);
@@ -75,6 +76,7 @@ public class ModConfigTest {
         assertEquals(HudPosition.TOP_LEFT, ModConfig.countHudPosition);
         assertEquals(150.0, ModConfig.targetVisualizerRange, 0.0);
         assertEquals(150.0, ModConfig.oreVisualizerRange, 0.0);
+        assertEquals(1.0, ModConfig.oreVisualizerBrightness, 0.0);
         assertTrue(ModConfig.isMineOreEnabled(OreType.COAL));
         assertTrue(ModConfig.isMineOreEnabled(OreType.DIAMOND));
         assertFalse(ModConfig.isMineOreEnabled(OreType.QUARTZ));
@@ -226,6 +228,7 @@ public class ModConfigTest {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.ORE_VISUALIZER, true);
         ModConfig.saveNumber(ModuleSetting.ORE_RANGE, 500.0);
+        ModConfig.saveNumber(ModuleSetting.ORE_BRIGHTNESS, 0.46);
         ModConfig.toggle(ModuleSetting.ORE_DIAMOND);
         ModConfig.toggle(ModuleSetting.ORE_COUNT_HUD);
         ModConfig.cycleChoice(ModuleSetting.ORE_COUNT_POSITION);
@@ -234,6 +237,7 @@ public class ModConfigTest {
 
         assertTrue(ModConfig.oreVisualizer);
         assertEquals(500.0, ModConfig.oreVisualizerRange, 0.0);
+        assertEquals(0.5, ModConfig.oreVisualizerBrightness, 0.001);
         assertFalse(ModConfig.isOreEnabled(OreType.DIAMOND));
         assertTrue(ModConfig.isOreEnabled(OreType.IRON));
         assertTrue(ModConfig.oreCountHud);
@@ -318,18 +322,34 @@ public class ModConfigTest {
     }
 
     @Test
-    public void persistsWweFlightModeAndSpeed() throws Exception {
+    public void persistsWweFlightModeAndIndependentDescentSpeed() throws Exception {
         ModConfig.load(configFile());
         ModConfig.saveModule(ModuleId.FLIGHT, true);
         ModConfig.cycleChoice(ModuleSetting.FLIGHT_MODE);
-        ModConfig.cycleChoice(ModuleSetting.FLIGHT_MODE);
         ModConfig.saveNumber(ModuleSetting.FLIGHT_SPEED, 4.46);
+        ModConfig.saveNumber(ModuleSetting.FLIGHT_DESCENT_SPEED, 0.76);
         ModConfig.reload();
 
         assertTrue(ModConfig.flight);
-        assertEquals(FlightMode.HYPIXEL, ModConfig.flightMode);
+        assertEquals(FlightMode.VANILLA, ModConfig.flightMode);
         assertEquals(4.5, ModConfig.flightSpeed, 0.001);
-        assertEquals("Hypixel", ModConfig.getChoice(ModuleSetting.FLIGHT_MODE));
+        assertEquals(0.8, ModConfig.flightDescentSpeed, 0.001);
+        assertEquals("原版", ModConfig.getChoice(ModuleSetting.FLIGHT_MODE));
+    }
+
+    @Test
+    public void migratesHiddenHypixelFlightModeToStatic() throws Exception {
+        File file = configFile();
+        Configuration legacy = new Configuration(file);
+        legacy.get("flight", "mode", "hypixel").set("hypixel");
+        legacy.save();
+
+        ModConfig.load(file);
+
+        assertEquals(FlightMode.STATIC, ModConfig.flightMode);
+        String saved = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        assertTrue(saved.contains("S:mode=static"));
+        assertFalse(saved.contains("S:mode=hypixel"));
     }
 
     @Test

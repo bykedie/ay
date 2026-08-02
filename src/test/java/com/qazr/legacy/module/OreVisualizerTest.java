@@ -46,6 +46,36 @@ public class OreVisualizerTest {
         assertEquals(1096, OreVisualizer.scanSliceChecks(3000, 4096, 4096));
         assertEquals(0, OreVisualizer.scanSliceChecks(4096, 4096, 1024));
         assertEquals(0, OreVisualizer.scanSliceChecks(0, 4096, 0));
+        assertEquals(12, OreVisualizer.scanBudget(true, false));
+        assertEquals(16384, OreVisualizer.scanBlockBudget(true, false));
+        assertEquals(2, OreVisualizer.scanBudget(true, true));
+        assertEquals(4096, OreVisualizer.scanBlockBudget(true, true));
+    }
+
+    @Test
+    public void onlyInRangeEnabledMarkersEndAutoMineRangeWarmup() {
+        assertTrue(!OreVisualizer.mineTypeEligible(false, true));
+        assertTrue(OreVisualizer.mineTypeEligible(true, true));
+        assertTrue(!OreVisualizer.mineMarkerWithinRange(257.0, 256.0));
+        assertTrue(OreVisualizer.mineMarkerWithinRange(256.0, 256.0));
+        assertEquals(12, OreVisualizer.scanBudget(true, false));
+        assertEquals(16384, OreVisualizer.scanBlockBudget(true, false));
+        assertEquals(2, OreVisualizer.scanBudget(true, true));
+        assertEquals(4096, OreVisualizer.scanBlockBudget(true, true));
+    }
+
+    @Test
+    public void appliesConfiguredBrightnessWithoutChangingHue() {
+        assertEquals(0x804020, OreVisualizer.brightenedColor(0x804020, 1.0));
+        assertEquals(0x402010, OreVisualizer.brightenedColor(0x804020, 0.5));
+        assertEquals(0x000000, OreVisualizer.brightenedColor(0x804020, 0.0));
+    }
+
+    @Test
+    public void unfinishedScanTasksYieldToUnstartedChunksAtTheSameWave() {
+        assertTrue(OreVisualizer.scanWavePrecedes(0, 1));
+        assertTrue(!OreVisualizer.scanWavePrecedes(1, 0));
+        assertTrue(OreVisualizer.scanWavePrecedes(1, 1));
     }
 
     @Test

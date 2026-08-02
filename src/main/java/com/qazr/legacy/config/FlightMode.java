@@ -2,8 +2,7 @@ package com.qazr.legacy.config;
 
 public enum FlightMode {
     STATIC("static", "静态"),
-    VANILLA("vanilla", "原版"),
-    HYPIXEL("hypixel", "Hypixel");
+    VANILLA("vanilla", "原版");
 
     private final String key;
     private final String displayName;

@@ -1,5 +1,6 @@
 package com.qazr.legacy.module;
 
+import com.qazr.legacy.config.FlightMode;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -13,11 +14,19 @@ public class FlightControllerTest {
     @Test
     public void resolvesVerticalKeysWithoutDrift() {
         assertEquals(0.20, FlightController.verticalMotion(true, false, 0.20), 0.0001);
-        assertEquals(-0.20, FlightController.verticalMotion(false, true, 0.20), 0.0001);
+        assertEquals(-0.35, FlightController.verticalMotion(
+            false, true, 0.20, 0.35), 0.0001);
         assertEquals(0.0, FlightController.verticalMotion(false, false, 0.20), 0.0001);
         assertEquals(0.0, FlightController.verticalMotion(true, true, 0.20), 0.0001);
         assertEquals(true, FlightController.landingRequested(false, true));
         assertEquals(false, FlightController.landingRequested(true, true));
+    }
+
+    @Test
+    public void exposesOnlySupportedFlightModes() {
+        assertEquals(FlightMode.VANILLA, FlightMode.next(FlightMode.STATIC));
+        assertEquals(FlightMode.STATIC, FlightMode.next(FlightMode.VANILLA));
+        assertEquals(FlightMode.STATIC, FlightMode.fromKey("hypixel"));
     }
 
     @Test
@@ -66,33 +75,36 @@ public class FlightControllerTest {
         assertEquals(-0.4, reversed.motionZ, 0.0001);
 
         FlightController.StaticFrame neutral = FlightController.staticFrameFor(
-            0.0F, 0.0F, 0.0F, true, true, 0.4);
+            0.0F, 0.0F, 0.0F, true, true, 0.4, 0.7);
         assertEquals(0.0, neutral.motionY, 0.0001);
         assertEquals(false, neutral.vanillaJump);
     }
 
     @Test
-    public void reproducesHypixelThreeTickPositionPulse() {
-        assertEquals(3.0E-9, FlightController.hypixelOffsetForTick(2), 1.0E-20);
-        assertEquals(0.0, FlightController.hypixelOffsetForTick(3), 0.0);
-    }
-
-    @Test
-    public void hypixelPreservesPhysicalGroundState() {
-        assertEquals(false, FlightController.hypixelPacketOnGround(false));
-        assertEquals(true, FlightController.hypixelPacketOnGround(true));
-    }
-
-    @Test
     public void safeLandingDescendsQuicklyAndStopsAtTheSurface() {
         assertEquals(-1.0, FlightController.safeLandingMotion(
-            -4.0, Double.POSITIVE_INFINITY, 4.0), 0.0001);
+            -4.0, Double.POSITIVE_INFINITY, 0.8), 0.0001);
+        assertEquals(-0.8, FlightController.safeLandingMotion(
+            0.0, Double.POSITIVE_INFINITY, 0.8), 0.0001);
         assertEquals(-0.35, FlightController.safeLandingMotion(
-            0.0, Double.POSITIVE_INFINITY, 0.0), 0.0001);
+            0.0, Double.POSITIVE_INFINITY, 0.35), 0.0001);
         assertEquals(-1.0, FlightController.safeLandingMotion(-1.0, 3.0, 1.0), 0.0001);
         assertEquals(-0.5, FlightController.safeLandingMotion(-1.0, 0.5, 1.0), 0.0001);
         assertEquals(-0.03, FlightController.safeLandingMotion(-1.0, 0.03, 1.0), 0.0001);
         assertEquals(0.0, FlightController.safeLandingMotion(-1.0, 0.0, 1.0), 0.0001);
+    }
+
+    @Test
+    public void vanillaLandingControlStartsBeforeTravel() {
+        assertEquals(true, FlightController.preTravelControlRequired(
+            FlightMode.VANILLA, false, true));
+        assertEquals(false, FlightController.preTravelControlRequired(
+            FlightMode.VANILLA, true, true));
+        assertEquals(false, FlightController.preTravelControlRequired(
+            FlightMode.VANILLA, false, false));
+        assertEquals(false, FlightController.preTravelControlRequired(
+            FlightMode.STATIC, false, true));
+        assertEquals(-0.05, FlightController.vanillaPreTravelMotion(-0.35, 0.10F), 0.0001);
     }
 
     @Test

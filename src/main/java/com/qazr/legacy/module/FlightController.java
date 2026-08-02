@@ -15,9 +15,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 public final class FlightController {
-    private static final double HYPIXEL_OFFSET = 1.0E-9;
     private static final double LANDING_SEARCH_DISTANCE = 4.0;
-    private static final double DEFAULT_DESCENT_SPEED = 0.35;
     private static final double MAX_CONTROLLED_DESCENT_SPEED = 1.0;
 
     private final Minecraft mc = Minecraft.getMinecraft();
@@ -41,14 +39,26 @@ public final class FlightController {
         discardSuppressedInput();
         boolean controlReady = mc.player != null && mc.world != null
             && mc.player.connection != null && !mc.player.isRiding();
-        if (!controlReady || !modules.isEnabled(ModuleId.FLIGHT)
-                || ModConfig.flightMode != FlightMode.STATIC) return;
+        if (!controlReady || !modules.isEnabled(ModuleId.FLIGHT)) return;
 
         capturePlayer();
-        switchMode(FlightMode.STATIC);
+        switchMode(ModConfig.flightMode);
         MovementInput input = event.getMovementInput();
+        if (ModConfig.flightMode == FlightMode.VANILLA) {
+            vanillaFlight();
+            if (preTravelControlRequired(ModConfig.flightMode, input.jump, input.sneak)) {
+                double distance = groundDistance(mc.player, LANDING_SEARCH_DISTANCE);
+                double desiredMotion = safeLandingMotion(
+                    0.0, distance, ModConfig.flightDescentSpeed);
+                mc.player.motionY = vanillaPreTravelMotion(
+                    desiredMotion, mc.player.capabilities.getFlySpeed());
+            }
+            return;
+        }
+
         StaticFrame frame = staticFrameFor(mc.player.rotationYaw, input.moveForward,
-            input.moveStrafe, input.jump, input.sneak, ModConfig.flightSpeed);
+            input.moveStrafe, input.jump, input.sneak, ModConfig.flightSpeed,
+            ModConfig.flightDescentSpeed);
         mc.player.motionX = frame.motionX;
         mc.player.motionY = frame.motionY;
         mc.player.motionZ = frame.motionZ;
@@ -84,16 +94,15 @@ public final class FlightController {
             case VANILLA:
                 vanillaFlight();
                 break;
-            case HYPIXEL:
-                hypixelFlight();
-                break;
             case STATIC:
             default:
                 mc.player.fallDistance = 0.0F;
                 break;
         }
-        protectLanding(landingRequested(mc.gameSettings.keyBindJump.isKeyDown(),
-            mc.gameSettings.keyBindSneak.isKeyDown()));
+        if (ModConfig.flightMode == FlightMode.STATIC) {
+            protectLanding(landingRequested(mc.gameSettings.keyBindJump.isKeyDown(),
+                mc.gameSettings.keyBindSneak.isKeyDown()));
+        }
     }
 
     @SubscribeEvent
@@ -105,17 +114,6 @@ public final class FlightController {
         mc.player.capabilities.isFlying = true;
         mc.player.capabilities.setFlySpeed(flySpeedFor(ModConfig.flightSpeed));
         mc.player.fallDistance = 0.0F;
-    }
-
-    private void hypixelFlight() {
-        mc.player.motionY = 0.0;
-        mc.player.onGround = hypixelPacketOnGround(mc.player.onGround);
-        applyHypixelOffsets(mc.player, mc.player.ticksExisted);
-        mc.player.fallDistance = 0.0F;
-    }
-
-    static boolean hypixelPacketOnGround(boolean physicallyOnGround) {
-        return physicallyOnGround;
     }
 
     private void capturePlayer() {
@@ -157,7 +155,7 @@ public final class FlightController {
         if (!descending) return;
         double distance = groundDistance(mc.player, LANDING_SEARCH_DISTANCE);
         mc.player.motionY = safeLandingMotion(
-            mc.player.motionY, distance, ModConfig.flightSpeed);
+            mc.player.motionY, distance, ModConfig.flightDescentSpeed);
         mc.player.fallDistance = 0.0F;
     }
 
@@ -228,19 +226,32 @@ public final class FlightController {
     }
 
     static double verticalMotion(boolean jump, boolean sneak, double speed) {
+        return verticalMotion(jump, sneak, speed, speed);
+    }
+
+    static double verticalMotion(
+            boolean jump, boolean sneak, double ascentSpeed, double descentSpeed) {
         if (jump == sneak) return 0.0;
-        return jump ? speed : -speed;
+        return jump ? ascentSpeed : -descentSpeed;
     }
 
     static boolean landingRequested(boolean jump, boolean sneak) {
         return sneak && !jump;
     }
 
+    static boolean preTravelControlRequired(FlightMode mode, boolean jump, boolean sneak) {
+        return mode == FlightMode.VANILLA && landingRequested(jump, sneak);
+    }
+
+    static double vanillaPreTravelMotion(double desiredMotion, float vanillaFlySpeed) {
+        return desiredMotion + vanillaFlySpeed * 3.0;
+    }
+
     static double safeLandingMotion(
             double requestedMotion, double groundDistance, double configuredSpeed) {
         if (groundDistance <= 0.001) return 0.0;
         double requestedSpeed = requestedMotion < -0.01
-            ? -requestedMotion : Math.max(DEFAULT_DESCENT_SPEED, configuredSpeed);
+            ? Math.max(-requestedMotion, configuredSpeed) : configuredSpeed;
         double descentSpeed = Math.min(MAX_CONTROLLED_DESCENT_SPEED, requestedSpeed);
         if (Double.isFinite(groundDistance)) descentSpeed = Math.min(descentSpeed, groundDistance);
         return -descentSpeed;
@@ -270,8 +281,14 @@ public final class FlightController {
 
     static StaticFrame staticFrameFor(float yaw, float forward, float strafe,
             boolean jump, boolean sneak, double speed) {
+        return staticFrameFor(yaw, forward, strafe, jump, sneak, speed, speed);
+    }
+
+    static StaticFrame staticFrameFor(float yaw, float forward, float strafe,
+            boolean jump, boolean sneak, double speed, double descentSpeed) {
         double[] horizontal = movementFor(yaw, forward, strafe, speed);
-        return new StaticFrame(horizontal[0], verticalMotion(jump, sneak, speed),
+        return new StaticFrame(horizontal[0],
+            verticalMotion(jump, sneak, speed, descentSpeed),
             horizontal[1], 0.0F, 0.0F, false);
     }
 
@@ -294,16 +311,4 @@ public final class FlightController {
         }
     }
 
-    static double hypixelOffsetForTick(int ticksExisted) {
-        return ticksExisted % 3 == 0 ? 0.0 : HYPIXEL_OFFSET * 3.0;
-    }
-
-    private static void applyHypixelOffsets(EntityPlayerSP player, int ticksExisted) {
-        for (int i = 0; i < 3; i++) {
-            player.setPosition(player.posX, player.posY + HYPIXEL_OFFSET, player.posZ);
-            if (ticksExisted % 3 == 0) {
-                player.setPosition(player.posX, player.posY - HYPIXEL_OFFSET, player.posZ);
-            }
-        }
-    }
 }

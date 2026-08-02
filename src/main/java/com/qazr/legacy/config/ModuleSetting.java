@@ -37,6 +37,7 @@ public enum ModuleSetting {
     BRIDGE_DELAY(ModuleId.AUTO_BRIDGE, "放置间隔", Type.NUMBER, 0.0, 10.0, 1.0, " tick"),
     BRIDGE_AVOID_FEET(ModuleId.AUTO_BRIDGE, "防卡脚", Type.TOGGLE),
     ORE_RANGE(ModuleId.ORE_VISUALIZER, "显示距离", Type.NUMBER, 16.0, 500.0, 1.0, " 格"),
+    ORE_BRIGHTNESS(ModuleId.ORE_VISUALIZER, "方框亮度", Type.NUMBER, 0.0, 1.0, 0.1, ""),
     ORE_COAL(ModuleId.ORE_VISUALIZER, "显示煤矿", Type.TOGGLE),
     ORE_COAL_COLOR(ModuleId.ORE_VISUALIZER, "煤矿方框颜色", Type.COLOR),
     ORE_IRON(ModuleId.ORE_VISUALIZER, "显示铁矿", Type.TOGGLE),
@@ -88,6 +89,7 @@ public enum ModuleSetting {
     BLINK_ATTACK_POINT(ModuleId.BLINK_STRIKE, "攻击部位", Type.CHOICE),
     FLIGHT_MODE(ModuleId.FLIGHT, "飞行模式", Type.CHOICE),
     FLIGHT_SPEED(ModuleId.FLIGHT, "飞行速度", Type.NUMBER, 0.0, 10.0, 0.1, " 格/tick"),
+    FLIGHT_DESCENT_SPEED(ModuleId.FLIGHT, "下降速度", Type.NUMBER, 0.0, 1.0, 0.1, " 格/tick"),
     TARGET_RANGE(ModuleId.TARGET_VISUALIZER, "显示距离", Type.NUMBER, 3.0, 500.0, 1.0, " 格"),
     TARGET_SKELETON(ModuleId.TARGET_VISUALIZER, "绘制骨骼", Type.TOGGLE),
     TARGET_BOX(ModuleId.TARGET_VISUALIZER, "绘制方框", Type.TOGGLE),
@@ -192,6 +194,7 @@ public enum ModuleSetting {
             case BRIDGE_DELAY: return "两次自动搭路放置之间至少等待的 tick 数。数值低更跟手，数值高更稳。";
             case BRIDGE_AVOID_FEET: return "开启后跳过可能与玩家脚部碰撞的放置位置，降低卡脚概率。";
             case ORE_RANGE: return "绘制矿石方框的最大距离。最多 500 格，但只能显示客户端已加载区块。";
+            case ORE_BRIGHTNESS: return "按比例调整所有矿石方框的 RGB 亮度，不改变各矿物的颜色和透明度。";
             case ORE_COUNT_HUD: return "开启后在屏幕角落显示当前范围内已缓存并启用显示的矿物方块数量。";
             case ORE_COUNT_POSITION: return "选择矿物/生物数量 HUD 的屏幕角落位置；两个计数会并列显示。";
             case MELEE_RANGE: return "从玩家眼睛到目标碰撞箱最近点的最大攻击距离，仍受服务端距离检查。";
@@ -225,8 +228,9 @@ public enum ModuleSetting {
             case BLINK_VISUALIZE: return "用红色方框标出闪现攻击本次选中的目标。";
             case BLINK_PRIORITY: return "选择按距离最近或血量最低排列闪现攻击目标。点击切换。";
             case BLINK_ATTACK_POINT: return "选择闪现攻击发包时瞄准目标的部位，用于远端旋转和命中点。";
-            case FLIGHT_MODE: return "切换 WWE Flight 的静态、原版和 Hypixel 三种模式。Hypixel 悬空时保留真实未接地状态；按住潜行会受控下降，高空关闭后仍会控制到真实接触面。生存服是否造成摔落伤害由服务端状态决定。";
-            case FLIGHT_SPEED: return "WWE Flight 的移动速度。静态模式同时用于水平和升降，原版模式会按 WWE 的规则除以 10 后写入飞行速度；受控下降最高为 1 格/tick，并在接近地面时按剩余距离收敛。";
+            case FLIGHT_MODE: return "切换 WWE Flight 的静态和原版模式；按住潜行会受控下降，高空关闭后仍会控制到真实接触面。生存服是否造成摔落伤害由服务端状态决定。";
+            case FLIGHT_SPEED: return "WWE Flight 的水平和上升速度。原版模式会按 WWE 的规则除以 10 后写入飞行速度。";
+            case FLIGHT_DESCENT_SPEED: return "按住潜行或高空关闭 Flight 后的受控下降速度；接近地面时会按剩余距离收敛。";
             case TARGET_RANGE: return "目标骨骼、方框和射线的最大绘制距离，范围为 3 到 500 格。";
             case TARGET_SKELETON: return "按目标实际渲染模型绘制人形、四足、马、蜘蛛等对应骨架。";
             case TARGET_BOX: return "在目标碰撞箱外绘制细线方框。可见目标为绿色，遮挡目标为红色。";

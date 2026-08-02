@@ -42,6 +42,7 @@ public final class ModConfig {
     public static int bridgeDelayTicks;
     public static boolean bridgeAvoidFeet;
     public static double oreVisualizerRange;
+    public static double oreVisualizerBrightness;
     public static boolean oreCountHud;
     private static final EnumMap<OreType, Boolean> oreEnabled = new EnumMap<>(OreType.class);
     private static final EnumMap<OreType, Integer> oreColors = new EnumMap<>(OreType.class);
@@ -80,6 +81,7 @@ public final class ModConfig {
     private static final Set<String> blinkExcludedModEntities = new LinkedHashSet<>();
     public static FlightMode flightMode;
     public static double flightSpeed;
+    public static double flightDescentSpeed;
     public static boolean targetSkeleton;
     public static boolean targetBox;
     public static boolean targetRays;
@@ -151,6 +153,8 @@ public final class ModConfig {
         bridgeAvoidFeet = configuration.getBoolean("avoidFeetCollision", "autoBridge", true, "Skip placements that may intersect the player's feet.");
         oreVisualizerRange = configuration.getFloat("range", "oreVisualizer", 150.0F, 16.0F, 500.0F,
             "Maximum ore visualization distance. Only client-loaded chunks can be scanned.");
+        oreVisualizerBrightness = configuration.getFloat("brightness", "oreVisualizer", 1.0F, 0.0F, 1.0F,
+            "RGB brightness multiplier for ore outlines.");
         oreCountHud = configuration.getBoolean("countHud", "oreVisualizer", false, "Show nearby cached ore count on the HUD.");
         oreEnabled.clear();
         oreColors.clear();
@@ -204,9 +208,15 @@ public final class ModConfig {
         configuration.getCategory("flight").remove("boatPackets");
         configuration.getCategory("flight").remove("verticalSpeed");
         if (legacyFlight) configuration.getCategory("flight").remove("speed");
-        flightMode = FlightMode.fromKey(configuration.getString("mode", "flight", FlightMode.STATIC.key(),
-            "WWE Flight mode: static, vanilla or hypixel."));
+        String configuredFlightMode = configuration.getString("mode", "flight", FlightMode.STATIC.key(),
+            "WWE Flight mode: static or vanilla.");
+        flightMode = FlightMode.fromKey(configuredFlightMode);
+        if (!flightMode.key().equalsIgnoreCase(configuredFlightMode)) {
+            configuration.get("flight", "mode", FlightMode.STATIC.key()).set(flightMode.key());
+        }
         flightSpeed = configuration.getFloat("speed", "flight", 1.0F, 0.0F, 10.0F, "WWE Flight speed.");
+        flightDescentSpeed = configuration.getFloat("descentSpeed", "flight", 0.35F, 0.0F, 1.0F,
+            "Independent controlled descent speed.");
         targetSkeleton = configuration.getBoolean("skeleton", "targetVisualizer", true, "Draw stick-figure skeletons.");
         targetBox = configuration.getBoolean("box", "targetVisualizer", true, "Draw target bounding boxes.");
         targetRays = configuration.getBoolean("rays", "targetVisualizer", false, "Draw lines from the camera to targets.");
@@ -287,6 +297,7 @@ public final class ModConfig {
             case BRIDGE_DOWN_SCAN: return bridgeDownScan;
             case BRIDGE_DELAY: return bridgeDelayTicks;
             case ORE_RANGE: return oreVisualizerRange;
+            case ORE_BRIGHTNESS: return oreVisualizerBrightness;
             case MELEE_RANGE: return meleeRange;
             case MELEE_DELAY: return meleeDelayTicks;
             case MELEE_MAX_TARGETS: return meleeMaxTargets;
@@ -297,6 +308,7 @@ public final class ModConfig {
             case BLINK_DELAY: return blinkDelayTicks;
             case BLINK_MAX_TARGETS: return blinkMaxTargets;
             case FLIGHT_SPEED: return flightSpeed;
+            case FLIGHT_DESCENT_SPEED: return flightDescentSpeed;
             case TARGET_RANGE: return targetVisualizerRange;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }
@@ -345,6 +357,7 @@ public final class ModConfig {
             case BRIDGE_DOWN_SCAN: bridgeDownScan = (int) rounded; saveInt("autoBridge", "downScan", bridgeDownScan); break;
             case BRIDGE_DELAY: bridgeDelayTicks = (int) rounded; saveInt("autoBridge", "delayTicks", bridgeDelayTicks); break;
             case ORE_RANGE: oreVisualizerRange = rounded; saveDouble("oreVisualizer", "range", rounded); break;
+            case ORE_BRIGHTNESS: oreVisualizerBrightness = rounded; saveDouble("oreVisualizer", "brightness", rounded); break;
             case MELEE_RANGE: meleeRange = rounded; saveDouble("meleeAura", "range", rounded); break;
             case MELEE_DELAY: meleeDelayTicks = (int) rounded; saveInt("meleeAura", "delayTicks", meleeDelayTicks); break;
             case MELEE_MAX_TARGETS: meleeMaxTargets = (int) rounded; saveInt("meleeAura", "maxTargets", meleeMaxTargets); break;
@@ -355,6 +368,7 @@ public final class ModConfig {
             case BLINK_DELAY: blinkDelayTicks = (int) rounded; saveInt("blinkStrike", "delayTicks", blinkDelayTicks); break;
             case BLINK_MAX_TARGETS: blinkMaxTargets = (int) rounded; saveInt("blinkStrike", "maxTargets", blinkMaxTargets); break;
             case FLIGHT_SPEED: flightSpeed = rounded; saveDouble("flight", "speed", rounded); break;
+            case FLIGHT_DESCENT_SPEED: flightDescentSpeed = rounded; saveDouble("flight", "descentSpeed", rounded); break;
             case TARGET_RANGE: targetVisualizerRange = rounded; saveDouble("targetVisualizer", "range", rounded); break;
             default: throw new IllegalArgumentException("Setting is not numeric: " + setting);
         }

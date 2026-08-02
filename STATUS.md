@@ -1,74 +1,47 @@
 # Voris Hub Current Status
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Current State
 
-- Version: `1.10.144`
+- Version: `1.10.145`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 102 commits ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 1 commit ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
-- Working tree: child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: control static flight before travel`
-- Coordination commit: `407fcc3 docs: coordinate auto miner audit threads`
-- Previous fix: `08f062c fix: skip unusable auto miner corridor samples`
-- Current round: complete. Do not dispatch additional audit or implementation tasks.
-- Heartbeat automation `voris-hub` remains paused by user request.
+- Working tree after the acceptance commit: existing child audit reports remain untracked under `reports/`
+- Latest accepted change: `fix: stabilize flight blink and ore discovery`
+- Current Codex goal: `019fc144-e3cb-7371-8aea-519a8f355577`
+- Recovered stalled session: `019fc0f7-46b1-7b02-869b-b1406acc1e02`
+- Current round: complete after the local acceptance commit; no push was performed
 
 ## Last Verified Release
 
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 189
+- Tests: 194
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.144.jar`
-- SHA-256: `A0E9DF892FE7A254B0E474B1DDD3F230D1BFFB77A69365EBCF07EDBB0F080B13`
+- Artifact: `build/libs/voris-hub-1.10.145.jar`
+- SHA-256: `2A4F35A5D34EDD653BB72FA6E927542F4575E0C2D0F0D3E7792B797E6A03C04C`
+- Release checks: Forge 1.12.2 metadata, required classes, and Java 8 bytecode passed
 
-## Recently Fixed
+## Accepted Changes
 
-- Static Flight now owns current-tick movement from `InputUpdateEvent`, suppressing vanilla acceleration until movement completes and restoring the user's input at PlayerTick END.
-- AutoMiner scaffold assist now uses scoped synchronized sneak-place behavior, preventing interactive supports from opening a GUI instead of accepting the block.
-- AutoMiner now checks real collision shapes for replaceable route cells and clears colliding layers instead of endlessly replanning through them.
-- AutoMiner now performs its bounded final unreachable-route validation atomically, preventing a route opened mid-pass from receiving a mixed-snapshot 100-tick cooldown.
-- AutoMiner now releases route-owned clearing before either tick phase can damage an obstacle after its loaded ore owner disappears or changes type, while preserving temporarily unloaded targets.
-- Blink now preflights the complete same-tick movement burst, omits unsafe remote critical packets, and refuses ordinary round trips that vanilla would correct before their return path.
-- Blink plans now reject candidate positions that vanilla 1.12.2 would discard under its entity-position distance and entity-eye visibility envelope, while continuing to search viable heights and angles.
-- Blink reachability caches now reset when the player's feet cell or Flight state changes, preventing stale red targets from suppressing valid new routes and stale green targets from outliving their planning context.
-- Hypixel Flight now preserves the collision-derived ground state instead of declaring an airborne player grounded and prematurely settling server-side fall distance.
-- Flight now preserves neutral vertical input when Jump and Sneak are held together.
-- Controlled descent can move at up to 1.0 block per tick and bounds the final step by the measured collision-surface distance.
-- Flight no longer snaps the player to a synthetic landing position or sends an extra grounded position packet.
-- Disabling Flight in midair retains controlled descent until real ground contact or a recognized fall-safe state. Client-side control cannot erase fall distance already accumulated by a survival server, so this is not a server-side no-fall guarantee.
-- Horizontal descent now validates swept head clearance consistently in A*, path validation, and corridor generation.
-- Path-search failure cooldowns are bound to the feet-cell origin and released after the player moves to a new cell.
-- Corridor ray samples now skip allowed-but-unusable early hits and continue to a usable sample.
-- Restarted A* searches now validate exhausted failure snapshots instead of treating them as immediately unreachable.
-- A second stale validation result is deferred instead of adding a reachable ore to the 100-tick failed-route cooldown.
-- Active item use now pauses both START- and END-phase automatic mining work without discarding the locked target.
-- Mining, clearing, and scaffold deadlines are frozen while the player eats, draws a bow, blocks, or uses another item.
+- Flight now exposes only Static and Vanilla modes. Legacy `flight.mode=hypixel` values migrate to and are written back as `static`.
+- Flight has an independent descent speed with default `0.35` and range `0.0`-`1.0`; Static uses it separately from horizontal/ascent speed.
+- Vanilla Flight enables its capability during `InputUpdateEvent` and compensates the later vanilla Sneak subtraction before travel, giving current-tick controlled descent and surface convergence.
+- Blink Strike retains expensive planning across ticks with global limits of 12 target plans, 16 candidates, and 96 collision samples per tick.
+- Incomplete Blink searches remain pending instead of being cached as unreachable; feet-cell and Flight context changes still invalidate planning evidence.
+- AutoMiner's shared ore cache uses the higher discovery budget until an enabled ore marker exists inside `pathRange`, and restores that warm-up after the final in-range marker is removed.
+- Unfinished ore scan tasks advance by scan wave so unstarted chunks are not starved behind a repeatedly resumed nearby chunk.
+- Ore outlines have a shared RGB brightness multiplier with default `1.0` and range `0.0`-`1.0`.
 
-## Known Non-Defects Already Audited
+## Audited Boundaries
 
-- The three-tick mining completion pause is an intentional rollback-confirmation window.
-- `pathIndex == 1` corridor lookback retains one completed node as safety context and has no proven missing-transition defect.
-- `routeCorridorCache` keys include path identity, index, and route start; no stale-cache defect has been proven.
+- Forge 1.12.2 bytecode confirms `InputUpdateEvent` runs before vanilla flight's `motionY -= flySpeed * 3` and before parent travel, validating the Vanilla descent compensation.
+- AutoMiner's three-tick final completion pause remains an intentional rollback-confirmation window; no separate permanent quota, label-order, route-ownership, or completion defect was proven.
+- Blink collision samples are intentionally sliced across ticks. The destination is revalidated before a plan completes; world changes in an already checked route segment remain a residual integration risk, and restoring synchronous whole-route validation would reintroduce the reported client-thread stall.
 
-## Main Thread Acceptance Rule
+## Acceptance Rule
 
-Child reports are hypotheses until the main thread reproduces them with current code, adds a failing regression, applies a minimal fix, runs `AutoMinerTest`, updates version/docs, runs full `clean verifyRelease`, and creates one local commit.
-
-## Active Parallel Audit Threads
-
-- Main acceptance thread: `019f9f53-3e60-77c2-8cd8-200a735687ba` (the only pinned Voris thread)
-- Review heartbeat: automation `voris-hub`, every two minutes, attached to the main thread
-- Thread 01: `019fbc95-4783-7cd3-b136-ac1ec3026422`
-- Thread 02: `019fbc95-8fad-7ff0-a158-3ada819ea97f`
-- Thread 03: `019fbc95-9858-7d73-b1a6-6fff02cfa405`
-- Thread 04: `019fbc95-a250-74f1-8e22-e53c19e78c52`
-- Thread 05: `019fbc95-aa57-7ef0-90ca-35b799b16f7a`
-- Thread 06: `019fbc95-c30d-7e31-8ea4-22bf6a4ae205`
-- Thread 07: `019fbc95-d4af-7480-8b82-8609c4afd026`
-- Thread 08: `019fbc95-baae-7f80-9263-65604b42a88b`
-- Thread 09: `019fbc95-ccfb-7491-aa8a-b0bff2b169fa`
-- Thread 10: `019fbc95-b2b9-7271-b21e-7c86ed2900ba`
+Future source changes should include a focused regression, run the affected test classes, update version and handoff documents, pass full `clean verifyRelease`, and create a local commit. Keep `reports/` untracked unless the user explicitly requests otherwise.
