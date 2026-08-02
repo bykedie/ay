@@ -114,15 +114,19 @@ public final class BlinkStrike {
         double originalMotionZ = mc.player.motionZ;
         boolean originalOnGround = mc.player.onGround;
         int sent = 0;
+        Vec3d remoteEyes = new Vec3d(plan.destination.x,
+            plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
+        float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
         try {
-            for (BlinkPath.Point point : path) {
-                sendPosition(point, transportOnGround);
+            for (int i = 0; i < path.size(); i++) {
+                BlinkPath.Point point = path.get(i);
+                if (i + 1 == path.size()) {
+                    sendPositionRotation(point, rotations[0], rotations[1], transportOnGround);
+                } else {
+                    sendPosition(point, transportOnGround);
+                }
                 sent++;
             }
-            Vec3d remoteEyes = new Vec3d(plan.destination.x,
-                plan.destination.y + mc.player.getEyeHeight(), plan.destination.z);
-            float[] rotations = CombatSupport.rotations(remoteEyes, target, ModConfig.blinkAttackPoint);
-            mc.player.connection.sendPacket(new CPacketPlayer.Rotation(rotations[0], rotations[1], transportOnGround));
             if (critical) sendRemoteCritical(plan.destination);
             mc.player.connection.sendPacket(new CPacketUseEntity(target));
             mc.player.swingArm(EnumHand.MAIN_HAND);
@@ -433,7 +437,6 @@ public final class BlinkStrike {
             if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, point))) return false;
         }
         BlinkPath.Point destination = outward.get(outward.size() - 1);
-        if (!vanillaSameTickMoveAccepted(++ordinal, displacementSq(origin, destination))) return false;
         if (critical) {
             if (!vanillaSameTickMoveAccepted(++ordinal,
                     displacementSq(origin, destination.x, destination.y + 0.0625D, destination.z))) {
@@ -471,8 +474,8 @@ public final class BlinkStrike {
     static List<List<BlinkPath.Point>> routeWaypoints(BlinkPath.Point origin, BlinkPath.Point destination) {
         List<List<BlinkPath.Point>> routes = new ArrayList<>(4);
         routes.add(java.util.Collections.singletonList(destination));
-        addRoute(routes, new BlinkPath.Point(destination.x, origin.y, destination.z), destination);
-        addRoute(routes, new BlinkPath.Point(origin.x, destination.y, origin.z), destination);
+        addRoute(routes, origin, new BlinkPath.Point(destination.x, origin.y, destination.z), destination);
+        addRoute(routes, origin, new BlinkPath.Point(origin.x, destination.y, origin.z), destination);
         double raisedY = Math.max(origin.y, destination.y) + 1.0;
         List<BlinkPath.Point> raised = new ArrayList<>(3);
         raised.add(new BlinkPath.Point(origin.x, raisedY, origin.z));
@@ -482,8 +485,10 @@ public final class BlinkStrike {
         return routes;
     }
 
-    private static void addRoute(List<List<BlinkPath.Point>> routes, BlinkPath.Point waypoint,
-            BlinkPath.Point destination) {
+    private static void addRoute(List<List<BlinkPath.Point>> routes, BlinkPath.Point origin,
+            BlinkPath.Point waypoint, BlinkPath.Point destination) {
+        if (waypoint.distanceTo(origin) <= 0.0001
+                || waypoint.distanceTo(destination) <= 0.0001) return;
         List<BlinkPath.Point> route = new ArrayList<>(2);
         route.add(waypoint);
         if (waypoint.distanceTo(destination) > 0.0001) route.add(destination);
@@ -561,6 +566,12 @@ public final class BlinkStrike {
 
     private void sendPosition(BlinkPath.Point point, boolean onGround) {
         mc.player.connection.sendPacket(new CPacketPlayer.Position(point.x, point.y, point.z, onGround));
+    }
+
+    private void sendPositionRotation(BlinkPath.Point point, float yaw, float pitch,
+            boolean onGround) {
+        mc.player.connection.sendPacket(new CPacketPlayer.PositionRotation(
+            point.x, point.y, point.z, yaw, pitch, onGround));
     }
 
     private boolean remoteCriticalEligible(BlinkPath.Point point, boolean originOnGround) {

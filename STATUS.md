@@ -4,14 +4,13 @@ Last updated: 2026-08-02
 
 ## Current State
 
-- Version: `1.10.145`
+- Version: `1.10.146`
 - Branch: `main`
-- Remote state after the acceptance commit: local branch is 1 commit ahead of `origin/main`
+- Remote state after the acceptance commit: local branch is 2 commits ahead of `origin/main`
 - Push policy: do not push until the user explicitly changes the instruction
 - Working tree after the acceptance commit: existing child audit reports remain untracked under `reports/`
-- Latest accepted change: `fix: stabilize flight blink and ore discovery`
+- Latest accepted change: `fix: restore distant blink strikes`
 - Current Codex goal: `019fc144-e3cb-7371-8aea-519a8f355577`
-- Recovered stalled session: `019fc0f7-46b1-7b02-869b-b1406acc1e02`
 - Current round: complete after the local acceptance commit; no push was performed
 
 ## Last Verified Release
@@ -19,14 +18,17 @@ Last updated: 2026-08-02
 - Command: `.\gradlew.bat clean verifyRelease --rerun-tasks --no-daemon --console=plain --stacktrace`
 - Result: successful
 - Test classes: 17
-- Tests: 194
+- Tests: 196
 - Failures/errors/skipped: 0/0/0
-- Artifact: `build/libs/voris-hub-1.10.145.jar`
-- SHA-256: `2A4F35A5D34EDD653BB72FA6E927542F4575E0C2D0F0D3E7792B797E6A03C04C`
+- Artifact: `build/libs/voris-hub-1.10.146.jar`
+- SHA-256: `471DDA52F753A10561B09C8581AA08F071E45F238D63E5D65FEA854DB52AD19C`
 - Release checks: Forge 1.12.2 metadata, required classes, and Java 8 bytecode passed
 
 ## Accepted Changes
 
+- Blink's final outward position now carries the remote yaw and pitch in one `PositionRotation` packet instead of sending a separate remote rotation movement packet.
+- The complete-burst preflight now matches that packet sequence, restoring safe four-step distant round trips while retaining rejection for genuinely unsafe fifth-outward-packet excursions.
+- Same-height dogleg routes that collapse to the direct route are removed before collision sampling, preserving the 12/16/96 per-tick planning limits for distinct route evidence.
 - Flight now exposes only Static and Vanilla modes. Legacy `flight.mode=hypixel` values migrate to and are written back as `static`.
 - Flight has an independent descent speed with default `0.35` and range `0.0`-`1.0`; Static uses it separately from horizontal/ascent speed.
 - Vanilla Flight enables its capability during `InputUpdateEvent` and compensates the later vanilla Sneak subtraction before travel, giving current-tick controlled descent and surface convergence.
@@ -41,6 +43,7 @@ Last updated: 2026-08-02
 - Forge 1.12.2 bytecode confirms `InputUpdateEvent` runs before vanilla flight's `motionY -= flySpeed * 3` and before parent travel, validating the Vanilla descent compensation.
 - AutoMiner's three-tick final completion pause remains an intentional rollback-confirmation window; no separate permanent quota, label-order, route-ownership, or completion defect was proven.
 - Blink collision samples are intentionally sliced across ticks. The destination is revalidated before a plan completes; world changes in an already checked route segment remain a residual integration risk, and restoring synchronous whole-route validation would reintroduce the reported client-thread stall.
+- Forge 1.12.2 `processPlayer` bytecode confirms `PositionRotation` consumes one movement packet and applies its coordinates and yaw/pitch together, matching the corrected Blink preflight model.
 
 ## Acceptance Rule
 

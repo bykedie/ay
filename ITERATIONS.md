@@ -915,3 +915,11 @@
 - Iteration 3: retained Blink candidate and collision planning across ticks with hard global budgets, while leaving incomplete searches uncached instead of marking them unreachable.
 - Iteration 4: made unfinished ore scans yield by scan wave and kept AutoMiner's high discovery budget active until an enabled marker exists inside `pathRange`, including after the final known marker is removed.
 - Iteration 5: added a shared ore-outline brightness multiplier and covered configuration migration, flight timing, Blink budgets, scan warm-up, scan fairness, and color scaling with focused regressions.
+
+## Version 1.10.146 Distant Blink Strike Regression Update
+
+- Iteration 1: reproduced a visible target fifteen blocks away producing four outward packets that were rejected only because remote rotation was modeled as a redundant sixth movement packet.
+- Iteration 2: moved remote yaw and pitch onto the final outward `PositionRotation` packet so the server receives the same attack orientation without an extra packet-count transition.
+- Iteration 3: aligned the complete-burst preflight with the actual packet sequence while retaining rejection for genuinely unsafe fifth-outward-packet excursions.
+- Iteration 4: removed same-height dogleg routes that collapse to the direct route and otherwise consume repeated collision samples before a useful alternative route.
+- Iteration 5: retained the 12 target-plan, 16 candidate, and 96 collision-sample per-tick budgets and added focused distant-target and route-deduplication regressions.

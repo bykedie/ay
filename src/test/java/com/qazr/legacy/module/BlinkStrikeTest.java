@@ -40,6 +40,17 @@ public class BlinkStrikeTest {
     }
 
     @Test
+    public void sameHeightTargetsDoNotRepeatTheDirectRoute() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = new BlinkPath.Point(12.0, 64.0, 0.0);
+        List<List<BlinkPath.Point>> routes = BlinkStrike.routeWaypoints(origin, destination);
+
+        assertEquals(2, routes.size());
+        assertEquals(1, routes.get(0).size());
+        assertEquals(3, routes.get(1).size());
+    }
+
+    @Test
     public void buildsEveryDoglegSegmentWithBoundedPacketSteps() {
         BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
         BlinkPath.Point destination = new BlinkPath.Point(8.0, 58.0, 0.0);
@@ -201,13 +212,29 @@ public class BlinkStrikeTest {
     }
 
     @Test
-    public void rejectsUnsafeOrdinaryRoundTripBeforeSendingIt() {
+    public void acceptsAVisibleTargetFifteenBlocksAwayWithTheDefaultStep() {
         BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
-        BlinkPath.Point destination = new BlinkPath.Point(12.0, 64.0, 0.0);
+        BlinkPath.Point destination = BlinkStrike
+            .candidatePositions(origin, 15.0, 64.0, 0.0, 2.5).get(0);
         List<BlinkPath.Point> outward = BlinkStrike.buildPath(origin,
-            java.util.Collections.singletonList(destination), 3.0);
+            java.util.Collections.singletonList(destination), 4.0);
 
+        assertEquals(13.2, destination.x, 0.0001);
         assertEquals(4, outward.size());
+        assertEquals(true, BlinkStrike.remoteMovementPlanAccepted(
+            origin, outward, false, 1));
+    }
+
+    @Test
+    public void stillRejectsAnExcursionWhoseFifthOutwardPacketIsTooFar() {
+        BlinkPath.Point origin = new BlinkPath.Point(0.0, 64.0, 0.0);
+        BlinkPath.Point destination = BlinkStrike
+            .candidatePositions(origin, 20.0, 64.0, 0.0, 2.5).get(0);
+        List<BlinkPath.Point> outward = BlinkStrike.buildPath(origin,
+            java.util.Collections.singletonList(destination), 4.0);
+
+        assertEquals(18.2, destination.x, 0.0001);
+        assertEquals(5, outward.size());
         assertEquals(false, BlinkStrike.remoteMovementPlanAccepted(
             origin, outward, false, 1));
     }
